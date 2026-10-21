@@ -1,6 +1,6 @@
-# OpsDesk Platform Lab
+# Request Tracker
 
-OpsDesk is a service-request management application used to practise the full software development lifecycle: requirements, maintainable application code, automated testing, container builds, Kubernetes deployment, progressive delivery, observability, security, and recovery.
+Request Tracker is a service-request management application used to practise the full software development lifecycle: requirements, maintainable application code, automated testing, container builds, Kubernetes deployment, progressive delivery, observability, security, and recovery.
 
 **Project status:** Initial repository setup. Application functionality and platform capabilities will be marked complete only after they are implemented and tested.
 

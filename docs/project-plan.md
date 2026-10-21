@@ -17,7 +17,7 @@ The repository is also a learning record. Each completed milestone should have r
 
 ## Planned application
 
-OpsDesk is a service-request management system for a small organization. Employees can submit a request; support staff can review, assign, prioritize, update, and resolve it. Changes to important request fields should be traceable.
+Request Tracker is a service-request management system for a small organization. Employees can submit a request; support staff can review, assign, prioritize, update, and resolve it. Changes to important request fields should be traceable.
 
 The initial backend will be Java 21 with Spring Boot and PostgreSQL. A TypeScript frontend will be added after the first end-to-end API slice is working. Database schema changes will use migrations.
 
