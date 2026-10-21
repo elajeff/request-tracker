@@ -1,0 +1,26 @@
+name: Feature or improvement
+description: Propose a small, testable change.
+title: ""
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or motivation
+      description: What needs to improve, and why?
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: List observable outcomes that prove the task is complete.
+      placeholder: "- [ ] ..."
+    validations:
+      required: true
+  - type: textarea
+    id: constraints
+    attributes:
+      label: Constraints and risks
+      description: Relevant compatibility, security, data, or operational considerations.
+    validations:
+      required: false

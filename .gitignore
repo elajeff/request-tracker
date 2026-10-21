@@ -1,0 +1,26 @@
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+
+# Java / Maven / Gradle
+target/
+build/
+.gradle/
+
+# Frontend dependencies and build output
+node_modules/
+dist/
+
+# IDE and local files
+.idea/
+.vscode/
+*.iml
+*.log
+.DS_Store
+Thumbs.db
+
+# Local Kubernetes state and test artifacts
+.terraform/
+coverage/
+test-results/

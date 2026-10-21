@@ -1,0 +1,31 @@
+name: Bug report
+description: Report a reproducible defect.
+title: "bug: "
+body:
+  - type: textarea
+    id: observed
+    attributes:
+      label: Observed behavior
+      description: What happened?
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Reproduction steps
+      description: Include relevant commands, logs, and environment details. Redact secrets.
+    validations:
+      required: true
+  - type: textarea
+    id: impact
+    attributes:
+      label: Impact and scope
+      description: Who or what is affected? Is there a workaround?
+    validations:
+      required: false
