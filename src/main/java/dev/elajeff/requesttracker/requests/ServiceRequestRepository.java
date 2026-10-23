@@ -40,6 +40,14 @@ public class ServiceRequestRepository {
                 priority.name());
     }
 
+    public boolean updateDetails(UUID id, String title, String description) {
+        return jdbcTemplate.update("""
+                UPDATE service_requests
+                SET title = ?, description = ?
+                WHERE id = ?
+                """, title, description, id) == 1;
+    }
+
     public boolean updateStatus(UUID id, ServiceRequestStatus status) {
         return jdbcTemplate.update("""
                 UPDATE service_requests
