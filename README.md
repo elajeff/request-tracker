@@ -118,7 +118,7 @@ PostgreSQL data is stored in a named Docker volume and remains after stopping th
 
 ## Development workflow
 
-Work is tracked in GitHub Issues, implemented on short-lived branches, and submitted through pull requests with a summary, actual verification results, and risk/rollback notes. Keep changes small and avoid claiming checks have passed unless they were run.
+Project work is tracked through GitHub Issues. Changes are developed on short-lived branches and submitted through pull requests that summarize the change, report the verification performed, and describe relevant risks and rollback considerations.
 
 ## License
 
