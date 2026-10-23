@@ -41,7 +41,7 @@ kubectl create secret generic request-tracker-db `
 
 if ($LASTEXITCODE -ne 0) { throw "Could not create database Secret." }
 Remove-Variable rng, bytes, dbPassword -ErrorAction SilentlyContinue
-
+```
 
 Install or upgrade the Helm release:
 
