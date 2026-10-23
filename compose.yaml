@@ -15,5 +15,17 @@ services:
       timeout: 3s
       retries: 10
 
+  app:
+    build: .
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/request_tracker
+      SPRING_DATASOURCE_USERNAME: request_tracker
+      SPRING_DATASOURCE_PASSWORD: request_tracker
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
 volumes:
   postgres-data:
