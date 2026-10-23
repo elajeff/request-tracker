@@ -8,6 +8,7 @@ import jakarta.validation.Valid;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -42,5 +43,12 @@ public class ServiceRequestController {
     @GetMapping("/{id}")
     public ServiceRequest findById(@PathVariable UUID id) {
         return service.findById(id);
+    }
+
+    @PatchMapping("/{id}/status")
+    public ServiceRequest updateStatus(
+            @PathVariable UUID id,
+            @Valid @RequestBody UpdateServiceRequestStatusRequest request) {
+        return service.updateStatus(id, request.status());
     }
 }
