@@ -1,4 +1,4 @@
-﻿# Local Kubernetes deployment with kind
+# Local Kubernetes deployment with kind
 
 Request Tracker runs as a frontend, Spring Boot API, and PostgreSQL in a local kind cluster. Its database volume is separate from the Docker Compose database.
 
@@ -24,7 +24,24 @@ Build and load both images:
     helm lint .\helm\request-tracker
     kubectl create namespace request-tracker --dry-run=client -o yaml | kubectl apply -f -
 
-On a fresh installation, create the `request-tracker-db` Secret with a random password. Do not replace it for an existing database unless you also change the PostgreSQL user's password.
+For a fresh installation, create the database Secret with a randomly generated password. This command does not print the password or save it in the repository:
+
+```powershell
+$rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+$bytes = New-Object byte[] 32
+$rng.GetBytes($bytes)
+$dbPassword = [BitConverter]::ToString($bytes).Replace("-", "").ToLowerInvariant()
+$rng.Dispose()
+
+kubectl create secret generic request-tracker-db `
+    --namespace request-tracker `
+    --from-literal=username=request_tracker `
+    "--from-literal=password=$dbPassword" `
+    --dry-run=client -o yaml | kubectl apply -f -
+
+if ($LASTEXITCODE -ne 0) { throw "Could not create database Secret." }
+Remove-Variable rng, bytes, dbPassword -ErrorAction SilentlyContinue
+
 
 Install or upgrade the Helm release:
 
