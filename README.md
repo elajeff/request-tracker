@@ -24,9 +24,22 @@ These are roadmap items, not claims that the capabilities already exist. See [`d
 
 We use GitHub Issues to define small tasks and acceptance criteria. Work is done on short-lived branches, then submitted as pull requests with a summary, test evidence, and risk/rollback notes. Automated checks will be required as they are introduced. Changes are not described as tested unless the checks were actually run.
 
+## Run and test the backend locally
+
+Requires Java 21. The Maven Wrapper downloads the pinned Maven distribution on first use, and Maven downloads dependencies from Maven Central; an internet connection is needed for the initial build.
+
+From the repository root in PowerShell:
+
+```powershell
+.\mvnw.cmd --batch-mode --no-transfer-progress verify
+.\mvnw.cmd spring-boot:run
+```
+
+The health endpoint is available at <http://localhost:8080/actuator/health>. Only the health endpoint is exposed over HTTP at this stage. Liveness and readiness health groups are enabled for later Kubernetes probes.
+
 ## Current state
 
-The repository currently contains project planning and contribution templates. The first implementation task is tracked in GitHub Issues.
+The initial backend provides a Spring Boot application and Actuator health endpoint. The related integration test and CI workflow are part of the first implementation slice; their verification results will be recorded in the pull request.
 
 ## License
 
