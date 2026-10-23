@@ -99,3 +99,37 @@ Work is tracked in GitHub Issues, implemented on short-lived branches, and submi
 ## License
 
 No license has been selected yet. Until one is added, do not assume that the source is licensed for reuse.
+
+## Web dashboard (development)
+
+The frontend uses TypeScript and Vite and connects to the Spring Boot API through a development proxy.
+
+Prerequisites: Java 21, Docker Desktop, and Node.js.
+
+1. Start PostgreSQL from the project directory:
+
+   ```powershell
+   docker compose up -d --wait postgres
+   ```
+
+2. Start Spring Boot from the project directory in a terminal dedicated to the backend:
+
+   ```powershell
+   .\mvnw.cmd spring-boot:run
+   ```
+
+3. Start the frontend from the project directory in a separate terminal:
+
+   ```powershell
+   npm.cmd ci --prefix frontend
+   npm.cmd run dev --prefix frontend
+   ```
+
+4. Open `http://127.0.0.1:5173`.
+
+To build the frontend, run from the project directory:
+
+```powershell
+npm.cmd ci --prefix frontend
+npm.cmd run build --prefix frontend
+```
