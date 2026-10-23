@@ -2,7 +2,7 @@
 
 Request Tracker is a service-request management application used to practise the full software development lifecycle: maintainable application code, automated testing, container builds, Kubernetes deployment, progressive delivery, observability, security, and recovery.
 
-**Current functionality:** a Java 21 / Spring Boot API backed by PostgreSQL, plus a TypeScript/Vite dashboard for creating, searching, editing, and updating service requests. Container/Kubernetes deployment and operational platform capabilities remain planned until implemented.
+**Current functionality:** a Java 21 / Spring Boot API backed by PostgreSQL, plus a TypeScript/Vite dashboard for creating, searching, editing, and updating service requests. Docker Compose runs the backend and PostgreSQL together; Kubernetes and operational platform capabilities remain planned.
 
 ## Application
 
@@ -25,12 +25,28 @@ A new request has a title, description, UUID, creation timestamp, and `NEW` stat
 - Java 21, Spring Boot, PostgreSQL, JDBC, and Flyway migrations.
 - A TypeScript/Vite dashboard with a development proxy to the Spring Boot API.
 - Reproducible local development with Docker Compose.
-- CI with GitHub Actions for backend verification and frontend builds; container image builds remain planned.
+- CI with GitHub Actions for backend verification, frontend builds, and container image builds.
 - Kubernetes deployment using `kind`, then selected exercises on k3s and RKE2.
 - Helm, Argo CD, Argo Rollouts, Prometheus, and Grafana.
 - Security checks, backup/restore exercises, incident runbooks, and a small custom Kubernetes controller.
 
 These roadmap items are not claims that the capabilities already exist. See [`docs/project-plan.md`](docs/project-plan.md).
+
+## Run with Docker Compose
+
+Requires Docker Desktop with Docker Compose.
+
+Start the backend and PostgreSQL:
+
+    docker compose up --build -d --wait
+
+The API is available at http://localhost:8080.
+Check http://localhost:8080/actuator/health for health status.
+
+View backend logs with `docker compose logs -f app`.
+Stop the containers with `docker compose down`.
+PostgreSQL data remains in its named volume.
+Running `docker compose down -v` deletes that data.
 
 ## Run locally
 
