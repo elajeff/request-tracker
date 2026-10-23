@@ -752,3 +752,28 @@ h1 {
     gap: 6px;
   }
 }
+
+/* Inline request detail editor */
+.request-edit-button {
+  margin-top: 12px;
+}
+
+.request-edit-form {
+  display: grid;
+  gap: 12px;
+  margin-top: 12px;
+  padding: 16px;
+  border: 1px solid #dce3ee;
+  border-radius: 12px;
+  background: #f8fafc;
+}
+
+.request-edit-form[hidden] {
+  display: none;
+}
+
+.edit-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}

@@ -56,6 +56,35 @@ class ServiceRequestIntegrationTest {
     }
 
     @Test
+    void requestDetailsCanBeEditedAndPersisted() throws Exception {
+        String id = createRequestAndGetId();
+        String title = "Updated request " + UUID.randomUUID();
+        String description = "Updated description.";
+
+        HttpResponse<String> updated = put(
+                "/api/requests/" + id,
+                "{\"title\":\"" + title
+                        + "\",\"description\":\"" + description + "\"}");
+
+        assertEquals(200, updated.statusCode());
+        assertTrue(updated.body().contains(title), updated.body());
+        assertTrue(updated.body().contains(description), updated.body());
+
+        HttpResponse<String> retrieved = get("/api/requests/" + id);
+        assertTrue(retrieved.body().contains(title), retrieved.body());
+        assertTrue(retrieved.body().contains(description), retrieved.body());
+
+        HttpResponse<String> invalid = put(
+                "/api/requests/" + id,
+                "{\"title\":\"   \",\"description\":\"Valid description.\"}");
+        assertEquals(400, invalid.statusCode());
+
+        HttpResponse<String> missing = put(
+                "/api/requests/" + UUID.randomUUID(),
+                "{\"title\":\"Missing request\",\"description\":\"Valid description.\"}");
+        assertEquals(404, missing.statusCode());
+    }
+    @Test
     void priorityCanBeSetAndUpdated() throws Exception {
         String title = "Urgent access " + UUID.randomUUID();
         String json = "{\"title\":\"" + title
@@ -181,6 +210,17 @@ class ServiceRequestIntegrationTest {
                 .timeout(Duration.ofSeconds(5))
                 .header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(json))
+                .build();
+
+        return CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+    }
+
+    private HttpResponse<String> put(String path, String json) throws Exception {
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create("http://127.0.0.1:" + port + path))
+                .timeout(Duration.ofSeconds(5))
+                .header("Content-Type", "application/json")
+                .PUT(HttpRequest.BodyPublishers.ofString(json))
                 .build();
 
         return CLIENT.send(request, HttpResponse.BodyHandlers.ofString());

@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -44,6 +45,13 @@ public class ServiceRequestController {
     @GetMapping("/{id}")
     public ServiceRequest findById(@PathVariable UUID id) {
         return service.findById(id);
+    }
+
+    @PutMapping("/{id}")
+    public ServiceRequest updateDetails(
+            @PathVariable UUID id,
+            @Valid @RequestBody UpdateServiceRequestDetailsRequest request) {
+        return service.updateDetails(id, request.title(), request.description());
     }
 
     @PatchMapping("/{id}/status")

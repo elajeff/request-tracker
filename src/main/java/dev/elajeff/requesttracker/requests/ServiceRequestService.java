@@ -33,6 +33,25 @@ public class ServiceRequestService {
                 .orElseThrow(() -> new ServiceRequestNotFoundException(id));
     }
 
+    public ServiceRequest updateDetails(UUID id, String title, String description) {
+        ServiceRequest current = findById(id);
+        String updatedTitle = title.strip();
+        String updatedDescription = description.strip();
+
+        if (current.title().equals(updatedTitle)
+                && current.description().equals(updatedDescription)) {
+            return current;
+        }
+
+        if (!repository.updateDetails(id, updatedTitle, updatedDescription)) {
+            throw new ServiceRequestNotFoundException(id);
+        }
+
+        return new ServiceRequest(
+                current.id(), updatedTitle, updatedDescription,
+                current.status(), current.priority(), current.createdAt());
+    }
+
     public ServiceRequest updateStatus(UUID id, ServiceRequestStatus status) {
         ServiceRequest current = findById(id);
 

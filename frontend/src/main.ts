@@ -193,6 +193,102 @@ function createRequestCard(request: ServiceRequest): HTMLElement {
 
   meta.append(created, fullId);
 
+  const editButton = document.createElement("button");
+  editButton.type = "button";
+  editButton.className = "button button-secondary request-edit-button";
+  editButton.textContent = "Edit details";
+  editButton.setAttribute("aria-label", `Edit details for ${request.title}`);
+
+  const editForm = document.createElement("form");
+  editForm.className = "request-edit-form";
+  editForm.hidden = true;
+
+  const editTitleField = document.createElement("label");
+  editTitleField.className = "form-field";
+  const editTitleLabel = document.createElement("span");
+  editTitleLabel.textContent = "Title";
+  const editTitle = document.createElement("input");
+  editTitle.type = "text";
+  editTitle.maxLength = 120;
+  editTitle.required = true;
+  editTitle.value = request.title;
+  editTitleField.append(editTitleLabel, editTitle);
+
+  const editDescriptionField = document.createElement("label");
+  editDescriptionField.className = "form-field";
+  const editDescriptionLabel = document.createElement("span");
+  editDescriptionLabel.textContent = "Description";
+  const editDescription = document.createElement("textarea");
+  editDescription.rows = 3;
+  editDescription.maxLength = 2000;
+  editDescription.required = true;
+  editDescription.value = request.description;
+  editDescriptionField.append(editDescriptionLabel, editDescription);
+
+  const editActions = document.createElement("div");
+  editActions.className = "edit-actions";
+
+  const saveButton = document.createElement("button");
+  saveButton.type = "submit";
+  saveButton.className = "button button-primary";
+  saveButton.textContent = "Save changes";
+
+  const cancelButton = document.createElement("button");
+  cancelButton.type = "button";
+  cancelButton.className = "button button-secondary";
+  cancelButton.textContent = "Cancel";
+
+  editActions.append(saveButton, cancelButton);
+  editForm.append(editTitleField, editDescriptionField, editActions);
+
+  editButton.addEventListener("click", () => {
+    editTitle.value = request.title;
+    editDescription.value = request.description;
+    editForm.hidden = false;
+    editButton.hidden = true;
+    editTitle.focus();
+  });
+
+  cancelButton.addEventListener("click", () => {
+    editForm.reset();
+    editForm.hidden = true;
+    editButton.hidden = false;
+  });
+
+  editForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+
+    const title = editTitle.value.trim();
+    const description = editDescription.value.trim();
+
+    if (!title || !description) {
+      showNotice("Enter both a title and a description.", "error");
+      return;
+    }
+
+    saveButton.disabled = true;
+    saveButton.textContent = "Saving…";
+
+    try {
+      const updated = await api<ServiceRequest>(
+        `/api/requests/${request.id}`,
+        {
+          method: "PUT",
+          body: JSON.stringify({ title, description })
+        }
+      );
+
+      requests = requests.map((item) => item.id === updated.id ? updated : item);
+      renderRequests();
+      showNotice("Request details updated.", "success");
+    } catch (error) {
+      showNotice(`Could not update request: ${errorMessage(error)}`, "error");
+    } finally {
+      saveButton.disabled = false;
+      saveButton.textContent = "Save changes";
+    }
+  });
+
   const controls = document.createElement("div");
   controls.className = "request-controls";
 
@@ -261,7 +357,7 @@ function createRequestCard(request: ServiceRequest): HTMLElement {
   });
 
   controls.append(statusControl.field, priorityControl.field);
-  card.append(headingRow, description, meta, controls);
+  card.append(headingRow, description, meta, editButton, editForm, controls);
 
   return card;
 }

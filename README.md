@@ -2,17 +2,20 @@
 
 Request Tracker is a service-request management application used to practise the full software development lifecycle: maintainable application code, automated testing, container builds, Kubernetes deployment, progressive delivery, observability, security, and recovery.
 
-**Current functionality:** a Java 21 / Spring Boot backend with a health endpoint and a PostgreSQL-backed service-request API. The frontend and operational platform capabilities remain planned until implemented.
+**Current functionality:** a Java 21 / Spring Boot API backed by PostgreSQL, plus a TypeScript/Vite dashboard for creating, searching, editing, and updating service requests. Container/Kubernetes deployment and operational platform capabilities remain planned until implemented.
 
 ## Application
 
-Employees can submit service requests. Support staff will be able to review, assign, prioritize, update, and resolve them, with a clear history of changes.
+Employees can submit service requests. The dashboard supports searching the queue, editing titles and descriptions, changing priority, and advancing status from `NEW` to `IN_PROGRESS` to `RESOLVED`. Assignment and change history remain future work.
 
 Implemented API:
 
 - `POST /api/requests` — create a request.
 - `GET /api/requests` — list requests, newest first.
 - `GET /api/requests/{id}` — retrieve a request by UUID.
+- `PUT /api/requests/{id}` — update a request title and description.
+- `PATCH /api/requests/{id}/status` — advance request status.
+- `PATCH /api/requests/{id}/priority` — update request priority.
 - `GET /actuator/health` — application health.
 
 A new request has a title, description, UUID, creation timestamp, and `NEW` status. Titles must be 1–120 characters and descriptions 1–2000 characters. This initial API has no authentication and is intended for local development, not public deployment.
@@ -20,9 +23,9 @@ A new request has a title, description, UUID, creation timestamp, and `NEW` stat
 ## Technology and roadmap
 
 - Java 21, Spring Boot, PostgreSQL, JDBC, and Flyway migrations.
-- A TypeScript frontend after the API behavior stabilizes.
+- A TypeScript/Vite dashboard with a development proxy to the Spring Boot API.
 - Reproducible local development with Docker Compose.
-- CI with GitHub Actions and container image builds.
+- CI with GitHub Actions for backend verification and frontend builds; container image builds remain planned.
 - Kubernetes deployment using `kind`, then selected exercises on k3s and RKE2.
 - Helm, Argo CD, Argo Rollouts, Prometheus, and Grafana.
 - Security checks, backup/restore exercises, incident runbooks, and a small custom Kubernetes controller.
