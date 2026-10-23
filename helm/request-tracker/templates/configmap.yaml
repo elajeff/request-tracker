@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: request-tracker-config
+data:
+  SPRING_DATASOURCE_URL: {{ printf "jdbc:postgresql://request-tracker-postgresql:5432/%s" .Values.postgresql.database | quote }}
+  SPRING_FLYWAY_ENABLED: "true"
+  MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: "health"
+  MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED: "true"

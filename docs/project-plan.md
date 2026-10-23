@@ -55,9 +55,9 @@ The initial backend will be Java 21 with Spring Boot and PostgreSQL. A TypeScrip
 
 ### 4. Kubernetes with kind and Helm
 
-- Create a local `kind` cluster and deploy via Helm.
-- Configure probes, requests/limits, configuration, Services, and least-privilege service accounts.
-- Test rollout, restart, configuration error, and database connectivity scenarios.
+- [x] Deploy the frontend, API, and PostgreSQL to local `kind` through Helm.
+- [x] Configure probes, resource limits, Services, persistent storage, ConfigMap/Secret configuration, and a ServiceAccount without API-token automount.
+- [ ] Exercise restart, configuration-error, and database-connectivity failure/recovery scenarios.
 
 ### 5. Observability and progressive delivery
 
