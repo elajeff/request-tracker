@@ -2,7 +2,7 @@
 
 Request Tracker is a service-request management application used to practise the full software development lifecycle: maintainable application code, automated testing, container builds, Kubernetes deployment, progressive delivery, observability, security, and recovery.
 
-**Current functionality:** a Java 21 / Spring Boot API backed by PostgreSQL, plus a TypeScript/Vite dashboard for creating, searching, editing, and updating service requests. Docker Compose runs the backend and PostgreSQL together; Kubernetes and operational platform capabilities remain planned.
+**Current functionality:** a Java 21 / Spring Boot API backed by PostgreSQL, plus a TypeScript/Vite dashboard for creating, searching, editing, and updating service requests. Docker Compose and Helm support local deployment; monitoring and progressive delivery remain planned.
 
 ## Application
 
@@ -26,7 +26,8 @@ A new request has a title, description, UUID, creation timestamp, and `NEW` stat
 - A TypeScript/Vite dashboard with a development proxy to the Spring Boot API.
 - Reproducible local development with Docker Compose.
 - CI with GitHub Actions for backend verification, frontend builds, and container image builds.
-- Kubernetes deployment using `kind`, then selected exercises on k3s and RKE2.
+- Helm deployment to local `kind`, with probes, resource limits, persistent PostgreSQL storage, ConfigMap/Secret configuration, and a ServiceAccount without API-token automount.
+- Further deployment and recovery exercises on `kind`, then k3s and RKE2.
 - Helm, Argo CD, Argo Rollouts, Prometheus, and Grafana.
 - Security checks, backup/restore exercises, incident runbooks, and a small custom Kubernetes controller.
 
@@ -47,6 +48,10 @@ View backend logs with `docker compose logs -f app`.
 Stop the containers with `docker compose down`.
 PostgreSQL data remains in its named volume.
 Running `docker compose down -v` deletes that data.
+
+## Deploy to Kubernetes with kind
+
+See [the local Kubernetes guide](docs/kind-deployment.md) for deployment, verification, dashboard access, and cleanup. Kubernetes has a database volume separate from Docker Compose.
 
 ## Run locally
 
