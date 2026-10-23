@@ -28,7 +28,8 @@ public class ServiceRequestController {
     @PostMapping
     public ResponseEntity<ServiceRequest> create(
             @Valid @RequestBody CreateServiceRequestRequest request) {
-        ServiceRequest created = service.create(request.title(), request.description());
+        ServiceRequest created = service.create(
+                request.title(), request.description(), request.priority());
 
         return ResponseEntity.created(
                 URI.create("/api/requests/" + created.id()))
@@ -50,5 +51,12 @@ public class ServiceRequestController {
             @PathVariable UUID id,
             @Valid @RequestBody UpdateServiceRequestStatusRequest request) {
         return service.updateStatus(id, request.status());
+    }
+
+    @PatchMapping("/{id}/priority")
+    public ServiceRequest updatePriority(
+            @PathVariable UUID id,
+            @Valid @RequestBody UpdateServiceRequestPriorityRequest request) {
+        return service.updatePriority(id, request.priority());
     }
 }

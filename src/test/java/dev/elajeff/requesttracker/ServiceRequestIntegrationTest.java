@@ -37,6 +37,7 @@ class ServiceRequestIntegrationTest {
         assertEquals(201, created.statusCode());
         assertTrue(created.body().contains(title), created.body());
         assertTrue(created.body().contains("\"status\":\"NEW\""), created.body());
+        assertTrue(created.body().contains("\"priority\":\"MEDIUM\""), created.body());
 
         var matcher = ID_PATTERN.matcher(created.body());
         assertTrue(matcher.find(), created.body());
@@ -55,10 +56,40 @@ class ServiceRequestIntegrationTest {
     }
 
     @Test
+    void priorityCanBeSetAndUpdated() throws Exception {
+        String title = "Urgent access " + UUID.randomUUID();
+        String json = "{\"title\":\"" + title
+                + "\",\"description\":\"Access needed.\",\"priority\":\"HIGH\"}";
+
+        HttpResponse<String> created = post("/api/requests", json);
+        assertEquals(201, created.statusCode());
+        assertTrue(created.body().contains("\"priority\":\"HIGH\""), created.body());
+
+        var matcher = ID_PATTERN.matcher(created.body());
+        assertTrue(matcher.find(), created.body());
+        String id = matcher.group(1);
+
+        HttpResponse<String> updated = patch(
+                "/api/requests/" + id + "/priority",
+                "{\"priority\":\"LOW\"}");
+
+        assertEquals(200, updated.statusCode());
+        assertTrue(updated.body().contains("\"priority\":\"LOW\""), updated.body());
+
+        HttpResponse<String> retrieved = get("/api/requests/" + id);
+        assertTrue(retrieved.body().contains("\"priority\":\"LOW\""), retrieved.body());
+
+        HttpResponse<String> invalid = patch(
+                "/api/requests/" + id + "/priority",
+                "{\"priority\":\"URGENT\"}");
+
+        assertEquals(400, invalid.statusCode());
+    }
+
+    @Test
     void statusMovesForwardAndIsPersisted() throws Exception {
         String id = createRequestAndGetId();
 
-        // A request cannot skip directly from NEW to RESOLVED.
         assertEquals(400, patch("/api/requests/" + id + "/status",
                 "{\"status\":\"RESOLVED\"}").statusCode());
 
@@ -127,7 +158,6 @@ class ServiceRequestIntegrationTest {
                 + "\",\"description\":\"Status update test.\"}";
 
         HttpResponse<String> created = post("/api/requests", json);
-
         assertEquals(201, created.statusCode());
 
         var matcher = ID_PATTERN.matcher(created.body());

@@ -16,8 +16,12 @@ public class ServiceRequestService {
         this.repository = repository;
     }
 
-    public ServiceRequest create(String title, String description) {
-        return repository.create(title.strip(), description.strip());
+    public ServiceRequest create(
+            String title, String description, ServiceRequestPriority priority) {
+        ServiceRequestPriority selectedPriority =
+                priority == null ? ServiceRequestPriority.MEDIUM : priority;
+
+        return repository.create(title.strip(), description.strip(), selectedPriority);
     }
 
     public List<ServiceRequest> findAll() {
@@ -32,7 +36,6 @@ public class ServiceRequestService {
     public ServiceRequest updateStatus(UUID id, ServiceRequestStatus status) {
         ServiceRequest current = findById(id);
 
-        // Repeating the current status is a harmless no-op.
         if (current.status() == status) {
             return current;
         }
@@ -54,10 +57,23 @@ public class ServiceRequestService {
         }
 
         return new ServiceRequest(
-                current.id(),
-                current.title(),
-                current.description(),
-                status,
-                current.createdAt());
+                current.id(), current.title(), current.description(),
+                status, current.priority(), current.createdAt());
+    }
+
+    public ServiceRequest updatePriority(UUID id, ServiceRequestPriority priority) {
+        ServiceRequest current = findById(id);
+
+        if (current.priority() == priority) {
+            return current;
+        }
+
+        if (!repository.updatePriority(id, priority)) {
+            throw new ServiceRequestNotFoundException(id);
+        }
+
+        return new ServiceRequest(
+                current.id(), current.title(), current.description(),
+                current.status(), priority, current.createdAt());
     }
 }

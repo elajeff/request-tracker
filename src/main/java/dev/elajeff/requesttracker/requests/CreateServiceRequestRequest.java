@@ -10,5 +10,7 @@ public record CreateServiceRequestRequest(
 
         @NotBlank(message = "must not be blank")
         @Size(max = 2000, message = "must be at most 2000 characters")
-        String description) {
+        String description,
+
+        ServiceRequestPriority priority) {
 }
