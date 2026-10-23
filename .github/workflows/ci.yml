@@ -12,6 +12,20 @@ jobs:
   backend-verify:
     name: Backend verification
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: request_tracker
+          POSTGRES_USER: request_tracker
+          POSTGRES_PASSWORD: request_tracker
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U request_tracker -d request_tracker"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - name: Check out source
         uses: actions/checkout@v7
@@ -24,4 +38,8 @@ jobs:
           cache: maven
 
       - name: Run tests and verification
+        env:
+          SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/request_tracker
+          SPRING_DATASOURCE_USERNAME: request_tracker
+          SPRING_DATASOURCE_PASSWORD: request_tracker
         run: ./mvnw --batch-mode --no-transfer-progress verify
