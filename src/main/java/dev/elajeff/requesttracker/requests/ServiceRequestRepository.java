@@ -22,19 +22,22 @@ public class ServiceRequestRepository {
         this.jdbcTemplate = jdbcTemplate;
     }
 
-    public ServiceRequest create(String title, String description) {
+    public ServiceRequest create(
+            String title, String description, ServiceRequestPriority priority) {
         UUID id = UUID.randomUUID();
 
         return jdbcTemplate.queryForObject("""
-                INSERT INTO service_requests (id, title, description, status)
-                VALUES (?, ?, ?, ?)
-                RETURNING id, title, description, status, created_at
+                INSERT INTO service_requests
+                    (id, title, description, status, priority)
+                VALUES (?, ?, ?, ?, ?)
+                RETURNING id, title, description, status, priority, created_at
                 """,
                 ROW_MAPPER,
                 id,
                 title,
                 description,
-                ServiceRequestStatus.NEW.name());
+                ServiceRequestStatus.NEW.name(),
+                priority.name());
     }
 
     public boolean updateStatus(UUID id, ServiceRequestStatus status) {
@@ -45,9 +48,17 @@ public class ServiceRequestRepository {
                 """, status.name(), id) == 1;
     }
 
+    public boolean updatePriority(UUID id, ServiceRequestPriority priority) {
+        return jdbcTemplate.update("""
+                UPDATE service_requests
+                SET priority = ?
+                WHERE id = ?
+                """, priority.name(), id) == 1;
+    }
+
     public List<ServiceRequest> findAll() {
         return jdbcTemplate.query("""
-                SELECT id, title, description, status, created_at
+                SELECT id, title, description, status, priority, created_at
                 FROM service_requests
                 ORDER BY created_at DESC, id DESC
                 """, ROW_MAPPER);
@@ -55,7 +66,7 @@ public class ServiceRequestRepository {
 
     public Optional<ServiceRequest> findById(UUID id) {
         List<ServiceRequest> matches = jdbcTemplate.query("""
-                SELECT id, title, description, status, created_at
+                SELECT id, title, description, status, priority, created_at
                 FROM service_requests
                 WHERE id = ?
                 """, ROW_MAPPER, id);
@@ -70,6 +81,7 @@ public class ServiceRequestRepository {
                 resultSet.getString("title"),
                 resultSet.getString("description"),
                 ServiceRequestStatus.valueOf(resultSet.getString("status")),
+                ServiceRequestPriority.valueOf(resultSet.getString("priority")),
                 resultSet.getTimestamp("created_at").toInstant());
     }
 }

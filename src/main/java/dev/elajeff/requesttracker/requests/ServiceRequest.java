@@ -8,5 +8,6 @@ public record ServiceRequest(
         String title,
         String description,
         ServiceRequestStatus status,
+        ServiceRequestPriority priority,
         Instant createdAt) {
 }
