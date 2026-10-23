@@ -37,6 +37,14 @@ public class ServiceRequestRepository {
                 ServiceRequestStatus.NEW.name());
     }
 
+    public boolean updateStatus(UUID id, ServiceRequestStatus status) {
+        return jdbcTemplate.update("""
+                UPDATE service_requests
+                SET status = ?
+                WHERE id = ?
+                """, status.name(), id) == 1;
+    }
+
     public List<ServiceRequest> findAll() {
         return jdbcTemplate.query("""
                 SELECT id, title, description, status, created_at

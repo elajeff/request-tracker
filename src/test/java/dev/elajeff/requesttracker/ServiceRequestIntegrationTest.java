@@ -55,6 +55,56 @@ class ServiceRequestIntegrationTest {
     }
 
     @Test
+    void statusMovesForwardAndIsPersisted() throws Exception {
+        String id = createRequestAndGetId();
+
+        // A request cannot skip directly from NEW to RESOLVED.
+        assertEquals(400, patch("/api/requests/" + id + "/status",
+                "{\"status\":\"RESOLVED\"}").statusCode());
+
+        HttpResponse<String> inProgress = patch("/api/requests/" + id + "/status",
+                "{\"status\":\"IN_PROGRESS\"}");
+
+        assertEquals(200, inProgress.statusCode());
+        assertTrue(inProgress.body().contains("\"status\":\"IN_PROGRESS\""),
+                inProgress.body());
+
+        HttpResponse<String> retrieved = get("/api/requests/" + id);
+        assertTrue(retrieved.body().contains("\"status\":\"IN_PROGRESS\""),
+                retrieved.body());
+
+        HttpResponse<String> resolved = patch("/api/requests/" + id + "/status",
+                "{\"status\":\"RESOLVED\"}");
+
+        assertEquals(200, resolved.statusCode());
+        assertTrue(resolved.body().contains("\"status\":\"RESOLVED\""),
+                resolved.body());
+
+        retrieved = get("/api/requests/" + id);
+        assertTrue(retrieved.body().contains("\"status\":\"RESOLVED\""),
+                retrieved.body());
+    }
+
+    @Test
+    void invalidStatusIsRejected() throws Exception {
+        String id = createRequestAndGetId();
+
+        HttpResponse<String> response = patch("/api/requests/" + id + "/status",
+                "{\"status\":\"CLOSED\"}");
+
+        assertEquals(400, response.statusCode());
+    }
+
+    @Test
+    void unknownRequestStatusUpdateReturnsNotFound() throws Exception {
+        HttpResponse<String> response = patch(
+                "/api/requests/" + UUID.randomUUID() + "/status",
+                "{\"status\":\"IN_PROGRESS\"}");
+
+        assertEquals(404, response.statusCode());
+    }
+
+    @Test
     void blankTitleIsRejected() throws Exception {
         HttpResponse<String> response = post(
                 "/api/requests",
@@ -69,6 +119,20 @@ class ServiceRequestIntegrationTest {
                 "/api/requests/" + UUID.randomUUID());
 
         assertEquals(404, response.statusCode());
+    }
+
+    private String createRequestAndGetId() throws Exception {
+        String title = "Status test " + UUID.randomUUID();
+        String json = "{\"title\":\"" + title
+                + "\",\"description\":\"Status update test.\"}";
+
+        HttpResponse<String> created = post("/api/requests", json);
+
+        assertEquals(201, created.statusCode());
+
+        var matcher = ID_PATTERN.matcher(created.body());
+        assertTrue(matcher.find(), created.body());
+        return matcher.group(1);
     }
 
     private HttpResponse<String> get(String path) throws Exception {
@@ -87,6 +151,17 @@ class ServiceRequestIntegrationTest {
                 .timeout(Duration.ofSeconds(5))
                 .header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(json))
+                .build();
+
+        return CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+    }
+
+    private HttpResponse<String> patch(String path, String json) throws Exception {
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create("http://127.0.0.1:" + port + path))
+                .timeout(Duration.ofSeconds(5))
+                .header("Content-Type", "application/json")
+                .method("PATCH", HttpRequest.BodyPublishers.ofString(json))
                 .build();
 
         return CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
