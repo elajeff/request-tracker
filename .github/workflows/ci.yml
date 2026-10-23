@@ -37,9 +37,32 @@ jobs:
           java-version: '21'
           cache: maven
 
-      - name: Run tests and verification
+      - name: Run backend verification
         env:
           SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/request_tracker
           SPRING_DATASOURCE_USERNAME: request_tracker
           SPRING_DATASOURCE_PASSWORD: request_tracker
         run: ./mvnw --batch-mode --no-transfer-progress verify
+
+  frontend-build:
+    name: Frontend build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Build frontend
+        run: npm run build
