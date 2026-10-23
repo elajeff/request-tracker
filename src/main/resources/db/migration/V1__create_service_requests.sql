@@ -1,0 +1,8 @@
+CREATE TABLE service_requests (
+    id UUID PRIMARY KEY,
+    title VARCHAR(120) NOT NULL,
+    description VARCHAR(2000) NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'NEW'
+        CHECK (status IN ('NEW', 'IN_PROGRESS', 'RESOLVED')),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
