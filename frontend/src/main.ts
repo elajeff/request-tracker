@@ -433,7 +433,6 @@ async function loadRequests(): Promise<void> {
   } catch (error) {
     if (load !== loadSequence || revision !== dataRevision) return;
     setConnectionStatus(false);
-    requests = [];
     renderRequests();
     showNotice(
       `Could not load requests. Make sure the backend and PostgreSQL are running. ${errorMessage(error)}`,
