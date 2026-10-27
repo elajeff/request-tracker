@@ -46,3 +46,21 @@ docker compose -f compose.yaml -f compose.monitoring.yaml stop prometheus grafan
 ```
 
 Do not use `down -v` to stop monitoring: it also deletes the application's database volume. The ordinary `compose.yaml` remains usable without the monitoring overlay or password file.
+
+## Alerts
+
+Prometheus evaluates three alerts, visible on its **Alerts** page:
+
+| Alert | Condition | Hold time |
+| --- | --- | --- |
+| RequestTrackerUnavailable | Metrics target is down or missing | 1 minute |
+| RequestTrackerHighErrorRate | More than 5% of application requests return 5xx | 5 minutes |
+| RequestTrackerSlowResponses | Mean application response time exceeds 1 second | 5 minutes |
+
+Traffic alerts exclude Actuator requests and require at least 0.1 requests per second over five minutes. This avoids alerts caused by isolated requests in an idle development environment. An unavailable metrics endpoint does not distinguish an application outage from a scrape failure. Check the target error and application logs before diagnosing the cause.
+
+These alerts are local diagnostics; no notification receiver is configured. Thresholds are development defaults, not service-level objectives. Test the rules with the same command used in CI:
+
+```sh
+docker run --rm --entrypoint /bin/promtool -v "$PWD/monitoring/prometheus:/etc/prometheus:ro" -w /etc/prometheus prom/prometheus:v3.10.0 test rules alerts.test.yml
+```
