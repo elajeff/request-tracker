@@ -777,3 +777,17 @@ h1 {
   flex-wrap: wrap;
   gap: 8px;
 }
+
+.assignment-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 10px;
+  margin-top: 16px;
+}
+.assignment-form .form-field { flex: 1; min-width: 180px; }
+.assignment-form small { flex-basis: 100%; color: #526178; }
+.request-history { margin-top: 16px; }
+.request-history summary { cursor: pointer; margin-bottom: 12px; }
+.history-entry { padding-block: 10px; border-bottom: 1px solid #dce3ee; overflow-wrap: anywhere; }
+.history-entry p { margin-block: 5px; white-space: pre-wrap; }

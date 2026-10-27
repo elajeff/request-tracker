@@ -10,7 +10,18 @@ interface ServiceRequest {
   status: RequestStatus;
   priority: RequestPriority;
   createdAt: string;
+  assignee: string | null;
 }
+
+interface RequestHistoryEntry {
+  id: number;
+  field: string;
+  oldValue: string | null;
+  newValue: string | null;
+  changedAt: string;
+}
+
+const assignmentDrafts = new Map<string, string>();
 
 const $ = <T extends HTMLElement>(id: string): T => {
   const element = document.getElementById(id);
@@ -375,8 +386,90 @@ function createRequestCard(request: ServiceRequest): HTMLElement {
     }
   });
 
+  const assignmentForm = document.createElement("form");
+  assignmentForm.className = "assignment-form";
+  const assignmentField = document.createElement("label");
+  assignmentField.className = "form-field";
+  const assignmentLabel = document.createElement("span");
+  assignmentLabel.textContent = "Assigned support staff";
+  const assignee = document.createElement("input");
+  assignee.type = "text";
+  assignee.maxLength = 120;
+  assignee.placeholder = "Unassigned";
+  assignee.value = assignmentDrafts.get(request.id) ?? request.assignee ?? "";
+  assignee.addEventListener("input", () => assignmentDrafts.set(request.id, assignee.value));
+  assignmentField.append(assignmentLabel, assignee);
+  const assignButton = document.createElement("button");
+  assignButton.type = "submit";
+  assignButton.className = "button button-secondary";
+  assignButton.textContent = "Save assignment";
+  const assignmentHelp = document.createElement("small");
+  assignmentHelp.textContent = "Leave blank to unassign.";
+  assignmentForm.append(assignmentField, assignButton, assignmentHelp);
+  assignmentForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    assignButton.disabled = true;
+    try {
+      const updated = await api<ServiceRequest>(`/api/requests/${request.id}/assignment`, {
+        method: "PATCH", body: JSON.stringify({ assignee: assignee.value.trim() })
+      });
+      assignmentDrafts.delete(request.id);
+      dataRevision++;
+      requests = requests.map((item) => item.id === updated.id
+        ? { ...item, assignee: updated.assignee } : item);
+      renderRequests();
+      showNotice("Assignment updated.", "success");
+    } catch (error) {
+      showNotice(`Assignment update failed: ${errorMessage(error)}`, "error");
+    } finally {
+      assignButton.disabled = false;
+    }
+  });
+
+  const history = document.createElement("details");
+  history.className = "request-history";
+  const historySummary = document.createElement("summary");
+  historySummary.textContent = "Change history";
+  const historyContent = document.createElement("div");
+  const historyRefresh = document.createElement("button");
+  historyRefresh.type = "button";
+  historyRefresh.className = "button button-secondary";
+  historyRefresh.textContent = "Refresh history";
+  let historyLoaded = false;
+  const loadHistory = async () => {
+    if (historyRefresh.disabled) return;
+    historyRefresh.disabled = true;
+    historyContent.textContent = "Loading history…";
+    try {
+      const entries = await api<RequestHistoryEntry[]>(`/api/requests/${request.id}/history`);
+      historyContent.replaceChildren();
+      if (!entries.length) historyContent.textContent = "No recorded changes.";
+      for (const entry of entries) {
+        const item = document.createElement("div");
+        item.className = "history-entry";
+        const label = document.createElement("strong");
+        label.textContent = `${new Date(entry.changedAt).toLocaleString()} · ${entry.field.toLowerCase()}`;
+        const values = document.createElement("p");
+        values.textContent = entry.field === "CREATED" ? `Created: ${entry.newValue}`
+          : `${entry.oldValue ?? "Unassigned"} → ${entry.newValue ?? "Unassigned"}`;
+        item.append(label, values);
+        historyContent.append(item);
+      }
+      historyLoaded = true;
+    } catch (error) {
+      historyContent.textContent = `Could not load history: ${errorMessage(error)}`;
+    } finally {
+      historyRefresh.disabled = false;
+    }
+  };
+  history.addEventListener("toggle", () => {
+    if (history.open && !historyLoaded) void loadHistory();
+  });
+  historyRefresh.addEventListener("click", () => void loadHistory());
+  history.append(historySummary, historyRefresh, historyContent);
+
   controls.append(statusControl.field, priorityControl.field);
-  card.append(headingRow, description, meta, editButton, editForm, controls);
+  card.append(headingRow, description, meta, editButton, editForm, controls, assignmentForm, history);
 
   return card;
 }
@@ -384,7 +477,7 @@ function createRequestCard(request: ServiceRequest): HTMLElement {
 function renderRequests(): void {
   const query = searchInput.value.trim().toLocaleLowerCase();
   const filtered = requests.filter((request) =>
-    `${request.title} ${request.description} ${request.id}`
+    `${request.title} ${request.description} ${request.id} ${request.assignee ?? ""}`
       .toLocaleLowerCase()
       .includes(query)
   );

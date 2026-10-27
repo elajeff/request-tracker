@@ -9,5 +9,6 @@ public record ServiceRequest(
         String description,
         ServiceRequestStatus status,
         ServiceRequestPriority priority,
-        Instant createdAt) {
+        Instant createdAt,
+        String assignee) {
 }
