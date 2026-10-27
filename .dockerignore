@@ -7,5 +7,6 @@ frontend/
 target/
 node_modules/
 dist/
-*.log.env
+*.log
+.env
 .env.*
