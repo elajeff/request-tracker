@@ -404,7 +404,7 @@ function createRequestCard(request: ServiceRequest): HTMLElement {
   assignButton.className = "button button-secondary";
   assignButton.textContent = "Save assignment";
   const assignmentHelp = document.createElement("small");
-  assignmentHelp.textContent = "Enter a staff name, or leave blank to unassign. Names are labels, not verified accounts.";
+  assignmentHelp.textContent = "Leave blank to unassign.";
   assignmentForm.append(assignmentField, assignButton, assignmentHelp);
   assignmentForm.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -443,7 +443,7 @@ function createRequestCard(request: ServiceRequest): HTMLElement {
     try {
       const entries = await api<RequestHistoryEntry[]>(`/api/requests/${request.id}/history`);
       historyContent.replaceChildren();
-      if (!entries.length) historyContent.textContent = "No recorded changes. History starts when tracking was introduced.";
+      if (!entries.length) historyContent.textContent = "No recorded changes.";
       for (const entry of entries) {
         const item = document.createElement("div");
         item.className = "history-entry";
