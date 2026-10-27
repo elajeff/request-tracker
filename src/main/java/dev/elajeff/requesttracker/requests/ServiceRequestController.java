@@ -67,4 +67,16 @@ public class ServiceRequestController {
             @Valid @RequestBody UpdateServiceRequestPriorityRequest request) {
         return service.updatePriority(id, request.priority());
     }
+
+    @PatchMapping("/{id}/assignment")
+    public ServiceRequest updateAssignment(
+            @PathVariable UUID id,
+            @Valid @RequestBody UpdateServiceRequestAssignmentRequest request) {
+        return service.updateAssignment(id, request.assignee());
+    }
+
+    @GetMapping("/{id}/history")
+    public List<RequestHistoryEntry> findHistory(@PathVariable UUID id) {
+        return service.findHistory(id);
+    }
 }

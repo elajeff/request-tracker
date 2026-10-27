@@ -6,7 +6,7 @@ Request Tracker is a service-request management application used to practise the
 
 ## Application
 
-Employees can submit service requests. The dashboard supports searching the queue, editing titles and descriptions, changing priority, and advancing status from `NEW` to `IN_PROGRESS` to `RESOLVED`. Assignment and change history remain future work.
+Employees can submit service requests. The dashboard supports searching the queue, editing titles and descriptions, changing priority, and advancing status from `NEW` to `IN_PROGRESS` to `RESOLVED`. Requests can be assigned to support staff using a name label. Each request shows persistent change history for its details, status, priority, and assignment. Names are not authenticated identities.
 
 Implemented API:
 
@@ -16,6 +16,8 @@ Implemented API:
 - `PUT /api/requests/{id}` — update a request title and description.
 - `PATCH /api/requests/{id}/status` — advance request status.
 - `PATCH /api/requests/{id}/priority` — update request priority.
+- `PATCH /api/requests/{id}/assignment` — assign, reassign, or unassign support staff.
+- `GET /api/requests/{id}/history` — list recorded changes, newest first.
 - `GET /actuator/health` — application health.
 - `GET /actuator/prometheus` - application metrics in Prometheus format.
 
@@ -164,3 +166,9 @@ To build the frontend, run from the project directory:
 npm.cmd ci --prefix frontend
 npm.cmd run build --prefix frontend
 ```
+
+## Assignment and history
+
+Use **Assigned support staff** on a request card to set a staff name (up to 120 characters), or save a blank field to unassign it. Search includes assignee names. Expand **Change history** to view timestamps and before/after values; use **Refresh history** to reload it.
+
+The assignment API accepts `{"assignee":"Alex Support"}`; an empty string unassigns. History is written in the same database transaction as each change. Unchanged values and rejected updates do not create history entries. Tracking starts with migration V3; existing requests are preserved without inventing earlier history. This application has no authentication, and history does not identify a verified actor or provide a tamper-proof audit log.

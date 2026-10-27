@@ -10,9 +10,18 @@ import java.util.regex.Pattern;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
+import dev.elajeff.requesttracker.requests.ServiceRequestRepository;
+import dev.elajeff.requesttracker.requests.ServiceRequestService;
 import org.springframework.boot.test.context.SpringBootTest;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.doThrow;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
@@ -179,6 +188,73 @@ class ServiceRequestIntegrationTest {
                 "/api/requests/" + UUID.randomUUID());
 
         assertEquals(404, response.statusCode());
+    }
+
+    @Autowired
+    private JdbcTemplate jdbc;
+
+    @Autowired
+    private ServiceRequestService service;
+
+    @MockitoSpyBean
+    private ServiceRequestRepository repository;
+
+    @Test
+    void assignmentCanBeChangedClearedAndValidated() throws Exception {
+        String id = createRequestAndGetId();
+        String path = "/api/requests/" + id + "/assignment";
+        assertEquals(200, patch(path, "{\"assignee\":\"  Alex Support  \"}").statusCode());
+        assertTrue(get("/api/requests/" + id).body().contains("\"assignee\":\"Alex Support\""));
+        assertEquals(200, patch(path, "{\"assignee\":\"Sam Support\"}").statusCode());
+        assertEquals(200, patch(path, "{\"assignee\":\"   \"}").statusCode());
+        assertTrue(get("/api/requests/" + id).body().contains("\"assignee\":null"));
+        assertEquals(400, patch(path, "{}").statusCode());
+        assertEquals(400, patch(path, "{\"assignee\":null}").statusCode());
+        assertEquals(400, patch(path, "{\"assignee\":\"" + "x".repeat(121) + "\"}").statusCode());
+        assertEquals(404, patch("/api/requests/" + UUID.randomUUID() + "/assignment",
+                "{\"assignee\":\"Alex\"}").statusCode());
+    }
+
+    @Test
+    void historyRecordsChangesButNotNoOpsOrRejectedUpdates() throws Exception {
+        String id = createRequestAndGetId();
+        UUID requestId = UUID.fromString(id);
+        String path = "/api/requests/" + id;
+        assertEquals(200, patch(path + "/assignment", "{\"assignee\":\"Alex\"}").statusCode());
+        assertEquals(200, patch(path + "/priority", "{\"priority\":\"HIGH\"}").statusCode());
+        assertEquals(200, patch(path + "/status", "{\"status\":\"IN_PROGRESS\"}").statusCode());
+        assertEquals(200, put(path, "{\"title\":\"Edited title\",\"description\":\"Edited details\"}").statusCode());
+        assertEquals(6, historyCount(requestId));
+        assertEquals(200, patch(path + "/assignment", "{\"assignee\":\" Alex \"}").statusCode());
+        assertEquals(200, patch(path + "/priority", "{\"priority\":\"HIGH\"}").statusCode());
+        assertEquals(200, patch(path + "/status", "{\"status\":\"IN_PROGRESS\"}").statusCode());
+        assertEquals(200, put(path, "{\"title\":\"Edited title\",\"description\":\"Edited details\"}").statusCode());
+        assertEquals(400, patch(path + "/status", "{\"status\":\"NEW\"}").statusCode());
+        assertEquals(6, historyCount(requestId));
+        var entries = service.findHistory(requestId);
+        assertEquals("DESCRIPTION", entries.getFirst().field());
+        assertEquals("Status update test.", entries.getFirst().oldValue());
+        assertEquals("Edited details", entries.getFirst().newValue());
+        assertEquals("CREATED", entries.getLast().field());
+        HttpResponse<String> history = get(path + "/history");
+        assertEquals(200, history.statusCode());
+        assertTrue(history.body().contains("\"field\":\"ASSIGNEE\""));
+        assertEquals(404, get("/api/requests/" + UUID.randomUUID() + "/history").statusCode());
+    }
+
+    @Test
+    void assignmentRollsBackWhenHistoryCannotBeWritten() throws Exception {
+        UUID id = UUID.fromString(createRequestAndGetId());
+        doThrow(new IllegalStateException("History unavailable"))
+                .when(repository).recordChange(eq(id), eq("ASSIGNEE"), isNull(), eq("Alex"));
+        assertThrows(IllegalStateException.class, () -> service.updateAssignment(id, "Alex"));
+        assertEquals(null, service.findById(id).assignee());
+        assertEquals(1, historyCount(id));
+    }
+
+    private int historyCount(UUID id) {
+        return jdbc.queryForObject("SELECT count(*) FROM request_history WHERE request_id = ?",
+                Integer.class, id);
     }
 
     private String createRequestAndGetId() throws Exception {
