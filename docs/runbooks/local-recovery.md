@@ -12,20 +12,45 @@ Start the application and save a synthetic request through the dashboard or `POS
 
 Use `docker compose ps -a` and `docker compose logs --tail=100 app postgres` to diagnose failures. PostgreSQL connection-validation warnings during the outage are expected. A readiness failure routes traffic away from the service; a database outage should not require restarting an otherwise live application.
 
-## Kubernetes follow-up
+## Kubernetes
 
-The Helm chart uses separate startup/liveness and database-aware readiness probes. Helm lint and rendering passed with Helm 3.19.0. Recovery was **not** tested on Kubernetes in the cloud development host: kind's default bridge failed because the host lacked the IPv6 filter table; an IPv4-only bridge allowed node creation, but kubelet failed because `/dev/kmsg` was absent. These are host prerequisites, not evidence of a chart defect.
+Use the existing deployment from [the deployment guide](../kind-deployment.md). Record the backend pod UID/restart count, PostgreSQL replicas, PVC UID/volume, database Secret identity/content, and saved request before testing. Forward directly to the backend pod so health checks remain accessible after readiness removes it from Service endpoints. Allow up to 40 seconds per readiness HTTP request: the connection pool can wait about 30 seconds when PostgreSQL is unavailable.
 
-On a host that supports kind, deploy using [the deployment guide](../kind-deployment.md), save a synthetic request, and record the backend pod's restart count and PostgreSQL PVC before testing:
+In PowerShell, restore the recorded replica count in `finally` even if an assertion fails:
 
-```sh
-kubectl get pods,pvc -n request-tracker
-kubectl rollout restart deployment/request-tracker -n request-tracker
-kubectl rollout status deployment/request-tracker -n request-tracker --timeout=180s
+```powershell
+$k = @('--context', 'kind-request-tracker', '-n', 'request-tracker')
+$replicas = kubectl @k get statefulset request-tracker-postgresql -o jsonpath='{.spec.replicas}'
+if ($LASTEXITCODE -ne 0 -or $replicas -notmatch '^\d+$' -or [int]$replicas -lt 1) { throw 'Record a running database replica count first' }
+$backendPod = kubectl @k get pods -l app.kubernetes.io/component=backend -o jsonpath='{.items[0].metadata.name}'
+if ($LASTEXITCODE -ne 0 -or -not $backendPod) { throw 'Backend pod lookup failed' }
+try {
+    kubectl @k scale statefulset/request-tracker-postgresql --replicas=0
+    if ($LASTEXITCODE -ne 0) { throw 'Database scale-down failed' }
+    kubectl @k wait "pod/$backendPod" --for=condition=Ready=false --timeout=180s
+    if ($LASTEXITCODE -ne 0) { throw 'Backend did not become unready' }
+    # Through the pod port-forward, assert readiness 503/DOWN and liveness 200/UP.
+    # Assert the same backend pod UID and unchanged restart count.
+} finally {
+    kubectl @k scale statefulset/request-tracker-postgresql "--replicas=$replicas"
+    if ($LASTEXITCODE -ne 0) { throw 'Database restoration failed; restore the recorded replicas immediately' }
+    kubectl @k rollout status statefulset/request-tracker-postgresql --timeout=180s
+    if ($LASTEXITCODE -ne 0) { throw 'Database recovery timed out; inspect the StatefulSet' }
+}
 ```
 
-Retrieve the same request after the backend restart. For the database outage, first inspect the actual controller and record its current replica count with `kubectl get deployment,statefulset -n request-tracker`. Temporarily scale only the PostgreSQL controller to zero, observe the backend becoming unready while liveness remains healthy, then restore the recorded replica count immediately. Wait for the database and backend to become ready, and retrieve the same record without restarting the backend. Do not delete storage. Record actual results before marking the Kubernetes reliability milestone complete.
+Wait for readiness 200/UP and the backend pod's Ready condition to recover automatically. Compare the saved request/history, all existing requests, restart count, storage, Secret, and settings with the baseline. Observe actual readiness failure; a fixed outage delay is insufficient.
 
 ## Verified results
 
-On 27 October 2026, the Compose exercise passed with Java 21, Spring Boot 4.1.2, and PostgreSQL 17.11. A saved request and its three history entries survived the backend restart. During a stopped-database outage, liveness returned 200/UP and readiness returned 503/DOWN. After PostgreSQL restarted on the same named volume, readiness recovered to 200/UP and the original request and history were unchanged, without another backend restart. No database volumes were removed. These results do not establish Kubernetes recovery behavior.
+On 27 October 2026, the Compose exercise passed with Java 21, Spring Boot 4.1.2, and PostgreSQL 17.11. A saved request and its three history entries survived the backend restart. During a stopped-database outage, liveness returned 200/UP and readiness returned 503/DOWN. After PostgreSQL restarted on the same named volume, readiness recovered to 200/UP and the original request and history were unchanged, without another backend restart. No database volumes were removed.
+
+On 28 October 2026, the Windows/Docker Desktop kind exercise passed in context `kind-request-tracker`, namespace `request-tracker`:
+
+- Cause: the checkout was on `feat/prometheus-metrics` (`4f76faa`), and the deployed `request-tracker:local` JAR omitted database readiness. Current main (`48ce555`) already contained `management.endpoint.health.group.readiness.include=readinessState,db`; no duplicate configuration fix was needed.
+- Built and loaded `request-tracker:main-48ce555-readiness-20261028011607`; Helm release revision 2 changed only the backend image, reusing existing values. Rollout passed. All 14 backend tests passed against an isolated temporary PostgreSQL database; Helm lint/render comparison passed. The regression test controls the database health contributor to test group membership; the outage exercise separately verifies real database failure.
+- Saved request `54f35b91-dbfc-4b95-9570-da8c80dd5dea` and both existing request records survived the upgrade unchanged. Its history contained zero entries after migration.
+- Scaled PostgreSQL from one replica to zero. Observed readiness 503/DOWN and backend Ready=false within 32.5 seconds, with liveness 200/UP and restart count 0. This is an observation time, not a required outage duration.
+- Restored PostgreSQL to one replica in `finally`. The same backend pod recovered to readiness 200/UP automatically; restart count remained 0. Saved data/history, PVC UID/volume, Secret identity/content, ConfigMap settings, and StatefulSet specification were unchanged.
+
+Limits: this verifies a single-node local database outage and image rollout, not host reboot, node/storage loss, backup restoration, or production failover. The earlier cloud host's kind prerequisites remained unverified. Existing Helm settings still expose only `health`; monitoring behavior was outside this exercise.
