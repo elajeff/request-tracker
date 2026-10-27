@@ -1,6 +1,10 @@
 package dev.elajeff.requesttracker.requests;
 
 import java.util.List;
+import java.nio.charset.StandardCharsets;
+import java.time.Instant;
+import java.time.DateTimeException;
+import java.util.Base64;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -29,8 +33,36 @@ public class ServiceRequestService {
         return created;
     }
 
-    public List<ServiceRequest> findAll() {
-        return repository.findAll();
+    public RequestQueuePage findPage(String query, String cursor, int limit) {
+        validateLimit(limit);
+        Instant beforeCreatedAt = null;
+        UUID beforeId = null;
+        if (cursor != null) {
+            try {
+                if (cursor.length() > 256) throw new IllegalArgumentException();
+                String[] parts = new String(Base64.getUrlDecoder().decode(cursor), StandardCharsets.UTF_8).split(",", -1);
+                if (parts.length != 2) throw new IllegalArgumentException();
+                beforeCreatedAt = Instant.parse(parts[0]);
+                if (beforeCreatedAt.isBefore(Instant.parse("0001-01-01T00:00:00Z"))
+                        || beforeCreatedAt.isAfter(Instant.parse("9999-12-31T23:59:59Z"))) {
+                    throw new IllegalArgumentException();
+                }
+                beforeId = UUID.fromString(parts[1]);
+                if (!beforeId.toString().equals(parts[1])) throw new IllegalArgumentException();
+            } catch (IllegalArgumentException | DateTimeException error) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid queue cursor");
+            }
+        }
+        List<ServiceRequest> rows = repository.findPage(query.strip(), beforeCreatedAt, beforeId, limit + 1);
+        boolean hasMore = rows.size() > limit;
+        List<ServiceRequest> items = List.copyOf(rows.subList(0, Math.min(limit, rows.size())));
+        String nextCursor = null;
+        if (hasMore) {
+            ServiceRequest last = items.getLast();
+            nextCursor = Base64.getUrlEncoder().withoutPadding().encodeToString(
+                    (last.createdAt() + "," + last.id()).getBytes(StandardCharsets.UTF_8));
+        }
+        return new RequestQueuePage(items, nextCursor, repository.counts());
     }
 
     public ServiceRequest findById(UUID id) {
@@ -121,9 +153,28 @@ public class ServiceRequestService {
                 current.status(), current.priority(), current.createdAt(), selected);
     }
 
-    public List<RequestHistoryEntry> findHistory(UUID id) {
+    public RequestHistoryPage findHistory(UUID id, String cursor, int limit) {
+        validateLimit(limit);
+        Long beforeId = null;
+        if (cursor != null) {
+            try {
+                beforeId = Long.valueOf(cursor);
+                if (beforeId <= 0) throw new NumberFormatException();
+            } catch (NumberFormatException error) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid history cursor");
+            }
+        }
         findById(id);
-        return repository.findHistory(id);
+        List<RequestHistoryEntry> rows = repository.findHistory(id, beforeId, limit + 1);
+        boolean hasMore = rows.size() > limit;
+        List<RequestHistoryEntry> items = List.copyOf(rows.subList(0, Math.min(limit, rows.size())));
+        return new RequestHistoryPage(items, hasMore ? Long.toString(items.getLast().id()) : null);
+    }
+
+    private static void validateLimit(int limit) {
+        if (limit < 1 || limit > 100) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Limit must be between 1 and 100");
+        }
     }
 
     private ServiceRequest findForUpdate(UUID id) {
