@@ -1,0 +1,114 @@
+rule_files:
+  - alerts.yml
+evaluation_interval: 15s
+tests:
+  - name: Unavailable target fires and then recovers
+    interval: 1m
+    input_series:
+      - series: 'up{job="request-tracker",instance="app:8080"}'
+        values: '0+0x3 1+0x3'
+    alert_rule_test:
+      - eval_time: 0m
+        alertname: RequestTrackerUnavailable
+        exp_alerts: []
+      - eval_time: 2m
+        alertname: RequestTrackerUnavailable
+        exp_alerts:
+          - exp_labels:
+              job: request-tracker
+              instance: app:8080
+              severity: critical
+            exp_annotations:
+              summary: Request Tracker metrics endpoint is unavailable
+      - eval_time: 5m
+        alertname: RequestTrackerUnavailable
+        exp_alerts: []
+  - name: Missing scrape target fires
+    alert_rule_test:
+      - eval_time: 2m
+        alertname: RequestTrackerUnavailable
+        exp_alerts:
+          - exp_labels:
+              job: request-tracker
+              severity: critical
+            exp_annotations:
+              summary: Request Tracker metrics endpoint is unavailable
+  - name: Sustained errors and slow responses fire after the hold period
+    interval: 1m
+    input_series:
+      - series: 'http_server_requests_seconds_count{job="request-tracker",uri="/api/requests",status="200"}'
+        values: '0+54x12'
+      - series: 'http_server_requests_seconds_count{job="request-tracker",uri="/api/requests",status="500"}'
+        values: '0+6x12'
+      - series: 'http_server_requests_seconds_sum{job="request-tracker",uri="/api/requests"}'
+        values: '0+120x12'
+    alert_rule_test:
+      - eval_time: 4m
+        alertname: RequestTrackerHighErrorRate
+        exp_alerts: []
+      - eval_time: 4m
+        alertname: RequestTrackerSlowResponses
+        exp_alerts: []
+      - eval_time: 10m
+        alertname: RequestTrackerHighErrorRate
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: More than 5% of application requests return 5xx responses
+      - eval_time: 10m
+        alertname: RequestTrackerSlowResponses
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: Mean application response latency exceeds one second
+  - name: Idle service and Actuator requests do not cause traffic alerts
+    interval: 1m
+    input_series:
+      - series: 'http_server_requests_seconds_count{job="request-tracker",uri="/api/requests",status="500"}'
+        values: '0+0x12'
+      - series: 'http_server_requests_seconds_sum{job="request-tracker",uri="/api/requests"}'
+        values: '0+0x12'
+      - series: 'http_server_requests_seconds_count{job="request-tracker",uri="/actuator/health",status="500"}'
+        values: '0+60x12'
+      - series: 'http_server_requests_seconds_sum{job="request-tracker",uri="/actuator/health"}'
+        values: '0+120x12'
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: RequestTrackerHighErrorRate
+        exp_alerts: []
+      - eval_time: 10m
+        alertname: RequestTrackerSlowResponses
+        exp_alerts: []
+  - name: Isolated slow failure does not page on low traffic
+    interval: 1m
+    input_series:
+      - series: 'http_server_requests_seconds_count{job="request-tracker",uri="/api/requests",status="500"}'
+        values: '0+1x12'
+      - series: 'http_server_requests_seconds_sum{job="request-tracker",uri="/api/requests"}'
+        values: '0+2x12'
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: RequestTrackerHighErrorRate
+        exp_alerts: []
+      - eval_time: 10m
+        alertname: RequestTrackerSlowResponses
+        exp_alerts: []
+
+  - name: Healthy traffic stays below the error and latency thresholds
+    interval: 1m
+    input_series:
+      - series: 'http_server_requests_seconds_count{job="request-tracker",uri="/api/requests",status="200"}'
+        values: '0+60x12'
+      - series: 'http_server_requests_seconds_count{job="request-tracker",uri="/api/requests",status="500"}'
+        values: '0+1x12'
+      - series: 'http_server_requests_seconds_sum{job="request-tracker",uri="/api/requests"}'
+        values: '0+6x12'
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: RequestTrackerHighErrorRate
+        exp_alerts: []
+      - eval_time: 10m
+        alertname: RequestTrackerSlowResponses
+        exp_alerts: []

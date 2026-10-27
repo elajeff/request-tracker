@@ -2,7 +2,7 @@
 
 Request Tracker is a service-request management application used to practise the full software development lifecycle: maintainable application code, automated testing, container builds, Kubernetes deployment, progressive delivery, observability, security, and recovery.
 
-**Current functionality:** a Java 21 / Spring Boot API backed by PostgreSQL, plus a TypeScript/Vite dashboard for creating, searching, editing, and updating service requests. Docker Compose and Helm support local deployment; monitoring and progressive delivery remain planned.
+**Current functionality:** a Java 21 / Spring Boot API backed by PostgreSQL, plus a TypeScript/Vite dashboard for creating, searching, editing, and updating service requests. Docker Compose and Helm support local deployment; optional local Prometheus/Grafana monitoring is available; progressive delivery remains planned.
 
 ## Application
 
@@ -25,7 +25,7 @@ A new request has a title, description, UUID, creation timestamp, and `NEW` stat
 
 Spring Boot exposes HTTP request, JVM, and runtime metrics at `/actuator/prometheus`.
 
-This endpoint is unauthenticated and intended for local or cluster-internal monitoring. Do not expose it publicly without access controls. Prometheus and Grafana are not yet deployed.
+This endpoint is unauthenticated and intended for local or cluster-internal monitoring. Do not expose it publicly without access controls. For the optional local collector and provisioned Grafana dashboard, see [local monitoring](docs/monitoring.md).
 
 ## Technology and roadmap
 

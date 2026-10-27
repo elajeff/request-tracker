@@ -61,8 +61,9 @@ The initial backend will be Java 21 with Spring Boot and PostgreSQL. A TypeScrip
 
 ### 5. Observability and progressive delivery
 
-- Add application metrics and Prometheus/Grafana dashboards.
-- Define useful alerts and a small set of service-level indicators.
+- [x] Add application metrics and a local Prometheus/Grafana dashboard.
+- [x] Add tested local availability, error-rate, and latency alerts.
+- [ ] Define service-level objectives from measured application behavior.
 - Use Argo CD for GitOps synchronization once basic deployment is repeatable.
 - Use Argo Rollouts for a controlled canary/abort exercise and validate behavior with metrics.
 - Document a failure, diagnosis, corrective change, and recovery.

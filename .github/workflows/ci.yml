@@ -89,3 +89,19 @@ jobs:
 
       - name: Render Helm chart
         run: helm template request-tracker ./helm/request-tracker --namespace request-tracker
+
+  monitoring-verify:
+    name: Monitoring rules
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+
+      - name: Validate Prometheus configuration and alert rules
+        run: |
+          docker run --rm --entrypoint /bin/promtool \
+            -v "$PWD/monitoring/prometheus:/etc/prometheus:ro" \
+            -w /etc/prometheus prom/prometheus:v3.10.0 check config prometheus.yml
+          docker run --rm --entrypoint /bin/promtool \
+            -v "$PWD/monitoring/prometheus:/etc/prometheus:ro" \
+            -w /etc/prometheus prom/prometheus:v3.10.0 test rules alerts.test.yml
