@@ -17,8 +17,15 @@ Implemented API:
 - `PATCH /api/requests/{id}/status` — advance request status.
 - `PATCH /api/requests/{id}/priority` — update request priority.
 - `GET /actuator/health` — application health.
+- `GET /actuator/prometheus` - application metrics in Prometheus format.
 
 A new request has a title, description, UUID, creation timestamp, and `NEW` status. Titles must be 1–120 characters and descriptions 1–2000 characters. This initial API has no authentication and is intended for local development, not public deployment.
+
+## Metrics
+
+Spring Boot exposes HTTP request, JVM, and runtime metrics at `/actuator/prometheus`.
+
+This endpoint is unauthenticated and intended for local or cluster-internal monitoring. Do not expose it publicly without access controls. Prometheus and Grafana are not yet deployed.
 
 ## Technology and roadmap
 
