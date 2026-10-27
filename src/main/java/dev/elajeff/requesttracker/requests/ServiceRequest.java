@@ -10,5 +10,7 @@ public record ServiceRequest(
         ServiceRequestStatus status,
         ServiceRequestPriority priority,
         Instant createdAt,
-        String assignee) {
+        String assignee,
+        UUID assigneeId,
+        Boolean assigneeActive) {
 }

@@ -15,6 +15,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import dev.elajeff.requesttracker.requests.ServiceRequestRepository;
 import dev.elajeff.requesttracker.requests.ServiceRequestService;
+import dev.elajeff.requesttracker.staff.StaffService;
 import org.springframework.boot.test.context.SpringBootTest;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -196,6 +197,9 @@ class ServiceRequestIntegrationTest {
     @Autowired
     private ServiceRequestService service;
 
+    @Autowired
+    private StaffService staff;
+
     @MockitoSpyBean
     private ServiceRequestRepository repository;
 
@@ -203,16 +207,18 @@ class ServiceRequestIntegrationTest {
     void assignmentCanBeChangedClearedAndValidated() throws Exception {
         String id = createRequestAndGetId();
         String path = "/api/requests/" + id + "/assignment";
-        assertEquals(200, patch(path, "{\"assignee\":\"  Alex Support  \"}").statusCode());
+        UUID alex = staff.create("Alex Support").id();
+        UUID sam = staff.create("Sam Support").id();
+        assertEquals(200, patch(path, assignment(alex)).statusCode());
         assertTrue(get("/api/requests/" + id).body().contains("\"assignee\":\"Alex Support\""));
-        assertEquals(200, patch(path, "{\"assignee\":\"Sam Support\"}").statusCode());
-        assertEquals(200, patch(path, "{\"assignee\":\"   \"}").statusCode());
+        assertEquals(200, patch(path, assignment(sam)).statusCode());
+        assertEquals(200, patch(path, "{\"unassign\":true}").statusCode());
         assertTrue(get("/api/requests/" + id).body().contains("\"assignee\":null"));
         assertEquals(400, patch(path, "{}").statusCode());
         assertEquals(400, patch(path, "{\"assignee\":null}").statusCode());
         assertEquals(400, patch(path, "{\"assignee\":\"" + "x".repeat(121) + "\"}").statusCode());
         assertEquals(404, patch("/api/requests/" + UUID.randomUUID() + "/assignment",
-                "{\"assignee\":\"Alex\"}").statusCode());
+                assignment(alex)).statusCode());
     }
 
     @Test
@@ -220,12 +226,13 @@ class ServiceRequestIntegrationTest {
         String id = createRequestAndGetId();
         UUID requestId = UUID.fromString(id);
         String path = "/api/requests/" + id;
-        assertEquals(200, patch(path + "/assignment", "{\"assignee\":\"Alex\"}").statusCode());
+        UUID alex = staff.create("Alex").id();
+        assertEquals(200, patch(path + "/assignment", assignment(alex)).statusCode());
         assertEquals(200, patch(path + "/priority", "{\"priority\":\"HIGH\"}").statusCode());
         assertEquals(200, patch(path + "/status", "{\"status\":\"IN_PROGRESS\"}").statusCode());
         assertEquals(200, put(path, "{\"title\":\"Edited title\",\"description\":\"Edited details\"}").statusCode());
         assertEquals(6, historyCount(requestId));
-        assertEquals(200, patch(path + "/assignment", "{\"assignee\":\" Alex \"}").statusCode());
+        assertEquals(200, patch(path + "/assignment", assignment(alex)).statusCode());
         assertEquals(200, patch(path + "/priority", "{\"priority\":\"HIGH\"}").statusCode());
         assertEquals(200, patch(path + "/status", "{\"status\":\"IN_PROGRESS\"}").statusCode());
         assertEquals(200, put(path, "{\"title\":\"Edited title\",\"description\":\"Edited details\"}").statusCode());
@@ -245,9 +252,10 @@ class ServiceRequestIntegrationTest {
     @Test
     void assignmentRollsBackWhenHistoryCannotBeWritten() throws Exception {
         UUID id = UUID.fromString(createRequestAndGetId());
+        UUID alex = staff.create("Alex").id();
         doThrow(new IllegalStateException("History unavailable"))
-                .when(repository).recordChange(eq(id), eq("ASSIGNEE"), isNull(), eq("Alex"));
-        assertThrows(IllegalStateException.class, () -> service.updateAssignment(id, "Alex"));
+                .when(repository).recordChange(eq(id), eq("ASSIGNEE"), isNull(), eq("Alex [" + alex + "]"));
+        assertThrows(IllegalStateException.class, () -> service.updateAssignment(id, alex));
         assertEquals(null, service.findById(id).assignee());
         assertEquals(1, historyCount(id));
     }
@@ -255,6 +263,10 @@ class ServiceRequestIntegrationTest {
     private int historyCount(UUID id) {
         return jdbc.queryForObject("SELECT count(*) FROM request_history WHERE request_id = ?",
                 Integer.class, id);
+    }
+
+    private String assignment(UUID id) {
+        return "{\"staffId\":\"" + id + "\"}";
     }
 
     private String createRequestAndGetId() throws Exception {

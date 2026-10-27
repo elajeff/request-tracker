@@ -63,14 +63,14 @@ class PaginationIntegrationTest {
     void queueSearchCoversUnloadedRecordsAndTreatsWildcardsLiterally() throws Exception {
         String token = UUID.randomUUID().toString();
         String target = UUID.randomUUID().toString();
-        insert(target, token + " older", "Literal 50%_\\ discount", "Alex Support", "2025-01-01T00:00:00Z");
+        insert(target, token + " older", "Literal 50%_\\ " + token, "Alex Support " + token, "2025-01-01T00:00:00Z");
         for (int i = 0; i < 26; i++) {
             insert(UUID.randomUUID().toString(), token, "Newer", null, "2026-01-01T00:00:00Z");
         }
         JsonNode initial = page("/api/requests?q=" + token);
         assertEquals(25, initial.get("items").size());
         assertFalse(itemIds(initial).contains(target));
-        for (String query : List.of(token + " older", "50%_\\", "aLeX sUpPoRt", target.toUpperCase())) {
+        for (String query : List.of(token + " older", "50%_\\ " + token, "aLeX sUpPoRt " + token, target.toUpperCase())) {
             assertEquals(List.of(target), itemIds(page("/api/requests?q=" + encode("  " + query + "  "))));
         }
         JsonNode empty = page("/api/requests?q=" + UUID.randomUUID());
@@ -135,10 +135,15 @@ class PaginationIntegrationTest {
     }
 
     private void insert(String id, String title, String description, String assignee, String createdAt) {
+        UUID staffId = null;
+        if (assignee != null) {
+            staffId = UUID.randomUUID();
+            jdbc.update("INSERT INTO support_staff (id, name) VALUES (?, ?)", staffId, assignee);
+        }
         jdbc.update("""
-                INSERT INTO service_requests (id, title, description, assignee, created_at)
+                INSERT INTO service_requests (id, title, description, assignee_id, created_at)
                 VALUES (?::uuid, ?, ?, ?, ?::timestamptz)
-                """, id, title, description, assignee, createdAt);
+                """, id, title, description, staffId, createdAt);
     }
 
     private String change(String requestId, String assignee) {

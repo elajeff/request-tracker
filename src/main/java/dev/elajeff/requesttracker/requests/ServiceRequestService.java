@@ -12,14 +12,18 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
+import dev.elajeff.requesttracker.staff.StaffService;
+import dev.elajeff.requesttracker.staff.SupportStaff;
 
 @Service
 public class ServiceRequestService {
 
     private final ServiceRequestRepository repository;
+    private final StaffService staffService;
 
-    public ServiceRequestService(ServiceRequestRepository repository) {
+    public ServiceRequestService(ServiceRequestRepository repository, StaffService staffService) {
         this.repository = repository;
+        this.staffService = staffService;
     }
 
     @Transactional
@@ -33,8 +37,11 @@ public class ServiceRequestService {
         return created;
     }
 
-    public RequestQueuePage findPage(String query, String cursor, int limit) {
+    public RequestQueuePage findPage(String query, String cursor, int limit, UUID staffId, boolean unassigned) {
         validateLimit(limit);
+        if (staffId != null && unassigned) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Choose staffId or unassigned, not both");
+        }
         Instant beforeCreatedAt = null;
         UUID beforeId = null;
         if (cursor != null) {
@@ -53,7 +60,7 @@ public class ServiceRequestService {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid queue cursor");
             }
         }
-        List<ServiceRequest> rows = repository.findPage(query.strip(), beforeCreatedAt, beforeId, limit + 1);
+        List<ServiceRequest> rows = repository.findPage(query.strip(), staffId, unassigned, beforeCreatedAt, beforeId, limit + 1);
         boolean hasMore = rows.size() > limit;
         List<ServiceRequest> items = List.copyOf(rows.subList(0, Math.min(limit, rows.size())));
         String nextCursor = null;
@@ -89,7 +96,7 @@ public class ServiceRequestService {
         recordChange(id, "DESCRIPTION", current.description(), updatedDescription);
         return new ServiceRequest(
                 current.id(), updatedTitle, updatedDescription,
-                current.status(), current.priority(), current.createdAt(), current.assignee());
+                current.status(), current.priority(), current.createdAt(), current.assignee(), current.assigneeId(), current.assigneeActive());
     }
 
     @Transactional
@@ -120,7 +127,7 @@ public class ServiceRequestService {
         recordChange(id, "STATUS", current.status().name(), status.name());
         return new ServiceRequest(
                 current.id(), current.title(), current.description(),
-                status, current.priority(), current.createdAt(), current.assignee());
+                status, current.priority(), current.createdAt(), current.assignee(), current.assigneeId(), current.assigneeActive());
     }
 
     @Transactional
@@ -138,19 +145,29 @@ public class ServiceRequestService {
         recordChange(id, "PRIORITY", current.priority().name(), priority.name());
         return new ServiceRequest(
                 current.id(), current.title(), current.description(),
-                current.status(), priority, current.createdAt(), current.assignee());
+                current.status(), priority, current.createdAt(), current.assignee(), current.assigneeId(), current.assigneeActive());
     }
 
     @Transactional
-    public ServiceRequest updateAssignment(UUID id, String assignee) {
+    public ServiceRequest updateAssignment(UUID id, UUID staffId) {
         ServiceRequest current = findForUpdate(id);
-        String selected = assignee.strip();
-        if (selected.isEmpty()) selected = null;
-        if (Objects.equals(current.assignee(), selected)) return current;
-        repository.updateAssignment(id, selected);
-        recordChange(id, "ASSIGNEE", current.assignee(), selected);
-        return new ServiceRequest(current.id(), current.title(), current.description(),
-                current.status(), current.priority(), current.createdAt(), selected);
+        if (Objects.equals(current.assigneeId(), staffId)) return current;
+        SupportStaff selected = null;
+        if (staffId != null) {
+            // Serialize assignment with deactivation/renaming of its target staff record.
+            selected = staffService.requireForUpdate(staffId);
+            if (!selected.active()) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cannot assign inactive staff");
+            }
+        }
+        repository.updateAssignment(id, staffId);
+        recordChange(id, "ASSIGNEE", assignmentLabel(current.assignee(), current.assigneeId()),
+                selected == null ? null : assignmentLabel(selected.name(), selected.id()));
+        return findById(id);
+    }
+
+    private static String assignmentLabel(String name, UUID id) {
+        return id == null ? null : name + " [" + id + "]";
     }
 
     public RequestHistoryPage findHistory(UUID id, String cursor, int limit) {
