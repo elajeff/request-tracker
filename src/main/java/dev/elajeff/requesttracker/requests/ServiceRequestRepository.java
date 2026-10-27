@@ -48,12 +48,12 @@ public class ServiceRequestRepository {
                 """, title, description, id) == 1;
     }
 
-    public boolean updateStatus(UUID id, ServiceRequestStatus status) {
+    public boolean updateStatus(UUID id, ServiceRequestStatus expected, ServiceRequestStatus status) {
         return jdbcTemplate.update("""
                 UPDATE service_requests
                 SET status = ?
-                WHERE id = ?
-                """, status.name(), id) == 1;
+                WHERE id = ? AND status = ?
+                """, status.name(), id, expected.name()) == 1;
     }
 
     public boolean updatePriority(UUID id, ServiceRequestPriority priority) {

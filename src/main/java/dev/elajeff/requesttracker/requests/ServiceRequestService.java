@@ -71,8 +71,9 @@ public class ServiceRequestService {
                     "Cannot change status from " + current.status() + " to " + status);
         }
 
-        if (!repository.updateStatus(id, status)) {
-            throw new ServiceRequestNotFoundException(id);
+        if (!repository.updateStatus(id, current.status(), status)) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT, "Request status changed. Refresh and try again.");
         }
 
         return new ServiceRequest(

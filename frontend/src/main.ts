@@ -32,6 +32,9 @@ const connectionIndicator = $("connection-indicator");
 const apiStatus = $("api-status");
 
 let requests: ServiceRequest[] = [];
+let loadSequence = 0;
+let dataRevision = 0;
+const drafts = new Map<string, { title: string; description: string }>();
 
 async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
   const headers = new Headers(options.headers);
@@ -201,7 +204,7 @@ function createRequestCard(request: ServiceRequest): HTMLElement {
 
   const editForm = document.createElement("form");
   editForm.className = "request-edit-form";
-  editForm.hidden = true;
+  editForm.hidden = !drafts.has(request.id);
 
   const editTitleField = document.createElement("label");
   editTitleField.className = "form-field";
@@ -211,7 +214,7 @@ function createRequestCard(request: ServiceRequest): HTMLElement {
   editTitle.type = "text";
   editTitle.maxLength = 120;
   editTitle.required = true;
-  editTitle.value = request.title;
+  editTitle.value = drafts.get(request.id)?.title ?? request.title;
   editTitleField.append(editTitleLabel, editTitle);
 
   const editDescriptionField = document.createElement("label");
@@ -222,7 +225,7 @@ function createRequestCard(request: ServiceRequest): HTMLElement {
   editDescription.rows = 3;
   editDescription.maxLength = 2000;
   editDescription.required = true;
-  editDescription.value = request.description;
+  editDescription.value = drafts.get(request.id)?.description ?? request.description;
   editDescriptionField.append(editDescriptionLabel, editDescription);
 
   const editActions = document.createElement("div");
@@ -241,15 +244,24 @@ function createRequestCard(request: ServiceRequest): HTMLElement {
   editActions.append(saveButton, cancelButton);
   editForm.append(editTitleField, editDescriptionField, editActions);
 
+  editButton.hidden = !editForm.hidden;
+  const saveDraft = () => {
+    drafts.set(request.id, { title: editTitle.value, description: editDescription.value });
+  };
+  editTitle.addEventListener("input", saveDraft);
+  editDescription.addEventListener("input", saveDraft);
+
   editButton.addEventListener("click", () => {
     editTitle.value = request.title;
     editDescription.value = request.description;
+    saveDraft();
     editForm.hidden = false;
     editButton.hidden = true;
     editTitle.focus();
   });
 
   cancelButton.addEventListener("click", () => {
+    drafts.delete(request.id);
     editForm.reset();
     editForm.hidden = true;
     editButton.hidden = false;
@@ -278,7 +290,10 @@ function createRequestCard(request: ServiceRequest): HTMLElement {
         }
       );
 
-      requests = requests.map((item) => item.id === updated.id ? updated : item);
+      drafts.delete(request.id);
+      dataRevision++;
+      requests = requests.map((item) => item.id === updated.id
+        ? { ...item, title: updated.title, description: updated.description } : item);
       renderRequests();
       showNotice("Request details updated.", "success");
     } catch (error) {
@@ -324,7 +339,9 @@ function createRequestCard(request: ServiceRequest): HTMLElement {
         }
       );
 
-      requests = requests.map((item) => item.id === updated.id ? updated : item);
+      dataRevision++;
+      requests = requests.map((item) => item.id === updated.id
+        ? { ...item, status: updated.status } : item);
       renderRequests();
       showNotice(`Status updated to ${statusLabel(updated.status)}.`, "success");
     } catch (error) {
@@ -347,7 +364,9 @@ function createRequestCard(request: ServiceRequest): HTMLElement {
         }
       );
 
-      requests = requests.map((item) => item.id === updated.id ? updated : item);
+      dataRevision++;
+      requests = requests.map((item) => item.id === updated.id
+        ? { ...item, priority: updated.priority } : item);
       renderRequests();
       showNotice("Priority updated.", "success");
     } catch (error) {
@@ -401,13 +420,18 @@ function renderRequests(): void {
 }
 
 async function loadRequests(): Promise<void> {
+  const load = ++loadSequence;
+  const revision = dataRevision;
   loadingPlaceholder.hidden = false;
 
   try {
-    requests = await api<ServiceRequest[]>("/api/requests");
+    const loaded = await api<ServiceRequest[]>("/api/requests");
+    if (load !== loadSequence || revision !== dataRevision) return;
+    requests = loaded;
     setConnectionStatus(true);
     renderRequests();
   } catch (error) {
+    if (load !== loadSequence || revision !== dataRevision) return;
     setConnectionStatus(false);
     requests = [];
     renderRequests();
@@ -416,7 +440,7 @@ async function loadRequests(): Promise<void> {
       "error"
     );
   } finally {
-    loadingPlaceholder.hidden = true;
+    if (load === loadSequence) loadingPlaceholder.hidden = true;
   }
 }
 
@@ -454,6 +478,7 @@ createForm.addEventListener("submit", async (event) => {
       })
     });
 
+    dataRevision++;
     requests = [created, ...requests];
     createForm.reset();
     priorityInput.value = "MEDIUM";
