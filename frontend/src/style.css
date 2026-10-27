@@ -287,6 +287,7 @@ h1 {
 
 .panel-header {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
@@ -791,3 +792,12 @@ h1 {
 .request-history summary { cursor: pointer; margin-bottom: 12px; }
 .history-entry { padding-block: 10px; border-bottom: 1px solid #dce3ee; overflow-wrap: anywhere; }
 .history-entry p { margin-block: 5px; white-space: pre-wrap; }
+
+.staff-directory { margin-top: 24px; border-top: 1px solid #dce3ee; padding-top: 16px; }
+.staff-directory summary { cursor: pointer; font-weight: 600; }
+.staff-record { display: flex; flex-wrap: wrap; gap: 8px; padding-block: 12px; border-bottom: 1px solid #dce3ee; }
+.staff-record small { width: 100%; overflow-wrap: anywhere; }
+.staff-record input { width: 100%; min-width: 0; }
+.assignment-select { max-width: 100%; }
+#staff-create-form { display: grid; gap: 8px; }
+#staff-filter { max-width: 260px; }

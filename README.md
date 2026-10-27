@@ -173,6 +173,12 @@ npm.cmd run build --prefix frontend
 
 ## Assignment and history
 
-Use **Assigned support staff** on a request card to set a staff name (up to 120 characters), or save a blank field to unassign it. Search includes assignee names. Expand **Change history** to view timestamps and before/after values; use **Refresh history** to reload it.
+Open **Manage support staff** beside the queue to create, rename, deactivate, or reactivate directory records. Names are 1–120 characters; duplicate names are allowed and IDs distinguish records. These are not authenticated users. Use **Load more staff** for additional directory records and selector options.
 
-The assignment API accepts `{"assignee":"Alex Support"}`; an empty string unassigns. History is written in the same database transaction as each change. Unchanged values and rejected updates do not create history entries. Tracking starts with migration V3; existing requests are preserved without inventing earlier history. This application has no authentication, and history does not identify a verified actor or provide a tamper-proof audit log.
+Choose active staff or **Unassigned** on a request. Deactivation preserves existing assignments but blocks new ones; reassignment and unassignment remain available. The staff filter includes inactive records and combines with search and pagination. Totals remain global. Expand **Change history** to load older changes or refresh.
+
+Staff API: `POST /api/staff` and `PUT /api/staff/{id}` accept `{"name":"Alex Support"}`; `PATCH /api/staff/{id}/active` accepts `{"active":false}` (or true). `GET /api/staff` uses `limit`/`cursor` pagination, ordered by UUID. There is no delete endpoint. Assignment now accepts `{"staffId":"UUID"}` or `{"unassign":true}` instead of a free-text name. Queue filters use `staffId=UUID` or `unassigned=true`, not both.
+
+Migration V5 copies every non-null legacy assignment exactly into a separate inactive staff record, linked to its request. Even equal names are not merged; review and reactivate, rename, or reassign them. Blank legacy names must be renamed before activation. The old text column is replaced only after copying its values; history rows are untouched. New assignment history captures name and staff ID at change time, in the same transaction. Renaming staff updates the current display without rewriting historical values. No-op/rejected updates add no history. History starts at V3 and identifies changes, not authenticated actors or a tamper-proof audit log.
+
+V5 requires the matching backend and dashboard; the previous free-text-assignment backend cannot run against the new schema.
