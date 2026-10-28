@@ -32,7 +32,7 @@ processes = []
 logs = []
 samples = []
 try:
-    for name, port, remote in [("prometheus", 19090, 9090), ("stable", 18100, 8080)]:
+    for name, port, remote in [("prometheus", 19090, 9090)]:
         log = output.with_suffix("." + name + ".log").open("w")
         logs.append(log)
         processes.append(subprocess.Popen(k + ["-n", "request-tracker", "port-forward",
@@ -57,8 +57,10 @@ try:
         except (OSError, ValueError) as error:
             sample["metricsObservationError"] = str(error)
         try:
-            sample["stableRequest"] = get("http://127.0.0.1:18100/api/requests/54f35b91-dbfc-4b95-9570-da8c80dd5dea")["id"]
-        except (OSError, ValueError) as error:
+            # A Service proxy follows endpoint changes; port-forward pins a pod that promotion may replace.
+            path = "/api/v1/namespaces/request-tracker/services/request-tracker-delivery-stable:http/proxy/api/requests/54f35b91-dbfc-4b95-9570-da8c80dd5dea"
+            sample["stableRequest"] = json.loads(subprocess.check_output(k + ["get", "--raw", path], text=True))["id"]
+        except (OSError, ValueError, subprocess.CalledProcessError) as error:
             sample["observationError"] = str(error)
             if args.require_availability and len(samples) > 0:
                 raise RuntimeError("Stable API availability check failed") from error

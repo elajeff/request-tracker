@@ -6,9 +6,9 @@ Use context `kind-request-tracker`, namespace `request-tracker`. The Helm releas
 
 Argo CD Core v3.5.6 manages only the chart's `delivery.enabled` mode, with resource names prefixed `request-tracker-delivery`. The AppProject excludes Secrets, PVCs, StatefulSets, and cluster resources. Argo Rollouts v1.10.1 owns backend ReplicaSets and the stable/canary Service hash selectors. Argo CD ignores only that hash selector field. Do not run `helm upgrade` with delivery mode enabled: Helm owns the baseline, Argo CD owns delivery desired state, and Rollouts owns rollout progression.
 
-The ordinary chart mode remains unchanged. The delivery frontend routes to the delivery backend. Four replicas implement approximate pod-weighted 25% → 50% → 100% exposure through a ClusterIP Service, with a separate stable Service for availability checks. These are replica-based proportions, not precise request-routing guarantees. No ingress or service mesh is installed.
+The ordinary chart mode remains unchanged. The delivery frontend routes to the delivery backend. Four replicas implement approximate pod-weighted 25% → 50% → 100% exposure through a ClusterIP Service, with a separate stable Service for availability checks. These are replica-based proportions, not precise request-routing guarantees. Replica-weighted canaries do not support traffic-router scale-down delays. No ingress or service mesh is installed.
 
-One in-cluster Prometheus scrapes each backend pod every five seconds and labels metrics with its Rollout hash. Existing Compose Prometheus is independent. Analysis requires at least 0.5 candidate requests/second, less than 5% 5xx, and mean response time below one second, for three measurements at 15-second intervals after warmup. Missing vectors/traffic and NaN cannot pass. These are exercise gates, not measured production SLOs.
+One in-cluster Prometheus scrapes each backend pod every five seconds and labels metrics with its Rollout hash. Analysis uses the fully qualified Service address because the Rollouts controller runs in another namespace. Existing Compose Prometheus is independent. Analysis requires at least 0.5 candidate requests/second, less than 5% 5xx, and mean response time below one second, for three measurements at 15-second intervals after warmup. Missing vectors/traffic and NaN cannot pass. These are exercise gates, not measured production SLOs.
 
 The optional read-only traffic deployment makes about ten requests/second against queue, staff, and saved-request history endpoints with new HTTP connections. Prometheus and Argo administrative endpoints are ClusterIP/internal only; use localhost port-forwards. Prometheus data is ephemeral (two-hour retention), so save exercise evidence outside Git.
 
@@ -19,12 +19,12 @@ The host has 12 logical CPUs and about 15 GiB available to kind. `delivery/boots
 1. Complete the release/restore checks in [local recovery](local-recovery.md). Never roll back below schema V5 with an old application image.
 2. Build/load the immutable application tags referenced by `delivery/values-kind.yaml` into the existing cluster. Local kind loading is a development mechanism, not a registry publication workflow.
 3. Run `helm lint helm/request-tracker -f delivery/values-kind.yaml`, render both chart modes, and server-dry-run the delivery resources after installing the CRDs. Inspect resource names: none may overlap baseline resources.
-4. Publish the reviewed `delivery/argocd-rollouts` branch **only with explicit permission**. Then apply `delivery/application.yaml` with context `kind-request-tracker`. Argo CD must fetch that branch from the actual origin; local files are not GitOps evidence.
+4. Publish the reviewed `delivery/argocd-rollouts` branch, then apply `delivery/application.yaml` with context `kind-request-tracker`. Argo CD must fetch that branch from the actual origin; local files are not GitOps evidence.
 5. Wait for Application Synced/Healthy and Rollout Healthy. Use `python delivery/observe.py --expect healthy --output target/delivery-initial.json`. Inspect actual Prometheus targets and HTTP metrics before starting a candidate.
 
 ## Exercise sequence
 
-Prepare four reviewed Git commits: baseline with traffic enabled, healthy candidate, faulty candidate, and the healthy candidate restored with traffic disabled. Advance the same published branch through those exact commits in order, waiting between each. Obtain permission for the specific branch/commits before any push. A healthy candidate may reuse the tested release artifact under a new immutable tag; no product feature is added by this exercise.
+Prepare reviewed Git commits for baseline with traffic enabled, healthy candidate, faulty candidate, and the healthy candidate restored with traffic disabled. Advance the same published branch in order, waiting for verification between stages. The healthy candidate reuses the tested release artifact under a new immutable tag; no product feature is added by this exercise.
 
 - Drift: scale `deployment/request-tracker-delivery-frontend` from one to two replicas. Observe OutOfSync and automatic restoration to one replica, then Synced/Healthy. Do not drift database resources.
 - Healthy candidate: publish its commit and run `delivery/observe.py --expect healthy --require-availability --output target/delivery-good.json`. Require successful AnalysisRuns at both exposure stages, observed stable/canary traffic, and final stable hash equal to the candidate hash.
@@ -37,3 +37,5 @@ An aborted Rollout can still reference the bad desired image until Git is correc
 ## Evidence
 
 Controller installation and manifest preparation alone do not complete Delivery. Record actual commit IDs, Application sync revisions, analysis outcomes, exposure measurements, stable availability, final image/hash, persistence comparison, and any failed/unrun checks after running the exercises. Browser verification remains separate from API/rollout verification.
+
+Baseline validation on 28 October 2026: Argo CD fetched and synchronized `2f1c512`, but Rollouts rejected the router-specific delay fields. Removing them produced four healthy replicas. The analysis provider's short hostname also failed from the controller namespace; the fully qualified Service address restored connectivity. Against live traffic, all three baseline metrics passed three measurements each. A nonexistent revision failed with traffic `[0]` and empty error/latency vectors. These baseline checks do not establish candidate promotion or abort.
