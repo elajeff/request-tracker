@@ -52,6 +52,24 @@ All request, staff, and history rows and Flyway state matched the pre-exercise s
 
 The initial `2f1c512` specification failed runtime validation because replica-weighted canaries reject traffic-router delay fields. The initial short Prometheus hostname also failed across namespaces. The repair removed those fields and used fully qualified Service DNS. Live baseline analysis then passed; a nonexistent revision failed with zero traffic and empty metric vectors.
 
-Unresolved: 457 paired availability probes recorded one brief stable-Service endpoint gap during successful promotion, with no Helm fallback failure. Ten subsequent stable probes passed before the fault stage. The traffic generator also recorded connection errors during endpoint changes; HTTP analysis alone does not measure those errors. Investigation is deferred; existing diagnostics are saved in `unresolved-promotion-endpoint-gap.json` alongside the raw observations. This exercise does not establish zero-downtime promotion or production SLOs. Browser acceptance remains unverified.
+Unresolved: 457 paired availability probes recorded one brief stable-Service endpoint gap during successful promotion, with no Helm fallback failure. Ten subsequent stable probes passed before the fault stage. The traffic generator also recorded connection errors during endpoint changes; HTTP analysis alone does not measure those errors. Investigation results follow below; the original diagnostics are saved in `unresolved-promotion-endpoint-gap.json` alongside the raw observations. This exercise does not establish zero-downtime promotion or production SLOs. Browser acceptance remains unverified.
 
 Raw observations and database snapshots are outside Git at `C:\Users\DESKTOP\request-tracker-backups\20261028-015609\delivery-20261028-025205`. On 28 October 2026, `request-tracker-v5-final.dump` was restored into a separate network-isolated PostgreSQL container. Request, staff, assignment, history, and Flyway rows/checksums exactly matched the saved snapshot. The temporary container was removed; the working database and deployment were untouched. Results are saved in `final-v5-restore-verification.json`. The earlier pre-upgrade restore/migration rehearsal is documented in [local recovery](local-recovery.md).
+
+### Endpoint-gap investigation
+
+The bounded 28 October exercise traced Services, EndpointSlices, legacy Endpoints, pod readiness/termination, and ReplicaSet scaling. The normal route was frontend → `request-tracker-delivery` → backend; diagnostic stable-Service and API-proxy probes were counted separately. Every request used a new connection with no retry or fallback.
+
+At 01:14:28.161Z, deletion of an outgoing pod was observed; its JVM exited within that second. Direct connection refusals began at .218Z and frontend 502s at .439Z. The main Service retained at least four ready endpoints throughout. This supports a shutdown/proxy-propagation race, not insufficient ready capacity. Kube-proxy used iptables with a one-second minimum synchronization period. The chart correction adds a five-second `preStop` delay so outgoing JVMs can serve traffic while endpoint/proxy updates propagate.
+
+The hook must exist on outgoing pods. Installation used a separate rolling configuration update without canary steps; measured verification restored the complete strategy and both inline analyses. Failed installation requests remain included:
+
+| Route | Baseline failures/requests | Installation | Corrected promotion | Git-state restoration | Entire exercise |
+| --- | --- | --- | --- | --- | --- |
+| Normal frontend | 9/2,209 | 6/788 | 0/2,216 | 0/2,327 | 15/7,844 |
+| Direct main Service | 4/1,109 | 2/426 | 0/1,118 | 0/1,165 | 6/3,969 |
+| Diagnostic stable Service | 11/2,172 | 13/812 | 0/2,216 | 0/2,328 | 24/7,833 |
+
+The corrected promotion ran from 01:19:38.808Z to 01:23:22.549Z; both Rollout-owned analyses succeeded. Separately, the hashed stable Service's ready set briefly emptied at selector handoffs (observed intervals 37–108 ms). The API proxy failed 2/1,586 requests overall, including once during corrected promotion. That control-plane diagnostic limitation remains unresolved; the drain does not make Service selector changes atomic.
+
+Evidence and the exercise runner are outside Git at `C:\Users\DESKTOP\request-tracker-backups\20261028-015609\endpoint-gap-20261028-031355`. Setup, review intervals, and cleanup are retained in full request totals. Application rows, Flyway state, database Secret, PVC, StatefulSet, and ConfigMap were unchanged. Cleanup restored Healthy/Synced Git revision `ab79c62`, four ready replicas, the original reconciliation policy, and the original pod template. Consequently the drain correction is local-only until published and deployed. One measured promotion is not a zero-interruption guarantee. Browser acceptance remains unverified.

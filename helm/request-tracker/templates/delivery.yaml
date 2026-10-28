@@ -48,6 +48,11 @@ spec:
           image: "{{ .Values.backend.image.repository }}:{{ .Values.backend.image.tag }}"
           imagePullPolicy: IfNotPresent
           ports: [{name: http, containerPort: 8080}]
+          lifecycle:
+            preStop:
+              exec:
+                # Allow endpoint and service-proxy updates before the JVM stops accepting requests.
+                command: [sh, -c, "sleep 5"]
           envFrom: [{configMapRef: {name: request-tracker-config}}]
           env:
             - name: SPRING_DATASOURCE_USERNAME
