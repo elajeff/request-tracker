@@ -1,8 +1,13 @@
 package dev.elajeff.requesttracker.requests;
 
-import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Size;
+import java.util.UUID;
+import jakarta.validation.constraints.AssertTrue;
 
 public record UpdateServiceRequestAssignmentRequest(
-        @NotNull @Size(max = 120) String assignee) {
+        UUID staffId, Boolean unassign) {
+    @AssertTrue(message = "Provide either staffId or unassign: true")
+    public boolean isSelectionValid() {
+        return (staffId != null && !Boolean.TRUE.equals(unassign))
+                || (staffId == null && Boolean.TRUE.equals(unassign));
+    }
 }

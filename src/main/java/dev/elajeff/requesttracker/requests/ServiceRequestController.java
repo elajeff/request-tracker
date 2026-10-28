@@ -41,8 +41,10 @@ public class ServiceRequestController {
     public RequestQueuePage findAll(
             @RequestParam(defaultValue = "") String q,
             @RequestParam(required = false) String cursor,
-            @RequestParam(defaultValue = "25") int limit) {
-        return service.findPage(q, cursor, limit);
+            @RequestParam(defaultValue = "25") int limit,
+            @RequestParam(required = false) UUID staffId,
+            @RequestParam(defaultValue = "false") boolean unassigned) {
+        return service.findPage(q, cursor, limit, staffId, unassigned);
     }
 
     @GetMapping("/{id}")
@@ -75,7 +77,7 @@ public class ServiceRequestController {
     public ServiceRequest updateAssignment(
             @PathVariable UUID id,
             @Valid @RequestBody UpdateServiceRequestAssignmentRequest request) {
-        return service.updateAssignment(id, request.assignee());
+        return service.updateAssignment(id, request.staffId());
     }
 
     @GetMapping("/{id}/history")

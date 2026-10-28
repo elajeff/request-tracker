@@ -11,6 +11,14 @@ interface ServiceRequest {
   priority: RequestPriority;
   createdAt: string;
   assignee: string | null;
+  assigneeId: string | null;
+  assigneeActive: boolean | null;
+}
+
+interface SupportStaff {
+  id: string;
+  name: string;
+  active: boolean;
 }
 
 interface RequestHistoryEntry {
@@ -58,16 +66,27 @@ const createButton = $("create-button") as HTMLButtonElement;
 const connectionIndicator = $("connection-indicator");
 const apiStatus = $("api-status");
 const loadMoreButton = $("load-more-button") as HTMLButtonElement;
+const staffFilter = $("staff-filter") as HTMLSelectElement;
+const staffNotice = $("staff-notice");
+const staffMoreButton = $("staff-more-button") as HTMLButtonElement;
+const staffCreateButton = $("staff-create-button") as HTMLButtonElement;
+const staffNameInput = $("staff-name-input") as HTMLInputElement;
 
 let requests: ServiceRequest[] = [];
 let loadSequence = 0;
 let dataRevision = 0;
 let nextCursor: string | null = null;
 let activeQuery = "";
+let activeStaffFilter = "";
 let requestsLoading = false;
 let searchTimer: number | undefined;
 let counts: RequestCounts = { total: 0, newCount: 0, inProgressCount: 0, resolvedCount: 0 };
 const drafts = new Map<string, { title: string; description: string }>();
+let staff: SupportStaff[] = [];
+let staffCursor: string | null = null;
+let staffLoading = false;
+let staffLoadSequence = 0;
+const staffNameDrafts = new Map<string, string>();
 
 async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
   const headers = new Headers(options.headers);
@@ -419,31 +438,31 @@ function createRequestCard(request: ServiceRequest): HTMLElement {
   assignmentField.className = "form-field";
   const assignmentLabel = document.createElement("span");
   assignmentLabel.textContent = "Assigned support staff";
-  const assignee = document.createElement("input");
-  assignee.type = "text";
-  assignee.maxLength = 120;
-  assignee.placeholder = "Unassigned";
-  assignee.value = assignmentDrafts.get(request.id) ?? request.assignee ?? "";
-  assignee.addEventListener("input", () => assignmentDrafts.set(request.id, assignee.value));
+  const assignee = document.createElement("select");
+  assignee.className = "control-select assignment-select";
+  assignee.dataset.requestId = request.id;
+  assignee.setAttribute("aria-label", `Assigned staff for ${request.title}`);
+  fillAssignmentOptions(assignee, request);
+  assignee.addEventListener("change", () => assignmentDrafts.set(request.id, assignee.value));
   assignmentField.append(assignmentLabel, assignee);
   const assignButton = document.createElement("button");
   assignButton.type = "submit";
   assignButton.className = "button button-secondary";
   assignButton.textContent = "Save assignment";
   const assignmentHelp = document.createElement("small");
-  assignmentHelp.textContent = "Leave blank to unassign.";
+  assignmentHelp.textContent = "Choose Unassigned to clear. More staff are available under Manage support staff.";
   assignmentForm.append(assignmentField, assignButton, assignmentHelp);
   assignmentForm.addEventListener("submit", async (event) => {
     event.preventDefault();
     assignButton.disabled = true;
     try {
       const updated = await api<ServiceRequest>(`/api/requests/${request.id}/assignment`, {
-        method: "PATCH", body: JSON.stringify({ assignee: assignee.value.trim() })
+        method: "PATCH", body: JSON.stringify(assignee.value ? { staffId: assignee.value } : { unassign: true })
       });
       assignmentDrafts.delete(request.id);
       dataRevision++;
       requests = requests.map((item) => item.id === updated.id
-        ? { ...item, assignee: updated.assignee } : item);
+        ? { ...item, assignee: updated.assignee, assigneeId: updated.assigneeId, assigneeActive: updated.assigneeActive } : item);
       renderRequests();
       showNotice("Assignment updated.", "success");
     } catch (error) {
@@ -522,6 +541,8 @@ function renderRequests(append = false): void {
     `${request.title} ${request.description} ${request.id} ${request.assignee ?? ""}`
       .toLowerCase()
       .includes(query)
+      && (!activeStaffFilter || (activeStaffFilter === "unassigned" ? request.assigneeId === null
+        : request.assigneeId === activeStaffFilter))
   );
 
   $("total-count").textContent = String(counts.total);
@@ -529,11 +550,11 @@ function renderRequests(append = false): void {
   $("progress-count").textContent = String(counts.inProgressCount);
   $("resolved-count").textContent = String(counts.resolvedCount);
 
-  $("request-summary").textContent = query
+  $("request-summary").textContent = query || activeStaffFilter
     ? `${filtered.length} matching requests loaded`
     : `Showing ${requests.length} of ${counts.total} requests`;
   loadMoreButton.hidden = nextCursor === null;
-  loadMoreButton.disabled = requestsLoading || searchInput.value.trim() !== activeQuery;
+  loadMoreButton.disabled = requestsLoading || searchInput.value.trim() !== activeQuery || staffFilter.value !== activeStaffFilter;
 
   if (!append) requestList.replaceChildren();
   const renderedIds = new Set(Array.from(requestList.children, (card) => (card as HTMLElement).dataset.requestId));
@@ -543,26 +564,30 @@ function renderRequests(append = false): void {
   }
 
   emptyState.hidden = filtered.length !== 0;
-  $("empty-title").textContent = query
+  $("empty-title").textContent = query || activeStaffFilter
     ? "No matching requests"
     : "No requests yet";
-  $("empty-description").textContent = query
-    ? "Try another search term."
+  $("empty-description").textContent = query || activeStaffFilter
+    ? "Try another search term or staff filter."
     : "Create your first request using the form.";
 }
 
 async function loadRequests(append = false): Promise<void> {
   window.clearTimeout(searchTimer);
-  if (append && (requestsLoading || !nextCursor || searchInput.value.trim() !== activeQuery)) return;
+  if (append && (requestsLoading || !nextCursor || searchInput.value.trim() !== activeQuery
+      || staffFilter.value !== activeStaffFilter)) return;
   const load = ++loadSequence;
   const revision = dataRevision;
   const query = append ? activeQuery : searchInput.value.trim();
+  const selectedStaff = append ? activeStaffFilter : staffFilter.value;
   requestsLoading = true;
   loadMoreButton.disabled = true;
   loadingPlaceholder.hidden = false;
 
   try {
     const parameters = new URLSearchParams({ limit: "25", q: query });
+    if (selectedStaff === "unassigned") parameters.set("unassigned", "true");
+    else if (selectedStaff) parameters.set("staffId", selectedStaff);
     if (append && nextCursor) parameters.set("cursor", nextCursor);
     const loaded = await api<RequestQueuePage>(`/api/requests?${parameters}`);
     if (load !== loadSequence) return;
@@ -575,6 +600,8 @@ async function loadRequests(append = false): Promise<void> {
     counts = loaded.counts;
     nextCursor = loaded.nextCursor;
     activeQuery = query;
+    activeStaffFilter = selectedStaff;
+    refreshStaffOptions();
     setConnectionStatus(true);
     renderRequests(append);
   } catch (error) {
@@ -588,7 +615,7 @@ async function loadRequests(append = false): Promise<void> {
     if (load === loadSequence) {
       requestsLoading = false;
       loadingPlaceholder.hidden = true;
-      loadMoreButton.disabled = searchInput.value.trim() !== activeQuery;
+      loadMoreButton.disabled = searchInput.value.trim() !== activeQuery || staffFilter.value !== activeStaffFilter;
     }
   }
 }
@@ -606,6 +633,7 @@ searchInput.addEventListener("input", () => {
   loadMoreButton.disabled = true;
   searchTimer = window.setTimeout(() => void loadRequests(), 250);
 });
+staffFilter.addEventListener("change", () => void loadRequests());
 loadMoreButton.addEventListener("click", () => void loadRequests(true));
 $("refresh-button").addEventListener("click", () => void loadRequests());
 
@@ -652,4 +680,162 @@ createForm.addEventListener("submit", async (event) => {
 });
 
 updateCharacterCounts();
+void loadStaff();
 void loadRequests();
+
+function staffLabel(person: SupportStaff): string {
+  return `${person.name.trim() ? person.name : "(blank legacy name)"} [${person.id}]${person.active ? "" : " — inactive"}`;
+}
+
+function fillAssignmentOptions(select: HTMLSelectElement, request: ServiceRequest): void {
+  const selected = assignmentDrafts.get(request.id) ?? request.assigneeId ?? "";
+  select.replaceChildren(new Option("Unassigned", ""));
+  const choices = staff.filter((person) => person.active);
+  if (request.assigneeId && !choices.some((person) => person.id === request.assigneeId)) {
+    choices.push(staff.find((person) => person.id === request.assigneeId)
+      ?? { id: request.assigneeId, name: request.assignee ?? "", active: request.assigneeActive === true });
+  }
+  for (const person of choices.sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id))) {
+    const option = new Option(staffLabel(person), person.id);
+    option.disabled = !person.active;
+    select.append(option);
+  }
+  if (selected && !choices.some((person) => person.id === selected)) {
+    const person = staff.find((item) => item.id === selected);
+    const option = new Option(person ? staffLabel(person) : `Previously selected staff [${selected}]`, selected);
+    option.disabled = person?.active === false;
+    select.append(option);
+  }
+  select.value = selected;
+}
+
+function refreshStaffOptions(): void {
+  const selected = staffFilter.value;
+  const known = new Map(staff.map((person) => [person.id, person]));
+  for (const request of requests) {
+    if (request.assigneeId && !known.has(request.assigneeId)) {
+      known.set(request.assigneeId, { id: request.assigneeId, name: request.assignee ?? "", active: request.assigneeActive === true });
+    }
+  }
+  staffFilter.replaceChildren(new Option("All staff", ""), new Option("Unassigned", "unassigned"));
+  for (const person of [...known.values()].sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id))) {
+    staffFilter.append(new Option(staffLabel(person), person.id));
+  }
+  if (selected && selected !== "unassigned" && !known.has(selected)) {
+    staffFilter.append(new Option(`Staff [${selected}]`, selected));
+  }
+  staffFilter.value = selected;
+  for (const select of requestList.querySelectorAll<HTMLSelectElement>(".assignment-select")) {
+    const request = requests.find((item) => item.id === select.dataset.requestId);
+    if (request) fillAssignmentOptions(select, request);
+  }
+}
+
+function staffSaved(person: SupportStaff): void {
+  ++staffLoadSequence;
+  staffLoading = false;
+  dataRevision++;
+  staff = staff.some((item) => item.id === person.id)
+    ? staff.map((item) => item.id === person.id ? person : item) : [...staff, person];
+  requests = requests.map((item) => item.assigneeId === person.id
+    ? { ...item, assignee: person.name, assigneeActive: person.active } : item);
+  renderStaff();
+  refreshStaffOptions();
+  renderRequests();
+  staffNotice.textContent = "Staff record saved. Existing assignments and historical values are retained.";
+}
+
+function renderStaff(): void {
+  $("staff-list").replaceChildren();
+  for (const person of staff) {
+    const row = document.createElement("form");
+    row.className = "staff-record";
+    const identity = document.createElement("small");
+    identity.textContent = `${person.active ? "Active" : "Inactive"} · ${person.id}`;
+    const name = document.createElement("input");
+    name.value = staffNameDrafts.get(person.id) ?? person.name;
+    name.maxLength = 120;
+    name.required = true;
+    name.setAttribute("aria-label", `Name for staff ${person.id}`);
+    name.addEventListener("input", () => staffNameDrafts.set(person.id, name.value));
+    const save = document.createElement("button");
+    save.type = "submit";
+    save.className = "button button-secondary";
+    save.textContent = "Save name";
+    const toggle = document.createElement("button");
+    toggle.type = "button";
+    toggle.className = "button button-secondary";
+    toggle.textContent = person.active ? "Deactivate" : "Reactivate";
+    const update = async (rename: boolean) => {
+      if (rename && !name.value.trim()) {
+        staffNotice.textContent = "Enter a staff name.";
+        return;
+      }
+      save.disabled = true;
+      toggle.disabled = true;
+      try {
+        const updated = await api<SupportStaff>(`/api/staff/${person.id}${rename ? "" : "/active"}`, {
+          method: rename ? "PUT" : "PATCH",
+          body: JSON.stringify(rename ? { name: name.value.trim() } : { active: !person.active })
+        });
+        if (rename) staffNameDrafts.delete(person.id);
+        staffSaved(updated);
+      } catch (error) {
+        staffNotice.textContent = `Could not save staff: ${errorMessage(error)}`;
+      } finally {
+        save.disabled = false;
+        toggle.disabled = false;
+      }
+    };
+    row.addEventListener("submit", (event) => { event.preventDefault(); void update(true); });
+    toggle.addEventListener("click", () => void update(false));
+    row.append(identity, name, save, toggle);
+    $("staff-list").append(row);
+  }
+  staffMoreButton.hidden = staffCursor === null;
+  staffMoreButton.disabled = staffLoading;
+}
+
+async function loadStaff(append = false): Promise<void> {
+  if (append && (staffLoading || !staffCursor)) return;
+  const load = ++staffLoadSequence;
+  staffLoading = true;
+  staffMoreButton.disabled = true;
+  staffNotice.textContent = "Loading staff…";
+  try {
+    const parameters = new URLSearchParams({ limit: "25" });
+    if (append && staffCursor) parameters.set("cursor", staffCursor);
+    const page = await api<Page<SupportStaff>>(`/api/staff?${parameters}`);
+    if (load !== staffLoadSequence) return;
+    staff = append ? [...staff, ...page.items.filter((person) => !staff.some((item) => item.id === person.id))] : page.items;
+    staffCursor = page.nextCursor;
+    renderStaff();
+    refreshStaffOptions();
+    staffNotice.textContent = `${staff.length} staff loaded.${staffCursor ? " Load more to see additional staff and assignment options." : ""}`;
+  } catch (error) {
+    if (load === staffLoadSequence) staffNotice.textContent = `Could not load staff: ${errorMessage(error)}. Use Refresh staff to retry.`;
+  } finally {
+    if (load === staffLoadSequence) {
+      staffLoading = false;
+      staffMoreButton.disabled = false;
+    }
+  }
+}
+
+$("staff-create-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const name = staffNameInput.value.trim();
+  if (!name) { staffNotice.textContent = "Enter a staff name."; return; }
+  staffCreateButton.disabled = true;
+  try {
+    const created = await api<SupportStaff>("/api/staff", { method: "POST", body: JSON.stringify({ name }) });
+    staffNameInput.value = "";
+    staffSaved(created);
+  } catch (error) {
+    staffNotice.textContent = `Could not create staff: ${errorMessage(error)}`;
+  } finally {
+    staffCreateButton.disabled = false;
+  }
+});
+staffMoreButton.addEventListener("click", () => void loadStaff(true));
+$("staff-refresh-button").addEventListener("click", () => void loadStaff());

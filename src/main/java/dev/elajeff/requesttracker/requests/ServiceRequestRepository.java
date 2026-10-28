@@ -19,6 +19,12 @@ public class ServiceRequestRepository {
     private static final RowMapper<ServiceRequest> ROW_MAPPER =
             ServiceRequestRepository::mapRow;
 
+    private static final String SELECT_REQUEST = """
+            SELECT r.id, r.title, r.description, r.status, r.priority, r.created_at,
+                r.assignee_id, s.name AS assignee, s.active AS assignee_active
+            FROM service_requests r LEFT JOIN support_staff s ON s.id = r.assignee_id
+            """;
+
     private final JdbcTemplate jdbcTemplate;
 
     public ServiceRequestRepository(JdbcTemplate jdbcTemplate) {
@@ -29,18 +35,17 @@ public class ServiceRequestRepository {
             String title, String description, ServiceRequestPriority priority) {
         UUID id = UUID.randomUUID();
 
-        return jdbcTemplate.queryForObject("""
+        jdbcTemplate.update("""
                 INSERT INTO service_requests
                     (id, title, description, status, priority)
                 VALUES (?, ?, ?, ?, ?)
-                RETURNING id, title, description, status, priority, created_at, assignee
                 """,
-                ROW_MAPPER,
                 id,
                 title,
                 description,
                 ServiceRequestStatus.NEW.name(),
                 priority.name());
+        return findById(id).orElseThrow();
     }
 
     public boolean updateDetails(UUID id, String title, String description) {
@@ -67,20 +72,25 @@ public class ServiceRequestRepository {
                 """, priority.name(), id) == 1;
     }
 
-    public List<ServiceRequest> findPage(String query, Instant beforeCreatedAt, UUID beforeId, int limit) {
-        String sql = """
-                SELECT id, title, description, status, priority, created_at, assignee
-                FROM service_requests
-                WHERE strpos(lower(concat_ws(' ', title, description, id::text, coalesce(assignee, ''))), lower(?)) > 0
+    public List<ServiceRequest> findPage(String query, UUID staffId, boolean unassigned,
+            Instant beforeCreatedAt, UUID beforeId, int limit) {
+        String sql = SELECT_REQUEST + """
+                WHERE strpos(lower(concat_ws(' ', r.title, r.description, r.id::text, coalesce(s.name, ''))), lower(?)) > 0
                 """;
         List<Object> parameters = new ArrayList<>();
         parameters.add(query);
+        if (staffId != null) {
+            sql += " AND r.assignee_id = ?";
+            parameters.add(staffId);
+        } else if (unassigned) {
+            sql += " AND r.assignee_id IS NULL";
+        }
         if (beforeCreatedAt != null) {
-            sql += " AND (created_at, id) < (?, ?)";
+            sql += " AND (r.created_at, r.id) < (?, ?)";
             parameters.add(Timestamp.from(beforeCreatedAt));
             parameters.add(beforeId);
         }
-        sql += " ORDER BY created_at DESC, id DESC LIMIT ?";
+        sql += " ORDER BY r.created_at DESC, r.id DESC LIMIT ?";
         parameters.add(limit);
         return jdbcTemplate.query(sql, ROW_MAPPER, parameters.toArray());
     }
@@ -97,22 +107,18 @@ public class ServiceRequestRepository {
     }
 
     public Optional<ServiceRequest> findById(UUID id) {
-        List<ServiceRequest> matches = jdbcTemplate.query("""
-                SELECT id, title, description, status, priority, created_at, assignee
-                FROM service_requests
-                WHERE id = ?
-                """, ROW_MAPPER, id);
+        List<ServiceRequest> matches = jdbcTemplate.query(SELECT_REQUEST + " WHERE r.id = ?", ROW_MAPPER, id);
 
         return matches.stream().findFirst();
     }
 
     public Optional<ServiceRequest> findByIdForUpdate(UUID id) {
-        return jdbcTemplate.query("SELECT * FROM service_requests WHERE id = ? FOR UPDATE",
+        return jdbcTemplate.query(SELECT_REQUEST + " WHERE r.id = ? FOR UPDATE OF r",
                 ROW_MAPPER, id).stream().findFirst();
     }
 
-    public void updateAssignment(UUID id, String assignee) {
-        jdbcTemplate.update("UPDATE service_requests SET assignee = ? WHERE id = ?", assignee, id);
+    public void updateAssignment(UUID id, UUID staffId) {
+        jdbcTemplate.update("UPDATE service_requests SET assignee_id = ? WHERE id = ?", staffId, id);
     }
 
     public void recordChange(UUID id, String field, String oldValue, String newValue) {
@@ -141,6 +147,8 @@ public class ServiceRequestRepository {
                 ServiceRequestStatus.valueOf(resultSet.getString("status")),
                 ServiceRequestPriority.valueOf(resultSet.getString("priority")),
                 resultSet.getTimestamp("created_at").toInstant(),
-                resultSet.getString("assignee"));
+                resultSet.getString("assignee"),
+                resultSet.getObject("assignee_id", UUID.class),
+                resultSet.getObject("assignee_active", Boolean.class));
     }
 }
