@@ -1,7 +1,7 @@
 backend:
   image:
     repository: request-tracker
-    tag: canary-fault-20261028015541
+    tag: canary-good-20261028015541
 frontend:
   image:
     repository: request-tracker-frontend
@@ -10,4 +10,4 @@ delivery:
   enabled: true
   replicas: 4
   traffic:
-    enabled: true
+    enabled: false
