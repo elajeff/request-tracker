@@ -14,6 +14,7 @@ PLURAL = "previewenvironments"
 OWNER = GROUP + "/owner-uid"
 FINALIZER = GROUP + "/cleanup"
 NAMESPACE = "preview-lab"
+DATABASE_IMAGE = "postgres:17-alpine@sha256:eee6c6e1b0894fa4fe0075eb054af9fd1cf39a35321c2d4110626cfe506411fb"
 api = None
 
 
@@ -166,7 +167,7 @@ def reconcile(body):
         credential = lambda key: {"secretKeyRef": {"name": prefix + "-credentials", "key": key}}
         db_env = [{"name": "POSTGRES_DB", "value": "preview"}, {"name": "PGDATA", "value": "/var/lib/postgresql/data/pgdata"},
                   {"name": "POSTGRES_USER", "valueFrom": credential("username")}, {"name": "POSTGRES_PASSWORD", "valueFrom": credential("password")}]
-        desired = [deployment(body, "db", "postgres:17-alpine", db_env, [{"name": "data", "persistentVolumeClaim": {"claimName": prefix + "-data"}}], [{"name": "data", "mountPath": "/var/lib/postgresql/data"}]),
+        desired = [deployment(body, "db", DATABASE_IMAGE, db_env, [{"name": "data", "persistentVolumeClaim": {"claimName": prefix + "-data"}}], [{"name": "data", "mountPath": "/var/lib/postgresql/data"}]),
             deployment(body, "backend", spec["backendImage"], [{"name": "SPRING_DATASOURCE_URL", "value": f"jdbc:postgresql://{prefix}-db:5432/preview"},
                 {"name": "SPRING_DATASOURCE_USERNAME", "valueFrom": credential("username")}, {"name": "SPRING_DATASOURCE_PASSWORD", "valueFrom": credential("password")}],
                 [{"name": "tmp", "emptyDir": {}}], [{"name": "tmp", "mountPath": "/tmp"}]),

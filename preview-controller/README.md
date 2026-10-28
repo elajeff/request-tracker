@@ -24,9 +24,9 @@ Intentional disposal requires a backup and confirmation that no pod mounts the P
 
 ## Run and verify
 
-The Python base is pinned by digest; `requirements.txt` declares direct dependencies and `constraints.txt` fixes their tested transitive versions. PostgreSQL remains the `17-alpine` upstream tag, so the complete environment is not a bit-for-bit reproducible artifact. Application tags/digests must already be available in the cluster.
+The Python base is pinned by digest; `requirements.txt` declares direct dependencies and `constraints.txt` fixes their tested transitive versions. The fixed PostgreSQL 17 Alpine reference is also pinned by digest. This fixes image/package selection; it does not assert bit-for-bit reproducible builds. Application tags/digests must already be available in the cluster.
 
-Build `preview-controller/Dockerfile` with a new unique tag, import it into `request-tracker-k3s` with k3d, and update the lab Deployment image explicitly. `lab.yaml` records the original verified `lab-v7` image; do not overwrite an existing image tag. Use the isolated kubeconfig for every command:
+Build `preview-controller/Dockerfile` with a new unique tag, import it into `request-tracker-k3s` with k3d, and update the lab Deployment image explicitly. `lab.yaml` records the hardened `security-20261028184215` image; do not overwrite an existing image tag. Use the isolated kubeconfig for every command:
 
 ```powershell
 kubectl --kubeconfig target/k3s-practice/kubeconfig.yaml --context k3d-request-tracker-k3s apply -f preview-controller/crd.yaml -f preview-controller/lab.yaml
@@ -55,3 +55,6 @@ The image `request-tracker-preview-controller:37969db-live-20261028182422` was b
 A separate temporary PostgreSQL pod read the newly retained request after preview deletion, then was removed. The pre-existing retained PVC/Secret pair preserved its UIDs and content hashes, and both kind/k3s application datasets matched their before-run snapshots. Final lab state: one Ready controller at one replica, zero active previews, and two intentionally retained PVC/credential Secret pairs. No generated credential values were found in controller logs. The default context remained `kind-request-tracker`.
 
 Runner stdout/stderr, exit status, lifecycle records, readback, and preservation checks are outside Git at `C:\Users\DESKTOP\request-tracker-backups\k3s-20261028-064246\reviewed-e2e-20261028-182421`. The immutable image was selected with an explicit lab Deployment override; the original `lab.yaml` image tag was not rewritten.
+
+
+The security/capstone review adds restricted Pod Security admission for `preview-lab` at policy version v1.37 and digest-pins PostgreSQL. See [review results and demonstration](../docs/runbooks/security-capstone.md).
