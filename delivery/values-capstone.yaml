@@ -1,7 +1,7 @@
 backend:
   image:
     repository: request-tracker
-    tag: capstone-good-20261028185252
+    tag: capstone-fault-20261028185252
 frontend:
   image:
     repository: request-tracker-frontend
