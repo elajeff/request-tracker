@@ -90,6 +90,11 @@ jobs:
       - name: Render Helm chart
         run: helm template request-tracker ./helm/request-tracker --namespace request-tracker
 
+      - name: Validate delivery chart mode
+        run: |
+          helm lint ./helm/request-tracker -f delivery/values-kind.yaml
+          helm template request-tracker-delivery ./helm/request-tracker --namespace request-tracker -f delivery/values-kind.yaml
+
   monitoring-verify:
     name: Monitoring rules
     runs-on: ubuntu-latest

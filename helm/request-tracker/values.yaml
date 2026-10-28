@@ -38,6 +38,12 @@ postgresql:
     requests:
       cpu: 100m
       memory: 256Mi
+
+delivery:
+  enabled: false
+  replicas: 4
+  traffic:
+    enabled: false
     limits:
       cpu: 500m
       memory: 512Mi
