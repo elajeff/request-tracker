@@ -21,6 +21,10 @@ Implemented API:
 - `GET /actuator/health` — application health.
 - `GET /actuator/prometheus` - application metrics in Prometheus format.
 
+Queue and history GET responses contain `items` and `nextCursor` (null at the end), replacing the previous bare arrays. Both accept `limit` (default 25, range 1–100) and the returned `cursor`. Queue search uses `q` across all titles, descriptions, UUIDs, and assignees, case-insensitively with literal substring matching. Queue responses also contain global `counts` (`total`, `newCount`, `inProgressCount`, `resolvedCount`).
+
+Use **Load more requests** or **Load older changes** to append pages. Search and Refresh restart from the newest results. Queue order is creation time then UUID descending; history uses descending change IDs. Cursors avoid shifts from new arrivals but do not freeze edits to search results.
+
 A new request has a title, description, UUID, creation timestamp, and `NEW` status. Titles must be 1–120 characters and descriptions 1–2000 characters. This initial API has no authentication and is intended for local development, not public deployment.
 
 ## Metrics

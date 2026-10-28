@@ -231,7 +231,7 @@ class ServiceRequestIntegrationTest {
         assertEquals(200, put(path, "{\"title\":\"Edited title\",\"description\":\"Edited details\"}").statusCode());
         assertEquals(400, patch(path + "/status", "{\"status\":\"NEW\"}").statusCode());
         assertEquals(6, historyCount(requestId));
-        var entries = service.findHistory(requestId);
+        var entries = service.findHistory(requestId, null, 25).items();
         assertEquals("DESCRIPTION", entries.getFirst().field());
         assertEquals("Status update test.", entries.getFirst().oldValue());
         assertEquals("Edited details", entries.getFirst().newValue());

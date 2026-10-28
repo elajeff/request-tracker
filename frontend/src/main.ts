@@ -21,6 +21,22 @@ interface RequestHistoryEntry {
   changedAt: string;
 }
 
+interface Page<T> {
+  items: T[];
+  nextCursor: string | null;
+}
+
+interface RequestCounts {
+  total: number;
+  newCount: number;
+  inProgressCount: number;
+  resolvedCount: number;
+}
+
+interface RequestQueuePage extends Page<ServiceRequest> {
+  counts: RequestCounts;
+}
+
 const assignmentDrafts = new Map<string, string>();
 
 const $ = <T extends HTMLElement>(id: string): T => {
@@ -41,10 +57,16 @@ const priorityInput = $("create-priority") as HTMLSelectElement;
 const createButton = $("create-button") as HTMLButtonElement;
 const connectionIndicator = $("connection-indicator");
 const apiStatus = $("api-status");
+const loadMoreButton = $("load-more-button") as HTMLButtonElement;
 
 let requests: ServiceRequest[] = [];
 let loadSequence = 0;
 let dataRevision = 0;
+let nextCursor: string | null = null;
+let activeQuery = "";
+let requestsLoading = false;
+let searchTimer: number | undefined;
+let counts: RequestCounts = { total: 0, newCount: 0, inProgressCount: 0, resolvedCount: 0 };
 const drafts = new Map<string, { title: string; description: string }>();
 
 async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
@@ -161,6 +183,7 @@ function statusOptions(status: RequestStatus): RequestStatus[] {
 function createRequestCard(request: ServiceRequest): HTMLElement {
   const card = document.createElement("article");
   card.className = "request-card";
+  card.dataset.requestId = request.id;
 
   const headingRow = document.createElement("div");
   headingRow.className = "request-heading-row";
@@ -351,6 +374,10 @@ function createRequestCard(request: ServiceRequest): HTMLElement {
       );
 
       dataRevision++;
+      const countKey = (status: RequestStatus): keyof RequestCounts =>
+        status === "NEW" ? "newCount" : status === "IN_PROGRESS" ? "inProgressCount" : "resolvedCount";
+      counts[countKey(request.status)]--;
+      counts[countKey(updated.status)]++;
       requests = requests.map((item) => item.id === updated.id
         ? { ...item, status: updated.status } : item);
       renderRequests();
@@ -431,20 +458,30 @@ function createRequestCard(request: ServiceRequest): HTMLElement {
   const historySummary = document.createElement("summary");
   historySummary.textContent = "Change history";
   const historyContent = document.createElement("div");
+  const historyNotice = document.createElement("p");
+  historyNotice.setAttribute("role", "status");
+  const historyMore = document.createElement("button");
+  historyMore.type = "button";
+  historyMore.className = "button button-secondary";
+  historyMore.textContent = "Load older changes";
+  historyMore.hidden = true;
   const historyRefresh = document.createElement("button");
   historyRefresh.type = "button";
   historyRefresh.className = "button button-secondary";
   historyRefresh.textContent = "Refresh history";
   let historyLoaded = false;
-  const loadHistory = async () => {
+  let historyCursor: string | null = null;
+  const loadHistory = async (append = false) => {
     if (historyRefresh.disabled) return;
     historyRefresh.disabled = true;
-    historyContent.textContent = "Loading history…";
+    historyMore.disabled = true;
+    historyNotice.textContent = "Loading history…";
     try {
-      const entries = await api<RequestHistoryEntry[]>(`/api/requests/${request.id}/history`);
-      historyContent.replaceChildren();
-      if (!entries.length) historyContent.textContent = "No recorded changes.";
-      for (const entry of entries) {
+      const parameters = new URLSearchParams({ limit: "25" });
+      if (append && historyCursor) parameters.set("cursor", historyCursor);
+      const page = await api<Page<RequestHistoryEntry>>(`/api/requests/${request.id}/history?${parameters}`);
+      if (!append) historyContent.replaceChildren();
+      for (const entry of page.items) {
         const item = document.createElement("div");
         item.className = "history-entry";
         const label = document.createElement("strong");
@@ -455,18 +492,23 @@ function createRequestCard(request: ServiceRequest): HTMLElement {
         item.append(label, values);
         historyContent.append(item);
       }
+      historyNotice.textContent = !append && !page.items.length ? "No recorded changes." : "";
+      historyCursor = page.nextCursor;
+      historyMore.hidden = historyCursor === null;
       historyLoaded = true;
     } catch (error) {
-      historyContent.textContent = `Could not load history: ${errorMessage(error)}`;
+      historyNotice.textContent = `Could not load history: ${errorMessage(error)}`;
     } finally {
       historyRefresh.disabled = false;
+      historyMore.disabled = false;
     }
   };
   history.addEventListener("toggle", () => {
     if (history.open && !historyLoaded) void loadHistory();
   });
   historyRefresh.addEventListener("click", () => void loadHistory());
-  history.append(historySummary, historyRefresh, historyContent);
+  historyMore.addEventListener("click", () => void loadHistory(true));
+  history.append(historySummary, historyRefresh, historyContent, historyNotice, historyMore);
 
   controls.append(statusControl.field, priorityControl.field);
   card.append(headingRow, description, meta, editButton, editForm, controls, assignmentForm, history);
@@ -474,33 +516,30 @@ function createRequestCard(request: ServiceRequest): HTMLElement {
   return card;
 }
 
-function renderRequests(): void {
-  const query = searchInput.value.trim().toLocaleLowerCase();
+function renderRequests(append = false): void {
+  const query = activeQuery.toLowerCase();
   const filtered = requests.filter((request) =>
     `${request.title} ${request.description} ${request.id} ${request.assignee ?? ""}`
-      .toLocaleLowerCase()
+      .toLowerCase()
       .includes(query)
   );
 
-  $("total-count").textContent = String(requests.length);
-  $("new-count").textContent = String(
-    requests.filter((request) => request.status === "NEW").length
-  );
-  $("progress-count").textContent = String(
-    requests.filter((request) => request.status === "IN_PROGRESS").length
-  );
-  $("resolved-count").textContent = String(
-    requests.filter((request) => request.status === "RESOLVED").length
-  );
+  $("total-count").textContent = String(counts.total);
+  $("new-count").textContent = String(counts.newCount);
+  $("progress-count").textContent = String(counts.inProgressCount);
+  $("resolved-count").textContent = String(counts.resolvedCount);
 
   $("request-summary").textContent = query
-    ? `Showing ${filtered.length} of ${requests.length} requests`
-    : `${requests.length} ${requests.length === 1 ? "request" : "requests"}`;
+    ? `${filtered.length} matching requests loaded`
+    : `Showing ${requests.length} of ${counts.total} requests`;
+  loadMoreButton.hidden = nextCursor === null;
+  loadMoreButton.disabled = requestsLoading || searchInput.value.trim() !== activeQuery;
 
-  requestList.replaceChildren();
+  if (!append) requestList.replaceChildren();
+  const renderedIds = new Set(Array.from(requestList.children, (card) => (card as HTMLElement).dataset.requestId));
 
   for (const request of filtered) {
-    requestList.append(createRequestCard(request));
+    if (!renderedIds.has(request.id)) requestList.append(createRequestCard(request));
   }
 
   emptyState.hidden = filtered.length !== 0;
@@ -512,27 +551,45 @@ function renderRequests(): void {
     : "Create your first request using the form.";
 }
 
-async function loadRequests(): Promise<void> {
+async function loadRequests(append = false): Promise<void> {
+  window.clearTimeout(searchTimer);
+  if (append && (requestsLoading || !nextCursor || searchInput.value.trim() !== activeQuery)) return;
   const load = ++loadSequence;
   const revision = dataRevision;
+  const query = append ? activeQuery : searchInput.value.trim();
+  requestsLoading = true;
+  loadMoreButton.disabled = true;
   loadingPlaceholder.hidden = false;
 
   try {
-    const loaded = await api<ServiceRequest[]>("/api/requests");
-    if (load !== loadSequence || revision !== dataRevision) return;
-    requests = loaded;
+    const parameters = new URLSearchParams({ limit: "25", q: query });
+    if (append && nextCursor) parameters.set("cursor", nextCursor);
+    const loaded = await api<RequestQueuePage>(`/api/requests?${parameters}`);
+    if (load !== loadSequence) return;
+    if (revision !== dataRevision) {
+      void loadRequests();
+      return;
+    }
+    requests = append ? [...requests, ...loaded.items.filter((item) => !requests.some((existing) => existing.id === item.id))]
+      : loaded.items;
+    counts = loaded.counts;
+    nextCursor = loaded.nextCursor;
+    activeQuery = query;
     setConnectionStatus(true);
-    renderRequests();
+    renderRequests(append);
   } catch (error) {
     if (load !== loadSequence || revision !== dataRevision) return;
     setConnectionStatus(false);
-    renderRequests();
     showNotice(
       `Could not load requests. Make sure the backend and PostgreSQL are running. ${errorMessage(error)}`,
       "error"
     );
   } finally {
-    if (load === loadSequence) loadingPlaceholder.hidden = true;
+    if (load === loadSequence) {
+      requestsLoading = false;
+      loadingPlaceholder.hidden = true;
+      loadMoreButton.disabled = searchInput.value.trim() !== activeQuery;
+    }
   }
 }
 
@@ -543,7 +600,13 @@ function updateCharacterCounts(): void {
 
 titleInput.addEventListener("input", updateCharacterCounts);
 descriptionInput.addEventListener("input", updateCharacterCounts);
-searchInput.addEventListener("input", renderRequests);
+searchInput.addEventListener("input", () => {
+  ++loadSequence;
+  window.clearTimeout(searchTimer);
+  loadMoreButton.disabled = true;
+  searchTimer = window.setTimeout(() => void loadRequests(), 250);
+});
+loadMoreButton.addEventListener("click", () => void loadRequests(true));
 $("refresh-button").addEventListener("click", () => void loadRequests());
 
 createForm.addEventListener("submit", async (event) => {
@@ -571,6 +634,8 @@ createForm.addEventListener("submit", async (event) => {
     });
 
     dataRevision++;
+    counts.total++;
+    counts.newCount++;
     requests = [created, ...requests];
     createForm.reset();
     priorityInput.value = "MEDIUM";

@@ -1,7 +1,6 @@
 package dev.elajeff.requesttracker.requests;
 
 import java.net.URI;
-import java.util.List;
 import java.util.UUID;
 
 import jakarta.validation.Valid;
@@ -14,6 +13,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -38,8 +38,11 @@ public class ServiceRequestController {
     }
 
     @GetMapping
-    public List<ServiceRequest> findAll() {
-        return service.findAll();
+    public RequestQueuePage findAll(
+            @RequestParam(defaultValue = "") String q,
+            @RequestParam(required = false) String cursor,
+            @RequestParam(defaultValue = "25") int limit) {
+        return service.findPage(q, cursor, limit);
     }
 
     @GetMapping("/{id}")
@@ -76,7 +79,9 @@ public class ServiceRequestController {
     }
 
     @GetMapping("/{id}/history")
-    public List<RequestHistoryEntry> findHistory(@PathVariable UUID id) {
-        return service.findHistory(id);
+    public RequestHistoryPage findHistory(@PathVariable UUID id,
+            @RequestParam(required = false) String cursor,
+            @RequestParam(defaultValue = "25") int limit) {
+        return service.findHistory(id, cursor, limit);
     }
 }
