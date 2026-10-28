@@ -1,0 +1,12 @@
+backend:
+  image:
+    repository: request-tracker
+    tag: k3s-e4a0d80-20261028063718
+frontend:
+  image:
+    repository: request-tracker-frontend
+    tag: k3s-e4a0d80-20261028063718
+postgresql:
+  existingSecret: request-tracker-k3s-db
+  persistence:
+    storageClassName: local-path

@@ -1,0 +1,56 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: request-tracker-delivery
+  namespace: argocd
+spec:
+  sourceRepos: [https://github.com/elajeff/request-tracker.git]
+  destinations:
+    - namespace: request-tracker
+      server: https://kubernetes.default.svc
+  clusterResourceBlacklist:
+    - group: '*'
+      kind: '*'
+  namespaceResourceWhitelist:
+    - {group: '', kind: ConfigMap}
+    - {group: '', kind: Service}
+    - {group: '', kind: ServiceAccount}
+    - {group: apps, kind: Deployment}
+    - {group: rbac.authorization.k8s.io, kind: Role}
+    - {group: rbac.authorization.k8s.io, kind: RoleBinding}
+    - {group: argoproj.io, kind: Rollout}
+    - {group: argoproj.io, kind: AnalysisTemplate}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: request-tracker-delivery
+  namespace: argocd
+spec:
+  project: request-tracker-delivery
+  source:
+    repoURL: https://github.com/elajeff/request-tracker.git
+    targetRevision: main
+    path: helm/request-tracker
+    helm:
+      releaseName: request-tracker-delivery
+      valueFiles: [../../delivery/values-kind.yaml]
+      parameters:
+        - name: backend.image.tag
+          value: k3s-e4a0d80-20261028063718-good
+        - name: frontend.image.tag
+          value: k3s-e4a0d80-20261028063718
+        - name: postgresql.existingSecret
+          value: request-tracker-k3s-db
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: request-tracker
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions: [RespectIgnoreDifferences=true]
+  ignoreDifferences:
+    - group: ''
+      kind: Service
+      jsonPointers: [/spec/selector/rollouts-pod-template-hash]
