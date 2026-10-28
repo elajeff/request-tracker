@@ -1,0 +1,10 @@
+apiVersion: previews.request-tracker.dev/v1
+kind: PreviewEnvironment
+metadata:
+  name: demo
+  namespace: preview-lab
+spec:
+  backendImage: request-tracker:k3s-e4a0d80-20261028063718
+  frontendImage: request-tracker-frontend:k3s-e4a0d80-20261028063718
+  ttlSeconds: 3600
+  storageRetentionPolicy: Retain
