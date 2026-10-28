@@ -28,7 +28,7 @@ Backend replacement preserved all data. During PostgreSQL scale-down, readiness 
 
 The initial backend pod restarted once during first installation; its replacement had zero restarts across the outage. No cause is asserted for that initial restart.
 
-`k3s-final.dump` restored into the separate `request-tracker-restore-check` PostgreSQL pod using ephemeral storage. All four requests, one staff record, eleven history rows, assignments, and Flyway V1–V5 matched exactly. The restore instance remains isolated from the working application.
+`k3s-final.dump` restored into the separate `request-tracker-restore-check` PostgreSQL pod using ephemeral storage. All four requests, one staff record, eleven history rows, assignments, and Flyway V1–V5 matched exactly. The temporary restore pod was removed after saving its verification, identity, and the backup outside Git; the working database and PVC were retained.
 
 Evidence and the backup are outside Git at `C:\Users\DESKTOP\request-tracker-backups\k3s-20261028-064246`.
 
@@ -53,4 +53,4 @@ All 148 failures remain counted, including the five during restoration. Separate
 
 At 04:53:41.362Z, Argo was Healthy/Synced at `e4a0d80`, with four ready stable replicas (`b696cdf94`) and no fault-image pods. The final backend is `request-tracker:k3s-e4a0d80-20261028063718-good`, an immutable alias of the tested baseline artifact; the frontend retains `k3s-e4a0d80-20261028063718`. Requests, assignments, staff, history, Flyway, Secret/configuration digests, PVC identity, and StatefulSet specification matched their snapshots. Kind's data/resources and default context were unchanged. The k3s server used about 3.14 GiB of its 5 GiB cap at the final sample; host free disk was 9.5 GiB.
 
-The single-node cluster and local-path storage provide no node-failure redundancy. The restore pod remains running with its independent ephemeral database. These container-based k3s results do not cover native Linux service management, multiple nodes, RKE2, or cloud storage.
+The single-node cluster and local-path storage provide no node-failure redundancy. These container-based k3s results do not cover native Linux service management, multiple nodes, RKE2, or cloud storage.
