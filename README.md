@@ -2,11 +2,11 @@
 
 Request Tracker is a service-request management application used to practise the full software development lifecycle: maintainable application code, automated testing, container builds, Kubernetes deployment, progressive delivery, observability, security, and recovery.
 
-**Current functionality:** a Java 21 / Spring Boot API backed by PostgreSQL, plus a TypeScript/Vite dashboard for creating, searching, editing, and updating service requests. Docker Compose and Helm support local deployment; optional local Prometheus/Grafana monitoring is available; progressive delivery remains planned.
+**Current functionality:** a Java 21 / Spring Boot API backed by PostgreSQL, plus a TypeScript/Vite dashboard for creating, searching, editing, and updating service requests. Docker Compose and Helm support local deployment. Local monitoring, verified Argo CD/Rollouts delivery, kind/k3s recovery exercises, and an isolated PreviewEnvironment controller are implemented; see the [release checklist](docs/release-checklist.md).
 
 ## Application
 
-Employees can submit service requests. The dashboard supports searching the queue, editing titles and descriptions, changing priority, and advancing status from `NEW` to `IN_PROGRESS` to `RESOLVED`. Requests can be assigned to support staff using a name label. Each request shows persistent change history for its details, status, priority, and assignment. Names are not authenticated identities.
+Employees can submit service requests. The dashboard supports searching the queue, editing titles and descriptions, changing priority, and advancing status from `NEW` to `IN_PROGRESS` to `RESOLVED`. Requests can be assigned to persistent active/inactive staff directory records; new assignments to inactive staff are rejected. Each request shows persistent change history for its details, status, priority, and assignment. Names are not authenticated identities.
 
 Implemented API:
 
@@ -40,7 +40,7 @@ This endpoint is unauthenticated and intended for local or cluster-internal moni
 - Reproducible local development with Docker Compose.
 - CI with GitHub Actions for backend verification, frontend builds, and container image builds.
 - Helm deployment to local `kind`, with probes, resource limits, persistent PostgreSQL storage, ConfigMap/Secret configuration, and a ServiceAccount without API-token automount.
-- Further deployment and recovery exercises on `kind`, then k3s and RKE2.
+- Verified deployment/recovery exercises on kind and k3s; RKE2 is deferred for v0.1.0.
 - Helm, Argo CD, Argo Rollouts, Prometheus, and Grafana.
 - Security checks, backup/restore exercises, incident runbooks, and a small custom Kubernetes controller.
 
