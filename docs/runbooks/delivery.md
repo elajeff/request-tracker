@@ -36,6 +36,22 @@ An aborted Rollout can still reference the bad desired image until Git is correc
 
 ## Evidence
 
-Controller installation and manifest preparation alone do not complete Delivery. Record actual commit IDs, Application sync revisions, analysis outcomes, exposure measurements, stable availability, final image/hash, persistence comparison, and any failed/unrun checks after running the exercises. Browser verification remains separate from API/rollout verification.
+Verified on 28 October 2026 against the published `delivery/argocd-rollouts` branch:
 
-Baseline validation on 28 October 2026: Argo CD fetched and synchronized `2f1c512`, but Rollouts rejected the router-specific delay fields. Removing them produced four healthy replicas. The analysis provider's short hostname also failed from the controller namespace; the fully qualified Service address restored connectivity. Against live traffic, all three baseline metrics passed three measurements each. A nonexistent revision failed with traffic `[0]` and empty error/latency vectors. These baseline checks do not establish candidate promotion or abort.
+| Stage | Commit | Observed result |
+| --- | --- | --- |
+| Repair | `3af44db` | Healthy/Synced; four ready replicas; automated prune/self-heal restored. |
+| Drift | `3af44db` | Frontend replicas 1 → 2 → 1; OutOfSync → Synced/Healthy without a manual correction. |
+| Promotion | `a6853ef` | Stable/candidate replicas 3/1 → 2/2 → 0/4. Candidate share of `/api/staff` traffic measured 22.1% → 55.3% → 100%. Both Rollout-owned inline AnalysisRuns passed all three metrics, three measurements each. |
+| Abort | `ed0d2b4` | Candidate 5xx ratio `[1]` exceeded the 5% gate. AnalysisRun `request-tracker-delivery-5bbd6f86f8-3-2` failed; Rollouts automatically set abort, restored four stable replicas, and scaled the fault ReplicaSet to zero. Routed traffic recorded 185 HTTP 500s. All 93 paired stable/fallback availability samples through abort passed. |
+| Restore | `ab79c62` | Healthy/Synced; stable hash `84b7bcf6bc`, four ready replicas, no fault-image pods, traffic deployment pruned, automated prune/self-heal enabled. |
+
+Final delivery backend: `request-tracker:canary-good-20261028015541`. Delivery frontend: `request-tracker-frontend:release-5ffe039-20261028015541`. Helm fallback revision 3 retains the V5-compatible `release-5ffe039-20261028015541` images.
+
+All request, staff, and history rows and Flyway state matched the pre-exercise snapshot: five requests, two staff records, nine history entries, versions 1–5. Database Secret, PVC, StatefulSet specification, and ConfigMap identities/content were unchanged. Both application stacks passed V5 reads and readiness/liveness checks.
+
+The initial `2f1c512` specification failed runtime validation because replica-weighted canaries reject traffic-router delay fields. The initial short Prometheus hostname also failed across namespaces. The repair removed those fields and used fully qualified Service DNS. Live baseline analysis then passed; a nonexistent revision failed with zero traffic and empty metric vectors.
+
+Limitations: 457 paired availability probes recorded one brief stable-Service endpoint gap during successful promotion, with no Helm fallback failure. Ten subsequent stable probes passed before the fault stage. The traffic generator also recorded connection errors during endpoint changes; HTTP analysis alone does not measure those errors. This exercise does not establish zero-downtime promotion, production SLOs, or browser acceptance. Browser acceptance remains unverified.
+
+Raw observations and database snapshots are outside Git at `C:\Users\DESKTOP\request-tracker-backups\20261028-015609\delivery-20261028-025205`. That directory also contains `request-tracker-v5-final.dump`; this final dump has not been restore-tested. The pre-upgrade backup's isolated restore/migration rehearsal is documented in [local recovery](local-recovery.md).
