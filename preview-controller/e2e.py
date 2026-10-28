@@ -73,6 +73,9 @@ def create(name, ttl=3600, retention="Delete"):
 
 base = {"apiVersion": GROUP + "/v1", "kind": "PreviewEnvironment", "metadata": {"name": "invalid-check", "namespace": "preview-lab"},
         "spec": {"backendImage": "request-tracker:valid", "frontendImage": "frontend:valid"}}
+defaulted = json.loads(run("create", "--dry-run=server", "-f", "-", "-o", "json", input=json.dumps(base)).stdout)
+assert defaulted["spec"]["ttlSeconds"] == 3600 and defaulted["spec"]["storageRetentionPolicy"] == "Retain"
+record("server defaults verified")
 for change in [{"ttlSeconds": 0}, {"ttlSeconds": 86401}, {"backendImage": "untagged"}, {"storageRetentionPolicy": "Unknown"}]:
     obj = copy.deepcopy(base)
     obj["spec"].update(change)
@@ -143,7 +146,7 @@ for component in ["backend", "frontend", "db"]:
     assert get("deployment", prefix + "-" + component) is None and get("service", prefix + "-" + component) is None
 record("default deletion retains PVC and credentials and removes workloads", prefix=prefix, request=request_id)
 
-again = create("demo")
+create("demo")
 again = wait(lambda: ready("demo"), "recreated name Ready with independent resources")
 assert again["status"]["resourcePrefix"] != prefix
 delete("demo")
@@ -151,14 +154,16 @@ assert get("pvc", again["status"]["resourcePrefix"] + "-data") is None
 
 # Pause only the lab controller to place a foreign resource before its first reconcile.
 run("scale", "deployment/preview-controller", "--replicas=0")
-run("rollout", "status", "deployment/preview-controller", "--timeout=60s")
-conflict = create("conflict")
-suffix = hashlib.sha256(conflict["metadata"]["uid"].encode()).hexdigest()[:10]
-foreign_name = "pe-conflict-" + suffix + "-db"
-foreign = {"apiVersion": "v1", "kind": "Service", "metadata": {"name": foreign_name, "namespace": "preview-lab"}, "spec": {"ports": [{"port": 5432}]}}
-run("create", "-f", "-", input=json.dumps(foreign))
-foreign_uid = get("service", foreign_name)["metadata"]["uid"]
-run("scale", "deployment/preview-controller", "--replicas=1")
+try:
+    run("rollout", "status", "deployment/preview-controller", "--timeout=60s")
+    conflict = create("conflict")
+    suffix = hashlib.sha256(conflict["metadata"]["uid"].encode()).hexdigest()[:10]
+    foreign_name = "pe-conflict-" + suffix + "-db"
+    foreign = {"apiVersion": "v1", "kind": "Service", "metadata": {"name": foreign_name, "namespace": "preview-lab"}, "spec": {"ports": [{"port": 5432}]}}
+    run("create", "-f", "-", input=json.dumps(foreign))
+    foreign_uid = get("service", foreign_name)["metadata"]["uid"]
+finally:
+    run("scale", "deployment/preview-controller", "--replicas=1")
 run("rollout", "status", "deployment/preview-controller", "--timeout=90s")
 wait(lambda: next(iter(get("preview", "conflict").get("status", {}).get("conditions", [])), {}).get("reason") == "OwnershipConflict", "foreign naming conflict reported")
 delete("conflict")

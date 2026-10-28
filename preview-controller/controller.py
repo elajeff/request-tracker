@@ -212,11 +212,21 @@ def startup(settings, **_):
 @kopf.on.resume(GROUP, VERSION, PLURAL)
 @kopf.timer(GROUP, VERSION, PLURAL, interval=5)
 def sync(body, **_):
-    reconcile(body)
+    try:
+        reconcile(body)
+    except ApiException as error:
+        raise kopf.TemporaryError(f"Kubernetes API {error.status}", delay=5) from None
 
 
 @kopf.on.delete(GROUP, VERSION, PLURAL)
 def cleanup(body, **_):
+    try:
+        cleanup_owned(body)
+    except ApiException as error:
+        raise kopf.TemporaryError(f"Cleanup API {error.status}", delay=5) from None
+
+
+def cleanup_owned(body):
     prefix, uid = names(body), body["metadata"]["uid"]
     targets = [("apps/v1", "Deployment", prefix + "-" + x, False) for x in ["frontend", "backend", "db"]]
     targets += [("v1", "Service", prefix + "-" + x, False) for x in ["frontend", "backend", "db"]]
