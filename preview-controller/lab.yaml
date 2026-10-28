@@ -98,7 +98,7 @@ spec:
         seccompProfile: {type: RuntimeDefault}
       containers:
         - name: controller
-          image: request-tracker-preview-controller:lab-v7
+          image: request-tracker-preview-controller:security-20261028184215
           imagePullPolicy: IfNotPresent
           securityContext:
             readOnlyRootFilesystem: true
