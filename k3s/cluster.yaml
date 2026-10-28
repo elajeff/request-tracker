@@ -1,0 +1,26 @@
+apiVersion: k3d.io/v1alpha5
+kind: Simple
+metadata:
+  name: request-tracker-k3s
+servers: 1
+agents: 0
+image: rancher/k3s:v1.37.1-k3s1
+kubeAPI:
+  hostIP: 127.0.0.1
+  hostPort: "6551"
+options:
+  k3d:
+    wait: true
+    timeout: 180s
+    disableLoadbalancer: true
+  k3s:
+    extraArgs:
+      - arg: --disable=traefik
+        nodeFilters: [server:0]
+      - arg: --disable=servicelb
+        nodeFilters: [server:0]
+  kubeconfig:
+    updateDefaultKubeconfig: false
+    switchCurrentContext: false
+  runtime:
+    serversMemory: 5g
