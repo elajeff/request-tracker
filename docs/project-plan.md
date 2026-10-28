@@ -76,8 +76,8 @@ The initial backend will be Java 21 with Spring Boot and PostgreSQL. A TypeScrip
 
 ### 7. Advanced controller and operational capstone
 
-- Define a `PreviewEnvironment` CustomResourceDefinition and implement a small controller that reconciles preview resources.
-- Test idempotency, retries, invalid specifications, status conditions, cleanup, and RBAC.
+- [x] Implement a namespaced `PreviewEnvironment` v1 controller with isolated resources; see [API and verification](../preview-controller/README.md).
+- [x] Verify idempotency, retry behavior, invalid specifications, status conditions, retention/cleanup, and lab RBAC.
 - Complete targeted CKA/CKAD/CKS-style practice labs without requiring paid exams.
 - Test database backup and restore, document cluster recovery procedures, and run selected failure/security scenarios.
 - Publish a final walkthrough, architecture documentation, runbooks, and a release when the product is sufficiently complete.
