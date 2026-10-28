@@ -70,7 +70,7 @@ The initial backend will be Java 21 with Spring Boot and PostgreSQL. A TypeScrip
 
 ### 6. Distribution practice
 
-- Repeat a selected set of deployment, troubleshooting, and recovery exercises on k3s.
+- [x] Repeat selected deployment, recovery, promotion, and abort exercises on k3s; see [verified results](runbooks/k3s.md).
 - Compare selected behavior with RKE2 if local resources allow.
 - Record only observed differences; do not imply cloud-provider deployment unless it was actually performed.
 
