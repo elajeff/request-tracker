@@ -64,8 +64,8 @@ The initial backend will be Java 21 with Spring Boot and PostgreSQL. A TypeScrip
 - [x] Add application metrics and a local Prometheus/Grafana dashboard.
 - [x] Add tested local availability, error-rate, and latency alerts.
 - [ ] Define service-level objectives from measured application behavior.
-- Use Argo CD for GitOps synchronization once basic deployment is repeatable.
-- Use Argo Rollouts for a controlled canary/abort exercise and validate behavior with metrics.
+- [x] Use Argo CD for GitOps synchronization and verify controlled drift reconciliation.
+- [x] Use Argo Rollouts for successful canary promotion and automatic abort under measured HTTP traffic; see [delivery results](runbooks/delivery.md).
 - Document a failure, diagnosis, corrective change, and recovery.
 
 ### 6. Distribution practice

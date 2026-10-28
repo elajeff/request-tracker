@@ -1,0 +1,190 @@
+{{- if .Values.delivery.enabled }}
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: request-tracker-delivery
+spec:
+  replicas: {{ .Values.delivery.replicas }}
+  revisionHistoryLimit: 3
+  progressDeadlineSeconds: 300
+  progressDeadlineAbort: true
+  selector:
+    matchLabels: {app: request-tracker-delivery, component: backend}
+  strategy:
+    canary:
+      stableService: request-tracker-delivery-stable
+      canaryService: request-tracker-delivery-canary
+      maxSurge: 1
+      maxUnavailable: 0
+      steps:
+        - setWeight: 25
+        - pause: {duration: 45s}
+        - analysis:
+            templates: [{templateName: request-tracker-delivery-http}]
+            args:
+              - name: revision
+                valueFrom: {podTemplateHashValue: Latest}
+        - setWeight: 50
+        - pause: {duration: 30s}
+        - analysis:
+            templates: [{templateName: request-tracker-delivery-http}]
+            args:
+              - name: revision
+                valueFrom: {podTemplateHashValue: Latest}
+        - setWeight: 100
+  template:
+    metadata:
+      labels: {app: request-tracker-delivery, component: backend}
+    spec:
+      # Covers the 5s drain, Spring's 30s web shutdown budget, and 5s of margin.
+      terminationGracePeriodSeconds: 40
+      serviceAccountName: request-tracker
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: backend
+          image: "{{ .Values.backend.image.repository }}:{{ .Values.backend.image.tag }}"
+          imagePullPolicy: IfNotPresent
+          ports: [{name: http, containerPort: 8080}]
+          lifecycle:
+            preStop:
+              exec:
+                # Allow endpoint and service-proxy updates before the JVM stops accepting requests.
+                command: [sh, -c, "sleep 5"]
+          envFrom: [{configMapRef: {name: request-tracker-config}}]
+          env:
+            - name: SPRING_DATASOURCE_USERNAME
+              valueFrom: {secretKeyRef: {name: {{ .Values.postgresql.existingSecret }}, key: username}}
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom: {secretKeyRef: {name: {{ .Values.postgresql.existingSecret }}, key: password}}
+            - name: MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE
+              value: health,prometheus
+          startupProbe:
+            httpGet: {path: /actuator/health/liveness, port: http}
+            periodSeconds: 5
+            failureThreshold: 36
+            timeoutSeconds: 2
+          livenessProbe:
+            httpGet: {path: /actuator/health/liveness, port: http}
+            periodSeconds: 10
+            timeoutSeconds: 2
+          readinessProbe:
+            httpGet: {path: /actuator/health/readiness, port: http}
+            periodSeconds: 5
+            timeoutSeconds: 2
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: [ALL]}
+          resources:
+            {{- toYaml .Values.backend.resources | nindent 12 }}
+          volumeMounts: [{name: tmp, mountPath: /tmp}]
+      volumes: [{name: tmp, emptyDir: {}}]
+---
+{{- range $name := list "request-tracker-delivery" "request-tracker-delivery-stable" "request-tracker-delivery-canary" }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $name }}
+spec:
+  selector: {app: request-tracker-delivery, component: backend}
+  ports: [{name: http, port: 8080, targetPort: http}]
+---
+{{- end }}
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: request-tracker-delivery-http
+spec:
+  args: [{name: revision}]
+  metrics:
+    - name: traffic-present
+      interval: 15s
+      count: 3
+      failureLimit: 0
+      successCondition: len(result) == 1 && result[0] >= 0.5
+      provider:
+        prometheus:
+          address: http://request-tracker-delivery-prometheus.request-tracker.svc.cluster.local:9090
+          query: >-
+            sum(rate(http_server_requests_seconds_count{job="request-tracker-delivery",revision="{{ "{{args.revision}}" }}",uri!~"/actuator/.*"}[30s])) or vector(0)
+    - name: error-rate
+      interval: 15s
+      count: 3
+      failureLimit: 0
+      successCondition: len(result) == 1 && result[0] >= 0 && result[0] < 0.05
+      provider:
+        prometheus:
+          address: http://request-tracker-delivery-prometheus.request-tracker.svc.cluster.local:9090
+          query: >-
+            (sum(rate(http_server_requests_seconds_count{job="request-tracker-delivery",revision="{{ "{{args.revision}}" }}",uri!~"/actuator/.*",status=~"5.."}[30s])) or vector(0))
+            / sum(rate(http_server_requests_seconds_count{job="request-tracker-delivery",revision="{{ "{{args.revision}}" }}",uri!~"/actuator/.*"}[30s]))
+    - name: mean-latency
+      interval: 15s
+      count: 3
+      failureLimit: 0
+      successCondition: len(result) == 1 && result[0] >= 0 && result[0] < 1
+      provider:
+        prometheus:
+          address: http://request-tracker-delivery-prometheus.request-tracker.svc.cluster.local:9090
+          query: >-
+            sum(rate(http_server_requests_seconds_sum{job="request-tracker-delivery",revision="{{ "{{args.revision}}" }}",uri!~"/actuator/.*"}[30s]))
+            / sum(rate(http_server_requests_seconds_count{job="request-tracker-delivery",revision="{{ "{{args.revision}}" }}",uri!~"/actuator/.*"}[30s]))
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: request-tracker-delivery-frontend
+data:
+  default.conf: |
+    server {
+      listen 8080;
+      root /usr/share/nginx/html;
+      location / { try_files $uri $uri/ /index.html; }
+      location /api/ { proxy_pass http://request-tracker-delivery:8080; }
+      location /actuator/ { proxy_pass http://request-tracker-delivery:8080; }
+    }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: request-tracker-delivery-frontend
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: request-tracker-delivery, component: frontend}}
+  template:
+    metadata:
+      labels: {app: request-tracker-delivery, component: frontend}
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 101
+        runAsGroup: 101
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: frontend
+          image: "{{ .Values.frontend.image.repository }}:{{ .Values.frontend.image.tag }}"
+          ports: [{name: http, containerPort: 8080}]
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: {drop: [ALL]}
+          readinessProbe: {httpGet: {path: /, port: http}, periodSeconds: 5}
+          livenessProbe: {httpGet: {path: /, port: http}, periodSeconds: 10}
+          resources:
+            {{- toYaml .Values.frontend.resources | nindent 12 }}
+          volumeMounts: [{name: nginx, mountPath: /etc/nginx/conf.d/default.conf, subPath: default.conf}]
+      volumes: [{name: nginx, configMap: {name: request-tracker-delivery-frontend}}]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: request-tracker-delivery-frontend
+spec:
+  selector: {app: request-tracker-delivery, component: frontend}
+  ports: [{name: http, port: 80, targetPort: http}]
+{{- end }}

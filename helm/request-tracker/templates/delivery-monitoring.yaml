@@ -1,0 +1,133 @@
+{{- if .Values.delivery.enabled }}
+apiVersion: v1
+kind: ServiceAccount
+metadata: {name: request-tracker-delivery-prometheus}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata: {name: request-tracker-delivery-prometheus}
+rules:
+  - apiGroups: ['']
+    resources: [pods]
+    verbs: [get, list, watch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata: {name: request-tracker-delivery-prometheus}
+subjects:
+  - {kind: ServiceAccount, name: request-tracker-delivery-prometheus, namespace: request-tracker}
+roleRef: {apiGroup: rbac.authorization.k8s.io, kind: Role, name: request-tracker-delivery-prometheus}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata: {name: request-tracker-delivery-prometheus}
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 5s
+      evaluation_interval: 5s
+    scrape_configs:
+      - job_name: request-tracker-delivery
+        metrics_path: /actuator/prometheus
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces: {names: [request-tracker]}
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_label_app]
+            regex: request-tracker-delivery
+            action: keep
+          - source_labels: [__meta_kubernetes_pod_label_component]
+            regex: backend
+            action: keep
+          - source_labels: [__meta_kubernetes_pod_container_port_name]
+            regex: http
+            action: keep
+          - source_labels: [__meta_kubernetes_pod_label_rollouts_pod_template_hash]
+            target_label: revision
+          - source_labels: [__meta_kubernetes_pod_name]
+            target_label: pod
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: request-tracker-delivery-prometheus}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: request-tracker-delivery, component: prometheus}}
+  template:
+    metadata:
+      labels: {app: request-tracker-delivery, component: prometheus}
+    spec:
+      serviceAccountName: request-tracker-delivery-prometheus
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        runAsGroup: 65534
+        fsGroup: 65534
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: prometheus
+          image: prom/prometheus:v3.10.0@sha256:4a61322ac1103a0e3aea2a61ef1718422a48fa046441f299d71e660a3bc71ae9
+          args: [--config.file=/etc/prometheus/prometheus.yml, --storage.tsdb.path=/prometheus, --storage.tsdb.retention.time=2h]
+          ports: [{name: http, containerPort: 9090}]
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: [ALL]}
+          readinessProbe: {httpGet: {path: /-/ready, port: http}, periodSeconds: 5}
+          livenessProbe: {httpGet: {path: /-/healthy, port: http}, periodSeconds: 10}
+          resources:
+            requests: {cpu: 50m, memory: 128Mi}
+            limits: {cpu: 250m, memory: 256Mi}
+          volumeMounts:
+            - {name: config, mountPath: /etc/prometheus, readOnly: true}
+            - {name: data, mountPath: /prometheus}
+      volumes:
+        - {name: config, configMap: {name: request-tracker-delivery-prometheus}}
+        - {name: data, emptyDir: {}}
+---
+apiVersion: v1
+kind: Service
+metadata: {name: request-tracker-delivery-prometheus}
+spec:
+  selector: {app: request-tracker-delivery, component: prometheus}
+  ports: [{name: http, port: 9090, targetPort: http}]
+{{- if .Values.delivery.traffic.enabled }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata: {name: request-tracker-delivery-traffic}
+data:
+  traffic.py: |
+{{ .Files.Get "files/traffic.py" | indent 4 }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: request-tracker-delivery-traffic}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: request-tracker-delivery, component: traffic}}
+  template:
+    metadata:
+      labels: {app: request-tracker-delivery, component: traffic}
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: traffic
+          image: python:3.13-alpine@sha256:8bcfa47b04b853a17aaf909362b847b2112fd6ec4105ea553ef9a43bafbb5916
+          command: [python, -B, /exercise/traffic.py]
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: [ALL]}
+          resources:
+            requests: {cpu: 25m, memory: 32Mi}
+            limits: {cpu: 100m, memory: 64Mi}
+          volumeMounts: [{name: script, mountPath: /exercise, readOnly: true}]
+      volumes: [{name: script, configMap: {name: request-tracker-delivery-traffic}}]
+{{- end }}
+{{- end }}

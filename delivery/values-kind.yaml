@@ -1,0 +1,13 @@
+backend:
+  image:
+    repository: request-tracker
+    tag: canary-good-20261028015541
+frontend:
+  image:
+    repository: request-tracker-frontend
+    tag: release-5ffe039-20261028015541
+delivery:
+  enabled: true
+  replicas: 4
+  traffic:
+    enabled: false

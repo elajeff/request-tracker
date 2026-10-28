@@ -1,3 +1,4 @@
+{{- if not .Values.delivery.enabled }}
 apiVersion: v1
 kind: Service
 metadata:
@@ -84,3 +85,5 @@ spec:
         resources:
           requests:
             storage: {{ .Values.postgresql.persistence.size }}
+
+{{- end }}

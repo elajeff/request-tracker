@@ -1,3 +1,4 @@
+{{- if not .Values.delivery.enabled }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -7,3 +8,5 @@ data:
   SPRING_FLYWAY_ENABLED: "true"
   MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: "health"
   MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED: "true"
+
+{{- end }}
