@@ -36,6 +36,8 @@ spec:
     metadata:
       labels: {app: request-tracker-delivery, component: backend}
     spec:
+      # Covers the 5s drain, Spring's 30s web shutdown budget, and 5s of margin.
+      terminationGracePeriodSeconds: 40
       serviceAccountName: request-tracker
       automountServiceAccountToken: false
       securityContext:
