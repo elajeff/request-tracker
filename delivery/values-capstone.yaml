@@ -1,7 +1,7 @@
 backend:
   image:
     repository: request-tracker
-    tag: k3s-e4a0d80-20261028063718-good
+    tag: capstone-good-20261028185252
 frontend:
   image:
     repository: request-tracker-frontend
