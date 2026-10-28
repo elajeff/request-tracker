@@ -30,7 +30,7 @@ spec:
   project: request-tracker-delivery
   source:
     repoURL: https://github.com/elajeff/request-tracker.git
-    targetRevision: delivery/argocd-rollouts
+    targetRevision: main
     path: helm/request-tracker
     helm:
       releaseName: request-tracker-delivery
