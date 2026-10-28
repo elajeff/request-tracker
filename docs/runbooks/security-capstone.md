@@ -27,7 +27,7 @@ Restricted admission guards new pod creation; it does not remove existing pods o
 
 ## Demonstration plan
 
-The following walkthrough is prepared, not a claim of another executed release or E2E run. Keep the default context unchanged and use explicit contexts throughout.
+The plan below was prepared after the security review. The subsequent [executed capstone walkthrough](capstone-demonstration.md) records new application, recovery, preview, and Git-published promotion/abort results. Keep the default context unchanged and use explicit contexts throughout.
 
 1. Show the merged history, controller CRD/Role, security namespace labels, and immutable image references. Explain that runtime permissions are confined to `preview-lab`, while CRD installation is administrative.
 2. Show the saved complete 24-check lifecycle evidence and the new admission/digest-pin results. Identify the earlier interrupted run separately.

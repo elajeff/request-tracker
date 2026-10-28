@@ -17,26 +17,43 @@ The lab controller was paused only during the disposable database outage so ordi
 
 Controller scripts, timestamped commands/results, stdout/stderr, API record identifiers, backup, snapshots, and security observations are outside Git at `C:\Users\DESKTOP\request-tracker-backups\k3s-20261028-064246\capstone-demo-20261028-185252`. `walkthrough.py` records the executed disposable-resource procedure; `walkthrough.json`, `independent-results.json`, `security-demonstration.json`, and `final-argo.json` contain its observations. Credential values and diagnostic dumps are not committed.
 
-## Git-published release segment: not executed
+## Executed Git-published release segment
 
-Healthy promotion and faulty-release abort remain pending publication approval. Earlier promotion/abort results do not count as results for this walkthrough. No local image override was substituted for a Git-published release.
+Four sequential non-force pushes advanced `elajeff/request-tracker` ? `refs/heads/demo/security-capstone-delivery` from published ancestor `e4bded1`. Only the four reviewed commits were introduced; no main update or security/capstone publication occurred. Each push followed verification of the preceding gate.
 
-The prepared branch `demo/security-capstone-delivery` is based on published main `e4bded1` and changes only `delivery/values-capstone.yaml`:
+| Commit | Gate observed (UTC, 28 October 2026) | Result |
+| --- | --- | --- |
+| `19c76ae` | 17:05:06.767Z | Baseline Synced/Healthy, four ready replicas; rendering equivalent to the saved original desired state |
+| `c61c346` | 17:09:34.933Z | Healthy candidate promoted; both owned analysis runs succeeded |
+| `891b7bc` | 17:11:14.047Z | Fault revision Synced; owned error-rate analysis measured 1.0 and Rollouts automatically aborted |
+| `5611dca` | 17:15:58.020Z | Stable revision Synced/Healthy with four ready replicas |
 
-1. `19c76ae`: baseline equivalent to the current rendered k3s desired state.
-2. `c61c346`: healthy image `request-tracker:capstone-good-20261028185252`.
-3. `891b7bc`: isolated fault image `request-tracker:capstone-fault-20261028185252`.
-4. `5611dca`: restore the original stable image.
+The k3s Application temporarily selected the published branch and `delivery/values-capstone.yaml` with local image parameters removed. Observations captured each exact Git revision. Healthy promotion exposed 3/1 ? 2/2 ? 0/4 stable/candidate replicas; pause samples measured 25.5% and 48.6% candidate traffic. Before the restore push, automatic abort was confirmed settled at four ready stable replicas and zero desired fault replicas. This was an actual rollout under traffic, not a standalone analysis test.
 
-After approval, publish one stage at a time, verify Argo synchronization at each commit, collect timestamped normal-route traffic and analysis results, and require actual promotion/automatic abort. Temporarily select the demo branch/values file in the k3s Application, removing local image parameters. Restore the saved original Application source after the stable stage or on failure. Stop publication if any preceding gate fails; restoring the original source does not require publishing unverified later commits. Kind must remain unchanged.
+Healthy candidate: `request-tracker:capstone-good-20261028185252`. Fault candidate: `request-tracker:capstone-fault-20261028185252`. These immutable tags reuse the tested healthy and isolated-fault artifacts. Traffic used the ordinary frontend ? Service ? backend route, fresh connections, and queue/staff/saved-history reads. There were no retries or fallback responses.
 
-The baseline rendering was checked against the saved original source and was identical. No Secret, storage, selector, or database change is part of the queue. This review does not authorize publication by itself.
+| Counting window | Requests | Failed requests |
+| --- | ---: | ---: |
+| Baseline | 162 | 0 |
+| Healthy promotion | 2,553 | 0 |
+| Fault | 938 | 126 HTTP 500 |
+| Git stable restoration | 2,695 | 39 HTTP 500 |
+| Original-source restoration | 12 | 0 |
+| Total | 6,360 | 165 HTTP 500 |
+
+Windows begin after the preceding gate and include time awaiting publication/reconciliation. All 39 restoration-window failures occurred from 17:11:14.591Z to 17:11:30.832Z, during abort settling and before the first observation of restore commit `5611dca` at 17:12:20.060Z. They remain counted; they are not attributed to the restored healthy image. Separate stable-Service API-proxy diagnostics passed 127/127 and did not replace normal-route requests. No zero-downtime guarantee or production SLO is established.
+
+The monitor's `finally` block restored the captured original k3s Application source after the stable Git stage. Final verification compared both Applications' original sources and reconciliation policies, the k3s Rollout specification, all application/Flyway rows, Secret/configuration digests, StatefulSet settings, storage identities, and retained preview resources. All matched their snapshots. Both Applications were Healthy/Synced at main `e4bded1`; four k3s stable replicas were ready, with no fault or traffic-generator pods. Kind and the default context were unchanged.
+
+Final k3s backend/frontend images are `request-tracker:k3s-e4a0d80-20261028063718-good` and `request-tracker-frontend:k3s-e4a0d80-20261028063718`. Both sources again use `helm/request-tracker`, `delivery/values-kind.yaml`, and main; the original k3s-specific image/Secret parameters were restored exactly. The published demo branch remains available as release evidence, not the active deployment source.
+
+New release evidence is outside Git in the walkthrough directory's `gitops-20261028-190147` subdirectory. It includes original/final Applications, publication commands, four gate records, analysis results, timestamped normal-route requests, ReplicaSet/traffic observations, failure counts, monitor code, and final preservation verification. Earlier kind/k3s release evidence is not substituted for this demonstration. No screen recording was captured.
 
 ## Completion criteria
 
-- Complete the pending Git-published promotion/abort segment and record every failed request, including restoration failures.
-- Verify final source configuration, application readiness, data preservation, and absence of fault-image pods after that segment.
-- Review and integrate the security/capstone branch and final documentation through the normal manual PR process.
-- Review the agreed roadmap checklist and label remaining work explicitly deferred; do not imply a production security assessment, HA storage, or RKE2 coverage.
+- [x] Execute Git-published promotion/abort and record every failed request, including restoration-window failures.
+- [x] Verify original sources, healthy stable replicas, data/resources, and absence of fault/traffic-generator pods.
+- [ ] Review and integrate the security/capstone branch and final documentation through the normal manual PR process.
+- [ ] Resolve the remaining roadmap scope explicitly before declaring the whole project complete: SLO definition, any unexecuted configuration-error/whole-cluster recovery exercises, certification-style labs, and final release packaging. RKE2, production security assessment, and HA storage were not performed.
 
 Trusted images/administrators, namespace/node deletion risks, retained-data backup responsibilities, and the single-node storage limitations remain as documented in [the security review](security-capstone.md).
