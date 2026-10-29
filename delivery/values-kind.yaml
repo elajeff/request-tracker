@@ -6,7 +6,7 @@ backend:
 frontend:
   image:
     repository: request-tracker-frontend
-    tag: auth-08e4a87-20261029041407
+    tag: react-b5b0ad152cbe75ced040c2ae57a2b99601d96609
 delivery:
   enabled: true
   replicas: 4
