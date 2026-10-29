@@ -113,7 +113,7 @@ With Node.js 24 and Docker Compose available, run from the repository root:
 node e2e/run.mjs
 ```
 
-The command builds the backend, dashboard, and Chromium-only test image, waits for functional readiness through nginx, and runs six independent UI journeys with synthetic records. The locked Playwright package installs its matching Chromium headless shell inside the image; no host browser installation is needed. Coverage includes SUPPORT create/edit persistence, staff assignment and filtering, status/priority history, queue/history pagination under new arrivals, REQUESTER ownership and edit restrictions, logout, and session-loss recovery. The session-loss fixture invalidates the session through a separate HTTP client; it does not wait for the idle timeout. Detailed business-rule checks remain in the backend suite.
+The command builds the backend, dashboard, and Chromium-only test image, waits for functional readiness through nginx, and runs ten independent UI journeys with synthetic records. The locked Playwright package installs its matching Chromium headless shell inside the image; no host browser installation is needed. Coverage includes SUPPORT create/edit persistence, staff assignment and filtering, status/priority history, queue/history pagination under new arrivals, REQUESTER ownership and edit restrictions, logout, and session-loss recovery. The session-loss fixture invalidates the session through a separate HTTP client; it does not wait for the idle timeout. The React journeys also cover rename/deactivate/reactivate, directory pagination/search, validation, load/save failures, session clearing and assignment consistency. Detailed business-rule checks remain in the backend suite.
 
 Each run uses a random Compose project, a private network with no host ports, and a fresh PostgreSQL database in memory. It never connects to development or Kubernetes databases. Cleanup removes only that run's containers, images, network, and temporary storage, including on ordinary failure or interruption; base images/build cache remain. Docker must stay available for cleanup.
 
@@ -131,7 +131,7 @@ No license has been selected yet. Until one is added, do not assume that the sou
 
 ## Web dashboard (development)
 
-The frontend uses TypeScript and Vite and connects to the Spring Boot API through a development proxy.
+The Vite frontend uses React/TypeScript for staff management and TypeScript for the request dashboard. Both use the existing session/CSRF client and same-origin development/nginx proxies.
 
 Prerequisites: Java 21, Docker Desktop, and Node.js.
 
@@ -166,7 +166,9 @@ npm.cmd run build --prefix frontend
 
 ## Assignment and history
 
-Open **Manage support staff** beside the queue to create, rename, deactivate, or reactivate directory records. Names are 1–120 characters; duplicate names are allowed and IDs distinguish records. These are not authenticated users. Use **Load more staff** for additional directory records and selector options.
+Open **Manage support staff** beside the queue to create, rename, deactivate, or reactivate directory records. Names are 1–120 characters; duplicate names are allowed and IDs distinguish records. These are not authenticated users. Use **Load more staff** for additional directory records and selector options. **Search staff** matches names or IDs across the directory by fetching remaining cursor pages (25 records per request); the API has no server-side staff search. A full search therefore loads the directory into browser memory.
+
+React exclusively owns `staff-management-root`; the request dashboard receives saved staff records and loaded pages to update assignment options. Session loss unmounts the directory and clears its drafts. Loading, empty, validation and error states are explicit; failed writes require a manual retry.
 
 Choose active staff or **Unassigned** on a request. Deactivation preserves existing assignments but blocks new ones; reassignment and unassignment remain available. The staff filter includes inactive records and combines with search and pagination. Totals remain global. Expand **Change history** to load older changes or refresh.
 
