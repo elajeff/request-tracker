@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { mkdirSync, writeFileSync, readdirSync, readFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync, readdirSync, readFileSync, appendFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -13,6 +13,7 @@ const composeArgs = ['compose', '--project-name', project, '--file', join(direct
 const passwords = Object.fromEntries(['SUPPORT', 'REQUESTER', 'OTHER'].map(role => [role, randomUUID()]));
 const databasePassword = randomUUID();
 const environment = { ...process.env, E2E_RESULTS_DIR: results, E2E_DB_PASSWORD: databasePassword,
+  E2E_UID: String(process.getuid?.() ?? 1000), E2E_GID: String(process.getgid?.() ?? 1000),
   ...Object.fromEntries(Object.entries(passwords).map(([role, password]) => [`E2E_${role}_PASSWORD`, password])) };
 const redact = text => [databasePassword, ...Object.values(passwords)].reduce(
   (value, password) => value.replaceAll(password, '[redacted]'), text);
@@ -95,9 +96,24 @@ try {
       else if (/\.(json|md|log|txt)$/.test(entry.name)) writeFileSync(path, redact(readFileSync(path, 'utf8')));
     }
   };
-  try { sanitize(results); } catch (error) { console.error(`Artifact sanitization failed: ${error.message}`); code ||= 1; }
+  let artifactsSafe = false;
+  try {
+    sanitize(results);
+    artifactsSafe = true;
+  } catch (error) {
+    console.error(`Artifact sanitization failed: ${error.message}`);
+    code ||= 1;
+  }
   saveArtifact('run.json', JSON.stringify({ project, exitCode: code,
-    cleanupExitCode: cleanupCode }, null, 2));
+    cleanupExitCode: cleanupCode, artifactsSafe }, null, 2));
+  if (artifactsSafe && process.env.GITHUB_OUTPUT) {
+    try {
+      appendFileSync(process.env.GITHUB_OUTPUT, 'artifacts_safe=true\n');
+    } catch (error) {
+      console.error(`Could not approve artifact upload: ${error.message}`);
+      code ||= 1;
+    }
+  }
   if (cleanupCode) console.error(`Compose cleanup failed (${cleanupCode}) for ${project}`);
 }
 process.exitCode = interrupted || code || cleanupCode;

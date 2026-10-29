@@ -119,6 +119,8 @@ Each run uses a random Compose project, a private network with no host ports, an
 
 Reports are written to `test-results/browser/<run>/`. Failures retain screenshots, JSON results, sanitized error contexts and stack logs from the synthetic environment. Authenticated traces are disabled because they contain reusable session material. Random test passwords are redacted from textual artifacts; database credentials are not sent through browser/API requests. Tests have no retries. The command preserves the failing command's exit code; cleanup failure also fails an otherwise successful run. GitHub Actions runs the same command and retains artifacts for seven days. Optional Playwright arguments can follow the command, for example `node e2e/run.mjs --grep "create and edit"`.
 
+The browser container uses the invoking Linux UID/GID (1000 on Windows) so the host can sanitize its reports. GitHub uploads artifacts only after sanitization succeeds.
+
 ## Development workflow
 
 Project work is tracked through GitHub Issues. Changes are developed on short-lived branches and submitted through pull requests that summarize the change, report the verification performed, and describe relevant risks and rollback considerations.

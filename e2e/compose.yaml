@@ -34,8 +34,11 @@ services:
 
   tests:
     build: .
+    user: "${E2E_UID:?Run node e2e/run.mjs}:${E2E_GID:?Run node e2e/run.mjs}"
     environment:
       CI: "true"
+      HOME: /tmp
+      npm_config_cache: /tmp/npm-cache
       E2E_SUPPORT_PASSWORD: ${E2E_SUPPORT_PASSWORD:?Run node e2e/run.mjs}
       E2E_REQUESTER_PASSWORD: ${E2E_REQUESTER_PASSWORD:?Run node e2e/run.mjs}
       E2E_OTHER_PASSWORD: ${E2E_OTHER_PASSWORD:?Run node e2e/run.mjs}
