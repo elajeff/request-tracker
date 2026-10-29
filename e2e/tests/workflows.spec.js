@@ -173,6 +173,10 @@ test('search and staff filters paginate queue and history without shifts or dupl
     });
   }
   await page.reload();
+  await page.getByText('Manage support staff', { exact: true }).click();
+  await page.getByRole('searchbox', { name: 'Search staff' }).fill('E2E pages');
+  await expect(page.getByRole('combobox', { name: 'Filter by assigned staff' })
+    .locator('option', { hasText: other.id })).toHaveCount(1);
   await search(page, 'e2e-pages-match');
   await filter(page, person.id);
   const expectedTitles = matching.map(row => row.title).reverse();

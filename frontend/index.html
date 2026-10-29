@@ -149,21 +149,7 @@
               </button>
             </form>
 
-            <details id="staff-directory" class="staff-directory">
-              <summary>Manage support staff</summary>
-              <p class="muted">Directory records, not user accounts. Matching names may be different people; use their IDs to distinguish them.</p>
-              <form id="staff-create-form">
-                <label class="form-field">
-                  <span>Staff name</span>
-                  <input id="staff-name-input" maxlength="120" required />
-                </label>
-                <button id="staff-create-button" class="button button-secondary" type="submit">Create staff</button>
-              </form>
-              <p id="staff-notice" role="status"></p>
-              <div id="staff-list"></div>
-              <button id="staff-more-button" class="button button-secondary" type="button" hidden>Load more staff</button>
-              <button id="staff-refresh-button" class="button button-secondary" type="button">Refresh staff</button>
-            </details>
+            <div id="staff-management-root"></div>
 
             <p class="form-note">
               Requests are saved in PostgreSQL and remain available after the app restarts.

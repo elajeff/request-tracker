@@ -86,3 +86,9 @@ Use uniquely named disposable accounts provisioned through the hidden-input proc
 2. Log in as requester B. A's request is absent from queue/search/history; direct detail/history API lookups return 404. B cannot manage staff, assignments, status or priority.
 3. Log in as SUPPORT. Confirm access to A's request, update assignment/status/priority, and inspect meaningful history values and actor names.
 4. While a disposable account is logged in, disable only that account through the local CLI. Its next protected action must return 401, clear private dashboard state and require login without silently retrying the failed action.
+
+### Pre-React deployed smoke: 29 October 2026
+
+Evidence outside Git: `authentication-react-smoke-20261029-135220` under the external backup directory. Twenty-four HTTP checks through the deployed k3s nginx route met their expected statuses: login/logout, requester ownership/history isolation, SUPPORT access, and disposable-account deactivation with existing-session invalidation and rejected login. One synthetic request/history event remains; its uniquely named REQUESTER account is disabled. Existing V6 records matched by stable ID and every field.
+
+The initial runner incorrectly reused the legacy-ownerless preservation helper and exited unsuccessfully. That failure is retained; a separate strict review verified original rows and explicitly accounted for the single request/history addition. No security defect was demonstrated. No migrations, restores, deployment or reconciliation changes were performed. Deployed browser login journeys were not completed (browser connection/CDP access failed); use the manual checklist above. The React implementation is verified separately against the isolated packaged frontend, not the deployed environments. V6 promotion/abort remains outstanding.
