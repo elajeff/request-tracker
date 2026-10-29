@@ -60,7 +60,7 @@ The optional delivery generator requires `delivery.traffic.accountSecret`, refer
 
 ## Migration and deployment
 
-The prepared [authentication cutover](runbooks/authentication-cutover.md) defines the coordinated baseline/delivery transition for kind and k3s.
+The [authentication cutover](runbooks/authentication-cutover.md) records the coordinated baseline/delivery transition for kind and k3s, including failures, final preservation checks and evidence limitations.
 
 V6 adds account, ownership, actor and session storage without changing V1–V5 or rewriting existing values. Back up the database before a deployment. Coordinate frontend/backend upgrades and remove all pre-authentication backends from both application routes before exposing the new release. An old V5 backend can still bypass the new authorization rules; it is not a safe security rollback or canary peer. Shared V6 session storage does not protect traffic handled by an old binary.
 
@@ -71,3 +71,18 @@ Roll back only to an authentication-compatible image, preserving V6 tables. Rest
 Run `node e2e/run.mjs` for the disposable PostgreSQL/backend/nginx/Chromium environment. It provisions random test passwords through environment variables, verifies SUPPORT and REQUESTER journeys, and removes only its randomly named Compose project. PostgreSQL uses memory-backed storage. Backend integration tests also require a disposable PostgreSQL database configured through the datasource environment variables; never point them at a development or cluster database.
 
 Authenticated traces are disabled because they contain passwords and reusable session/CSRF material. Failures retain screenshots, JSON results, sanitized error contexts and stack logs. Test assertions remain active with zero retries. GitHub Actions uses the same browser command; local success does not establish a GitHub CI result.
+
+### Milestone B closeout
+
+The V6 cutover completed in kind and k3s with authenticated routes available and original automated reconciliation restored. Final checks recorded Healthy/Synced at `74f76833fbd683e541b245d480d810ea8bd12b3e`, preserved original data/settings/storage, and no PostgreSQL restart or Rollout replacement. The runbook retains maintenance failures, the phase-ambiguous 401 and the missing initial snapshot from the stopped k3s attempt; later verification does not erase those limitations.
+
+Deployed authenticated browser journeys and V6 progressive promotion/automatic abort are not newly verified. Earlier manual dashboard acceptance and V5 release exercises do not establish these V6 results. Local cutover runners and private evidence remain outside Git; the repository helpers provide focused probe/preservation tests, not a complete cutover automation command.
+
+### Manual deployed-authentication checklist
+
+Use uniquely named disposable accounts provisioned through the hidden-input procedure above: two REQUESTER accounts and one SUPPORT account. Keep existing records/accounts unchanged. Use separate browser profiles for each account, `127.0.0.1` for kind and `localhost` for k3s; cookies are shared across ports on the same host.
+
+1. Log in as requester A, create a uniquely labelled request, reload and confirm persistence. Invalid credentials receive a generic error. Log out; private state clears and protected API calls return 401.
+2. Log in as requester B. A's request is absent from queue/search/history; direct detail/history API lookups return 404. B cannot manage staff, assignments, status or priority.
+3. Log in as SUPPORT. Confirm access to A's request, update assignment/status/priority, and inspect meaningful history values and actor names.
+4. While a disposable account is logged in, disable only that account through the local CLI. Its next protected action must return 401, clear private dashboard state and require login without silently retrying the failed action.
