@@ -111,10 +111,12 @@ spec:
       labels: {app: request-tracker-delivery, component: traffic}
     spec:
       automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 30
       securityContext:
         runAsNonRoot: true
         runAsUser: 10001
         runAsGroup: 10001
+        fsGroup: 10001
         seccompProfile: {type: RuntimeDefault}
       containers:
         - name: traffic
@@ -140,7 +142,11 @@ spec:
           resources:
             requests: {cpu: 25m, memory: 32Mi}
             limits: {cpu: 100m, memory: 64Mi}
-          volumeMounts: [{name: script, mountPath: /exercise, readOnly: true}]
-      volumes: [{name: script, configMap: {name: request-tracker-delivery-traffic}}]
+          volumeMounts:
+            - {name: script, mountPath: /exercise, readOnly: true}
+            - {name: evidence, mountPath: /evidence}
+      volumes:
+        - {name: script, configMap: {name: request-tracker-delivery-traffic}}
+        - {name: evidence, emptyDir: {sizeLimit: 64Mi}}
 {{- end }}
 {{- end }}
