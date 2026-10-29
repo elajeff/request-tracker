@@ -36,10 +36,6 @@ spec:
       releaseName: request-tracker-delivery
       valueFiles: [../../delivery/values-kind.yaml]
       parameters:
-        - name: backend.image.tag
-          value: k3s-e4a0d80-20261028063718-good
-        - name: frontend.image.tag
-          value: k3s-e4a0d80-20261028063718
         - name: postgresql.existingSecret
           value: request-tracker-k3s-db
   destination:
