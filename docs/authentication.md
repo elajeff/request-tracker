@@ -64,7 +64,7 @@ The prepared [authentication cutover](runbooks/authentication-cutover.md) define
 
 V6 adds account, ownership, actor and session storage without changing V1–V5 or rewriting existing values. Back up the database before a deployment. Coordinate frontend/backend upgrades and remove all pre-authentication backends from both application routes before exposing the new release. An old V5 backend can still bypass the new authorization rules; it is not a safe security rollback or canary peer. Shared V6 session storage does not protect traffic handled by an old binary.
 
-Roll back only to an authentication-compatible image, preserving V6 tables. Restoring a pre-V6 backup loses subsequent changes and requires an explicit recovery decision. This milestone does not deploy to the existing kind/k3s applications. Local administrator access, database access and application images remain trusted. Internet-facing brute-force protection, password recovery, MFA and TLS termination are outside this local-lab milestone.
+Roll back only to an authentication-compatible image, preserving V6 tables. Restoring a pre-V6 backup loses subsequent changes and requires an explicit recovery decision. Local administrator access, database access and application images remain trusted. Internet-facing brute-force protection, password recovery, MFA and TLS termination are outside this local-lab milestone.
 
 ## Verification
 
