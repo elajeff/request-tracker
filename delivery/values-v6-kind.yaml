@@ -2,7 +2,7 @@ backend:
   sessionCookieSecure: false
   image:
     repository: request-tracker
-    tag: auth-08e4a87-20261029041407
+    tag: v6-good-704354c-accounted
 frontend:
   image:
     repository: request-tracker-frontend
