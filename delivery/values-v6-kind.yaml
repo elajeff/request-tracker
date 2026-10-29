@@ -1,0 +1,16 @@
+backend:
+  sessionCookieSecure: false
+  image:
+    repository: request-tracker
+    tag: auth-08e4a87-20261029041407
+frontend:
+  image:
+    repository: request-tracker-frontend
+    tag: react-b5b0ad152cbe75ced040c2ae57a2b99601d96609
+delivery:
+  enabled: true
+  replicas: 4
+  traffic:
+    enabled: true
+    accountSecret: request-tracker-auth-traffic
+    requestId: "2eb623c8-0cae-4fe1-8efd-aa28c4be6b45"

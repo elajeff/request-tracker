@@ -14,7 +14,8 @@ public class InjectedFailureFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
             FilterChain chain) throws ServletException, IOException {
-        if (request.getRequestURI().startsWith("/api/")) {
+        if (request.getRequestURI().startsWith("/api/")
+                && !request.getRequestURI().startsWith("/api/session")) {
             response.setStatus(500);
             response.setContentType("application/json");
             response.getWriter().write("{\"error\":\"deliberate delivery exercise failure\"}");
