@@ -1,4 +1,5 @@
 backend:
+  sessionCookieSecure: false
   image:
     repository: request-tracker
     tag: k3s-e4a0d80-20261028063718

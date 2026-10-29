@@ -1,4 +1,5 @@
 backend:
+  sessionCookieSecure: true
   image:
     repository: request-tracker
     tag: local
@@ -47,3 +48,5 @@ delivery:
   replicas: 4
   traffic:
     enabled: false
+    accountSecret: ""
+    requestId: "54f35b91-dbfc-4b95-9570-da8c80dd5dea"

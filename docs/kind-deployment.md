@@ -45,7 +45,9 @@ Remove-Variable rng, bytes, dbPassword -ErrorAction SilentlyContinue
 
 Install or upgrade the Helm release:
 
-    helm upgrade --install request-tracker .\helm\request-tracker --namespace request-tracker --wait --timeout 5m
+    helm upgrade --install request-tracker .\helm\request-tracker --namespace request-tracker --set backend.sessionCookieSecure=false --wait --timeout 5m
+
+The cookie override is for local HTTP access. Authentication-compatible images require account provisioning and a coordinated upgrade of both application routes; see [authentication](authentication.md#migration-and-deployment).
 
 ## Verify and access
 

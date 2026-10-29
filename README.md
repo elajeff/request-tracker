@@ -6,7 +6,7 @@ Request Tracker is a service-request management application used to practise the
 
 ## Application
 
-Employees can submit service requests. The dashboard supports searching the queue, editing titles and descriptions, changing priority, and advancing status from `NEW` to `IN_PROGRESS` to `RESOLVED`. Requests can be assigned to persistent active/inactive staff directory records; new assignments to inactive staff are rejected. Each request shows persistent change history for its details, status, priority, and assignment. Names are not authenticated identities.
+Employees can submit service requests. The dashboard supports searching the queue, editing titles and descriptions, changing priority, and advancing status from `NEW` to `IN_PROGRESS` to `RESOLVED`. Requests can be assigned to persistent active/inactive staff directory records; new assignments to inactive staff are rejected. Each request shows persistent change history for its details, status, priority, and assignment. Staff names are not login identities. Session login and backend-enforced REQUESTER/SUPPORT permissions are described in [authentication](docs/authentication.md).
 
 Implemented API:
 
@@ -21,11 +21,11 @@ Implemented API:
 - `GET /actuator/health` — application health.
 - `GET /actuator/prometheus` - application metrics in Prometheus format.
 
-Queue and history GET responses contain `items` and `nextCursor` (null at the end), replacing the previous bare arrays. Both accept `limit` (default 25, range 1–100) and the returned `cursor`. Queue search uses `q` across all titles, descriptions, UUIDs, and assignees, case-insensitively with literal substring matching. Queue responses also contain global `counts` (`total`, `newCount`, `inProgressCount`, `resolvedCount`).
+Queue and history GET responses contain `items` and `nextCursor` (null at the end), replacing the previous bare arrays. Both accept `limit` (default 25, range 1–100) and the returned `cursor`. Queue search uses `q` across all titles, descriptions, UUIDs, and assignees, case-insensitively with literal substring matching. Queue responses also contain account-scoped `counts` (`total`, `newCount`, `inProgressCount`, `resolvedCount`).
 
 Use **Load more requests** or **Load older changes** to append pages. Search and Refresh restart from the newest results. Queue order is creation time then UUID descending; history uses descending change IDs. Cursors avoid shifts from new arrivals but do not freeze edits to search results.
 
-A new request has a title, description, UUID, creation timestamp, and `NEW` status. Titles must be 1–120 characters and descriptions 1–2000 characters. This initial API has no authentication and is intended for local development, not public deployment.
+A new request has a title, description, UUID, creation timestamp, and `NEW` status. Titles must be 1–120 characters and descriptions 1–2000 characters. The API requires a locally provisioned session account. Requesters see only their own requests and edit details only while NEW; support manages all requests and staff. This remains a local-lab application.
 
 ## Metrics
 
@@ -76,7 +76,7 @@ Start PostgreSQL from the repository root:
 docker compose up -d --wait postgres
 ```
 
-Run verification with the database available:
+Run backend verification against a separate disposable PostgreSQL database, configured through `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME` and `SPRING_DATASOURCE_PASSWORD`:
 
 ```powershell
 .\mvnw.cmd --batch-mode --no-transfer-progress verify
@@ -85,41 +85,17 @@ Run verification with the database available:
 Start the backend:
 
 ```powershell
+$env:SESSION_COOKIE_SECURE = "false" # Local HTTP only
 .\mvnw.cmd spring-boot:run
 ```
 
 The API is available at `http://localhost:8080`. Local-development database credentials are defined in `compose.yaml` and `application.properties`; override them with environment variables outside local development.
 
-## Try the API in PowerShell
+## Accounts and API access
 
-Create a request:
+Build the application and [provision SUPPORT and REQUESTER accounts](docs/authentication.md#local-provisioning) before signing in. No default login is installed. Use the dashboard through its Vite/nginx proxy.
 
-```powershell
-$body = @{
-    title = "Laptop access"
-    description = "Set up access for a new employee."
-} | ConvertTo-Json
-
-$created = Invoke-RestMethod `
-    -Uri "http://localhost:8080/api/requests" `
-    -Method Post `
-    -ContentType "application/json" `
-    -Body $body
-
-$created
-```
-
-List saved requests:
-
-```powershell
-Invoke-RestMethod -Uri "http://localhost:8080/api/requests"
-```
-
-Retrieve the created request:
-
-```powershell
-Invoke-RestMethod -Uri "http://localhost:8080/api/requests/$($created.id)"
-```
+API clients must retain cookies, fetch `/api/session`, and send the returned CSRF header with login and all subsequent state-changing calls. Fetch a new CSRF token after login. See the [session protocol and permission matrix](docs/authentication.md#session-and-csrf-protocol).
 
 Stop PostgreSQL when finished:
 
@@ -137,11 +113,13 @@ With Node.js 24 and Docker Compose available, run from the repository root:
 node e2e/run.mjs
 ```
 
-The command builds the backend, dashboard, and Chromium-only test image, waits for functional readiness through nginx, and runs four independent UI journeys with synthetic records. The locked Playwright package installs its matching Chromium headless shell inside the image; no host browser installation is needed. Coverage includes create/edit persistence, staff assignment and filtering, status/priority history, and queue/history pagination under new arrivals. Detailed business-rule checks remain in the backend suite.
+The command builds the backend, dashboard, and Chromium-only test image, waits for functional readiness through nginx, and runs six independent UI journeys with synthetic records. The locked Playwright package installs its matching Chromium headless shell inside the image; no host browser installation is needed. Coverage includes SUPPORT create/edit persistence, staff assignment and filtering, status/priority history, queue/history pagination under new arrivals, REQUESTER ownership and edit restrictions, logout, and session-loss recovery. The session-loss fixture invalidates the session through a separate HTTP client; it does not wait for the idle timeout. Detailed business-rule checks remain in the backend suite.
 
 Each run uses a random Compose project, a private network with no host ports, and a fresh PostgreSQL database in memory. It never connects to development or Kubernetes databases. Cleanup removes only that run's containers, images, network, and temporary storage, including on ordinary failure or interruption; base images/build cache remain. Docker must stay available for cleanup.
 
-Reports are written to `test-results/browser/<run>/`. Failures retain Playwright traces, screenshots, and stack logs containing only the synthetic test environment. Database credentials are not sent through browser/API requests or copied into reports. Tests have no retries. The command preserves the failing command's exit code; cleanup failure also fails an otherwise successful run. GitHub Actions runs the same command and retains artifacts for seven days. Optional Playwright arguments can follow the command, for example `node e2e/run.mjs --grep "create and edit"`.
+Reports are written to `test-results/browser/<run>/`. Failures retain screenshots, JSON results, sanitized error contexts and stack logs from the synthetic environment. Authenticated traces are disabled because they contain reusable session material. Random test passwords are redacted from textual artifacts; database credentials are not sent through browser/API requests. Tests have no retries. The command preserves the failing command's exit code; cleanup failure also fails an otherwise successful run. GitHub Actions runs the same command and retains artifacts for seven days. Optional Playwright arguments can follow the command, for example `node e2e/run.mjs --grep "create and edit"`.
+
+The browser container uses the invoking Linux UID/GID (1000 on Windows) so the host can sanitize its reports. GitHub uploads artifacts only after sanitization succeeds.
 
 ## Development workflow
 
@@ -166,6 +144,7 @@ Prerequisites: Java 21, Docker Desktop, and Node.js.
 2. Start Spring Boot from the project directory in a terminal dedicated to the backend:
 
    ```powershell
+   $env:SESSION_COOKIE_SECURE = "false" # Local HTTP only
    .\mvnw.cmd spring-boot:run
    ```
 
@@ -193,6 +172,6 @@ Choose active staff or **Unassigned** on a request. Deactivation preserves exist
 
 Staff API: `POST /api/staff` and `PUT /api/staff/{id}` accept `{"name":"Alex Support"}`; `PATCH /api/staff/{id}/active` accepts `{"active":false}` (or true). `GET /api/staff` uses `limit`/`cursor` pagination, ordered by UUID. There is no delete endpoint. Assignment now accepts `{"staffId":"UUID"}` or `{"unassign":true}` instead of a free-text name. Queue filters use `staffId=UUID` or `unassigned=true`, not both.
 
-Migration V5 copies every non-null legacy assignment exactly into a separate inactive staff record, linked to its request. Even equal names are not merged; review and reactivate, rename, or reassign them. Blank legacy names must be renamed before activation. The old text column is replaced only after copying its values; history rows are untouched. New assignment history captures name and staff ID at change time, in the same transaction. Renaming staff updates the current display without rewriting historical values. No-op/rejected updates add no history. History starts at V3 and identifies changes, not authenticated actors or a tamper-proof audit log.
+Migration V5 copies every non-null legacy assignment exactly into a separate inactive staff record, linked to its request. Even equal names are not merged; review and reactivate, rename, or reassign them. Blank legacy names must be renamed before activation. The old text column is replaced only after copying its values; history rows are untouched. New assignment history captures name and staff ID at change time, in the same transaction. Renaming staff updates the current display without rewriting historical values. No-op/rejected updates add no history. History starts at V3. V6 adds authenticated actor snapshots for new API changes; older changes remain unattributed. It is not a tamper-proof audit log.
 
 V5 requires the matching backend and dashboard; the previous free-text-assignment backend cannot run against the new schema.

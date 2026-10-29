@@ -18,6 +18,7 @@ services:
   app:
     build: .
     environment:
+      SESSION_COOKIE_SECURE: "false"
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/request_tracker
       SPRING_DATASOURCE_USERNAME: request_tracker
       SPRING_DATASOURCE_PASSWORD: request_tracker

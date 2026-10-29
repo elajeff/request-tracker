@@ -57,6 +57,8 @@ spec:
                 command: [sh, -c, "sleep 5"]
           envFrom: [{configMapRef: {name: request-tracker-config}}]
           env:
+            - name: SESSION_COOKIE_SECURE
+              value: {{ .Values.backend.sessionCookieSecure | quote }}
             - name: SPRING_DATASOURCE_USERNAME
               valueFrom: {secretKeyRef: {name: {{ .Values.postgresql.existingSecret }}, key: username}}
             - name: SPRING_DATASOURCE_PASSWORD
@@ -111,7 +113,7 @@ spec:
         prometheus:
           address: http://request-tracker-delivery-prometheus.request-tracker.svc.cluster.local:9090
           query: >-
-            sum(rate(http_server_requests_seconds_count{job="request-tracker-delivery",revision="{{ "{{args.revision}}" }}",uri!~"/actuator/.*"}[30s])) or vector(0)
+            sum(rate(http_server_requests_seconds_count{job="request-tracker-delivery",revision="{{ "{{args.revision}}" }}",uri!~"/actuator/.*|/api/session.*"}[30s])) or vector(0)
     - name: error-rate
       interval: 15s
       count: 3
@@ -121,8 +123,8 @@ spec:
         prometheus:
           address: http://request-tracker-delivery-prometheus.request-tracker.svc.cluster.local:9090
           query: >-
-            (sum(rate(http_server_requests_seconds_count{job="request-tracker-delivery",revision="{{ "{{args.revision}}" }}",uri!~"/actuator/.*",status=~"5.."}[30s])) or vector(0))
-            / sum(rate(http_server_requests_seconds_count{job="request-tracker-delivery",revision="{{ "{{args.revision}}" }}",uri!~"/actuator/.*"}[30s]))
+            (sum(rate(http_server_requests_seconds_count{job="request-tracker-delivery",revision="{{ "{{args.revision}}" }}",uri!~"/actuator/.*|/api/session.*",status=~"[45].."}[30s])) or vector(0))
+            / sum(rate(http_server_requests_seconds_count{job="request-tracker-delivery",revision="{{ "{{args.revision}}" }}",uri!~"/actuator/.*|/api/session.*"}[30s]))
     - name: mean-latency
       interval: 15s
       count: 3
@@ -132,8 +134,8 @@ spec:
         prometheus:
           address: http://request-tracker-delivery-prometheus.request-tracker.svc.cluster.local:9090
           query: >-
-            sum(rate(http_server_requests_seconds_sum{job="request-tracker-delivery",revision="{{ "{{args.revision}}" }}",uri!~"/actuator/.*"}[30s]))
-            / sum(rate(http_server_requests_seconds_count{job="request-tracker-delivery",revision="{{ "{{args.revision}}" }}",uri!~"/actuator/.*"}[30s]))
+            sum(rate(http_server_requests_seconds_sum{job="request-tracker-delivery",revision="{{ "{{args.revision}}" }}",uri!~"/actuator/.*|/api/session.*"}[30s]))
+            / sum(rate(http_server_requests_seconds_count{job="request-tracker-delivery",revision="{{ "{{args.revision}}" }}",uri!~"/actuator/.*|/api/session.*"}[30s]))
 ---
 apiVersion: v1
 kind: ConfigMap

@@ -109,10 +109,11 @@ jobs:
           node-version: '24'
 
       - name: Run isolated browser workflows
+        id: browser
         run: node e2e/run.mjs
 
       - name: Retain browser reports and failure evidence
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && steps.browser.outputs.artifacts_safe == 'true' }}
         uses: actions/upload-artifact@v7.0.2
         with:
           name: browser-workflows

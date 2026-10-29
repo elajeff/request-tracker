@@ -37,6 +37,8 @@ spec:
             - configMapRef:
                 name: request-tracker-config
           env:
+            - name: SESSION_COOKIE_SECURE
+              value: {{ .Values.backend.sessionCookieSecure | quote }}
             - name: SPRING_DATASOURCE_USERNAME
               valueFrom:
                 secretKeyRef:

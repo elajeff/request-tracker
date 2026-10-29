@@ -2,7 +2,6 @@ package dev.elajeff.requesttracker;
 
 import java.net.URI;
 import java.net.URLEncoder;
-import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
@@ -23,9 +22,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-class PaginationIntegrationTest {
-    private static final HttpClient CLIENT = HttpClient.newHttpClient();
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
+        properties = "server.servlet.session.cookie.secure=false")
+class PaginationIntegrationTest extends SupportApiTest {
 
     @Value("${local.server.port}")
     private int port;

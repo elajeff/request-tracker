@@ -4,7 +4,7 @@ services:
     environment:
       POSTGRES_DB: browser_tests
       POSTGRES_USER: browser_tests
-      POSTGRES_PASSWORD: disposable-test-only
+      POSTGRES_PASSWORD: ${E2E_DB_PASSWORD:?Run node e2e/run.mjs}
     tmpfs:
       - /var/lib/postgresql/data
     healthcheck:
@@ -17,9 +17,10 @@ services:
   request-tracker:
     build: ..
     environment:
+      SESSION_COOKIE_SECURE: "false"
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/browser_tests
       SPRING_DATASOURCE_USERNAME: browser_tests
-      SPRING_DATASOURCE_PASSWORD: disposable-test-only
+      SPRING_DATASOURCE_PASSWORD: ${E2E_DB_PASSWORD:?Run node e2e/run.mjs}
     depends_on:
       postgres:
         condition: service_healthy
@@ -33,8 +34,14 @@ services:
 
   tests:
     build: .
+    user: "${E2E_UID:?Run node e2e/run.mjs}:${E2E_GID:?Run node e2e/run.mjs}"
     environment:
       CI: "true"
+      HOME: /tmp
+      npm_config_cache: /tmp/npm-cache
+      E2E_SUPPORT_PASSWORD: ${E2E_SUPPORT_PASSWORD:?Run node e2e/run.mjs}
+      E2E_REQUESTER_PASSWORD: ${E2E_REQUESTER_PASSWORD:?Run node e2e/run.mjs}
+      E2E_OTHER_PASSWORD: ${E2E_OTHER_PASSWORD:?Run node e2e/run.mjs}
     volumes:
       - "${E2E_RESULTS_DIR:?Run node e2e/run.mjs}:/results"
     shm_size: 1gb

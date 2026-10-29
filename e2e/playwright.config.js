@@ -12,13 +12,13 @@ export default defineConfig({
   outputDir: '/results/tests',
   reporter: [
     ['list'],
-    ['html', { outputFolder: '/results/report', open: 'never' }],
+    ['json', { outputFile: '/results/report.json' }],
   ],
   use: {
     baseURL: 'http://frontend:8080',
     locale: 'en-GB',
     timezoneId: 'UTC',
-    trace: 'retain-on-failure',
+    trace: 'off',
     screenshot: 'only-on-failure',
   },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
