@@ -1,6 +1,6 @@
 # Authentication cutover
 
-The release selects `auth-08e4a87-20261029041407` for `request-tracker` and `request-tracker-frontend`. Both local Linux/amd64 images contain application revision `08e4a87`; they have not been loaded into either cluster. The following cutover has not been executed.
+The release selects `auth-08e4a87-20261029041407` for `request-tracker` and `request-tracker-frontend`. Both local Linux/amd64 images contain application revision `08e4a87`. Execution results and remaining limitations are recorded below.
 
 ## Resource scope
 
@@ -27,7 +27,7 @@ In each cluster the baseline route is `request-tracker-frontend:80` → `request
 5. Work on one cluster at a time. Stop only its application port-forwards; leave the existing host development JVM alone. Add selector `request-tracker.dev/maintenance=authentication` to both frontend Services, recording their original selectors. Existing port-forwards must stop because they can retain a direct pod connection despite Service selector changes. No ingress or public route is introduced.
 6. Scale baseline Deployment `request-tracker` to zero. Merge-patch Rollout `request-tracker-delivery` with [authentication-maintenance.json](../../delivery/authentication-maintenance.json). Wait at most 120 seconds for every old backend pod to terminate. All application writers must stop before the final backup.
 
-The patch keeps the existing Rollout and Services. Empty canary steps select rolling-update behavior; zero replicas first remove V5 pods. `maxSurge=0`, `maxUnavailable=100%` then permit the maintenance replacement. `progressDeadlineAbort=false` prevents a timeout from automatically restoring the old V5 stable ReplicaSet. No manual abort or V5 rollback is permitted during bootstrap. These fields passed server-side dry run in both clusters; controller behavior during this cutover remains unverified. See the [canary strategy](https://argo-rollouts.readthedocs.io/en/stable/features/canary/#mimicking-rolling-update) and [Rollout specification](https://argo-rollouts.readthedocs.io/en/stable/features/specification/).
+The patch keeps the existing Rollout and Services. Empty canary steps select rolling-update behavior; zero replicas first remove V5 pods. `maxSurge=0`, `maxUnavailable=100%` then permit the maintenance replacement. `progressDeadlineAbort=false` prevents a timeout from automatically restoring the old V5 stable ReplicaSet. No manual abort or V5 rollback is permitted during bootstrap. The cutover verified these fields in place without replacing either Rollout. See the [canary strategy](https://argo-rollouts.readthedocs.io/en/stable/features/canary/#mimicking-rolling-update) and [Rollout specification](https://argo-rollouts.readthedocs.io/en/stable/features/specification/).
 
 ## Backup, restore and V6
 
@@ -40,12 +40,12 @@ The patch keeps the existing Rollout and Services. Empty canary steps select rol
 
 ## In-place startup and acceptance
 
-1. Upgrade only the existing baseline Helm release, using its captured values plus the new image tags and `backend.sessionCookieSecure=false`. `--reset-then-reuse-values` preserves release overrides while adding new chart defaults. Do not use automatic rollback to the previous V5 release. The reviewed renders change only application images and cookie configuration; PostgreSQL resources, image, settings, selectors and storage remain unchanged, so no PostgreSQL restart is intended.
+1. Upgrade only the existing baseline Helm release, using its captured values plus the new image tags and `backend.sessionCookieSecure=false`. Use explicit `--server-side=false`: the maintenance selector is managed by `kubectl-patch`, which conflicts with Helm server-side apply. `--reset-then-reuse-values` preserves release overrides while adding new chart defaults. Do not use automatic rollback to the previous V5 release. The reviewed renders change only application images and cookie configuration; PostgreSQL resources, image, settings, selectors and storage remain unchanged, so no PostgreSQL restart is intended.
 2. Generate a bootstrap merge patch from the final rendered Rollout's `spec`: retain its new pod template and four replicas, but use empty steps, `maxSurge=0`, `maxUnavailable=100%` and `progressDeadlineAbort=false`. Apply it in place after confirming all V5 pods are absent. Wait at most 300 seconds for four ready V6 replicas and the V6 hash to become stable. Do not delete/recreate the Rollout or old zero-replica history.
 3. On k3s, remove only the obsolete backend/frontend image Helm parameters from the live Application source, retaining its database Secret parameter. This matches `k3s/application.yaml` and allows Git release values to select the images. The repository, path, main target and value-file list stay unchanged.
 4. Verify anonymous liveness/readiness and internal Prometheus scraping. Only health root, liveness, readiness and exposed Prometheus GET routes bypass login; other application-data endpoints remain protected. Check login, CSRF, requester isolation, SUPPORT operations and deactivation through both application routes, including sessions served by different backend replicas. Use disposable acceptance records and preserve all original records.
 5. Both routes within one cluster intentionally share its session database and cookie. Use `127.0.0.1` for kind browser URLs and `localhost` for k3s: cookies are host-scoped, not port-scoped. Suggested loopback forwards are kind baseline/delivery `18081/18082` and k3s `28081/28082`. Do not mix hostnames between clusters. Secure cookies remain false only for these local HTTP endpoints; HTTPS deployments require true.
-6. After every selected backend is V6, remove the temporary frontend selector guards for operator-owned acceptance forwards. Record timestamped normal-route probes, including every failure and the maintenance interval; do not retry failed requests or substitute diagnostic/fallback availability.
+6. After every selected backend is V6, complete acceptance through operator-owned pod forwards while both frontend selector guards remain closed. Remove the guards only after acceptance passes. Record timestamped normal-route probes, including every failure and the maintenance interval; do not retry failed requests or substitute diagnostic/fallback availability.
 
 ## Traffic and final reconciliation
 
@@ -60,3 +60,35 @@ After acceptance, explicitly remove only the newly created traffic Deployment/Co
 Allow at most 15 minutes per cluster after maintenance starts. Stop progression on backup mismatch, migration/provisioning error, readiness timeout, unauthorized data access, missing metrics or unexplained route failures. `finally` cleans up only resources created by this cutover; it must not reopen routes or restore automation to V5 desired state. On failure, retain maintenance and reconciliation holds, preserve the database/backup/evidence, and report the exact stage.
 
 Before the first V6 baseline is verified there is no approved older authentication image. Recovery keeps routes closed and repairs the same V6-compatible release; it does not use V5. After verification, retain this immutable backend/frontend pair as the V6-compatible fallback for later releases. A pre-V6 database restore is a separate disaster-recovery decision with possible loss of subsequent writes, not an automatic application rollback.
+
+## Execution evidence: 29 October 2026
+
+The reviewed release tree matches merged main `74f76833fbd683e541b245d480d810ea8bd12b3e`. Immutable backend/frontend tags are `auth-08e4a87-20261029041407`.
+
+Helm `v4.3.1+gc0d08d0` initially failed kind revision 4 because server-side apply conflicted with `kubectl-patch` ownership of the frontend Service selector. The upgrade was partial: baseline Deployments changed before the Service failed. Captured Helm values/manifests and live snapshots identified the actual state. A disposable release reproduced the conflict; an actual `--server-side=false` upgrade preserved its Service UID and maintenance selector. No force-conflicts, ownership takeover or resource replacement was used. The successful baseline upgrade used:
+
+```text
+helm --kube-context kind-request-tracker -n request-tracker upgrade request-tracker helm/request-tracker --server-side=false --reset-then-reuse-values --set backend.image.tag=auth-08e4a87-20261029041407 --set frontend.image.tag=auth-08e4a87-20261029041407 --set backend.sessionCookieSecure=false --wait --timeout 180s
+```
+
+Evidence is outside Git under `C:/Users/DESKTOP/request-tracker-backups/`:
+
+- `auth-repair-20261029-075800`: failed-release snapshots and disposable selector/ownership verification.
+- `authentication-kind-20261029-053946`: final pre-V6 backup, successful isolated restore/V6 rehearsal, and all 177 first-attempt probes (7 HTTP 200, 169 HTTP 502, 1 network failure). The attempt stopped after 90.31 seconds and retained maintenance.
+- `authentication-kind-20261029-055859`: successful recovery, authenticated acceptance, cross-replica sessions and analysis. Its 679 probes include 62 HTTP 401, 7 HTTP 502 and 12 network failures during maintenance; all 507 samples after reopening succeeded. Generated traffic recorded 1,095 HTTP 200 responses and no failures. All three analysis metrics passed with three successful measurements each.
+
+Kind maintenance began at 05:39:46.871 UTC; routes reopened at 05:59:53.273 UTC, a 20-minute 6.402-second interval including the stopped attempt and approval hold. Probe coverage is discontinuous between attempts. The recovery execution completed in 182.6 seconds; this is not the total maintenance duration. Helm revision 5 is deployed. The original 7 requests, 3 staff records and 26 history entries remain unchanged; V6 is applied. PostgreSQL restart count and Rollout UID are unchanged.
+
+Acceptance covered both application routes: ownership isolation, role restrictions, CSRF, rejected owner injection, request edits, staff assignment, search/filter pagination, history values/actors, legacy SUPPORT-only access, logout and account deactivation. A shared session was accepted by each of four delivery replicas. Anonymous health and Prometheus access remained functional. Expected 4xx security checks are recorded separately from maintenance probe failures. These are API/session checks, not a new browser acceptance run or authenticated progressive-promotion/abort exercise.
+
+### k3s stopped verification
+
+`authentication-k3s-20261029-060343` contains its independent final backup, exact isolated restore/V6 rehearsal, acceptance and stopped-state verification. Its original 4 requests, 1 staff record and 11 history entries remain unchanged. V1-V6 are applied; PostgreSQL restart count, Rollout UID, existing Secrets/configuration/PVCs and retained preview resources are unchanged. Helm revision 2 is deployed using the same explicit client-side upgrade flags, with `--kubeconfig target/k3s-practice/kubeconfig.yaml --kube-context k3d-request-tracker-k3s`.
+
+Maintenance began at 06:03:45.137 UTC and routes opened after acceptance at 06:08:53.237 UTC (308.100 seconds). All 134 samples after opening succeeded; generated normal-route traffic recorded 1,091 HTTP 200 responses and no failures. All three analysis metrics passed. The complete probe record contains 409 samples: 287 HTTP 200, 91 HTTP 502, 18 network failures and 13 HTTP 401. No sample was retried or removed.
+
+The final gate stopped at 06:11:08.388 UTC because one HTTP 401, at 06:06:19.568 UTC while maintenance remained closed, was tagged `authenticated acceptance`. The sampler selects its client before the request but reads the phase after completion; the gate classifies failures by that phase. This permits an in-flight anonymous maintenance request to be misclassified during the authenticated-client transition. Request-start time/client identity were not recorded, so that specific dispatch cannot be reconstructed conclusively. The observed failure preceded route opening by over two minutes; it is not a post-opening acceptance failure.
+
+The failed gate re-applied both maintenance selectors and left automated synchronization disabled. Both frontend Services have zero ready endpoints. Four V6 delivery replicas remain ready, and the Application source targets the reviewed main with only the original database Secret parameter retained. Its last sync succeeded at `74f7683`; maintenance creates intentional live drift, so cached Healthy/Synced status does not demonstrate an open application route. Temporary provisioning/traffic resources and the standalone AnalysisRun were removed; the traffic credential Secret and encrypted local account bundle remain. The execution stopped within 444.86 seconds, below its 15-minute bound. No V5 image was restored.
+
+Before reopening k3s, make sampler classification use request-dispatch context and an explicit maintenance/open boundary, then perform bounded authenticated route verification and restore the original automated-sync policy only after it passes. Do not repeat migrations or create the existing accounts again. The current immutable V6 image pair is the repair/fallback version; V5 images remain incompatible rollback peers.
