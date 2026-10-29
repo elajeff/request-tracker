@@ -1,7 +1,6 @@
 package dev.elajeff.requesttracker;
 
 import java.net.URI;
-import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
@@ -25,10 +24,10 @@ import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doThrow;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-class ServiceRequestIntegrationTest {
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
+        properties = "server.servlet.session.cookie.secure=false")
+class ServiceRequestIntegrationTest extends SupportApiTest {
 
-    private static final HttpClient CLIENT = HttpClient.newHttpClient();
     private static final Pattern ID_PATTERN =
             Pattern.compile("\"id\"\\s*:\\s*\"([0-9a-fA-F-]{36})\"");
 
@@ -254,7 +253,7 @@ class ServiceRequestIntegrationTest {
         UUID id = UUID.fromString(createRequestAndGetId());
         UUID alex = staff.create("Alex").id();
         doThrow(new IllegalStateException("History unavailable"))
-                .when(repository).recordChange(eq(id), eq("ASSIGNEE"), isNull(), eq("Alex [" + alex + "]"));
+                .when(repository).recordChange(eq(id), eq("ASSIGNEE"), isNull(), eq("Alex [" + alex + "]"), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
         assertThrows(IllegalStateException.class, () -> service.updateAssignment(id, alex));
         assertEquals(null, service.findById(id).assignee());
         assertEquals(1, historyCount(id));

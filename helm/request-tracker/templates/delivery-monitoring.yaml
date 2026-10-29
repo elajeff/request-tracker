@@ -120,6 +120,19 @@ spec:
         - name: traffic
           image: python:3.13-alpine@sha256:8bcfa47b04b853a17aaf909362b847b2112fd6ec4105ea553ef9a43bafbb5916
           command: [python, -B, /exercise/traffic.py]
+          env:
+            - name: TRAFFIC_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ required "delivery.traffic.accountSecret must reference a provisioned SUPPORT account" .Values.delivery.traffic.accountSecret }}
+                  key: username
+            - name: TRAFFIC_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.delivery.traffic.accountSecret }}
+                  key: password
+            - name: TRAFFIC_REQUEST_ID
+              value: {{ .Values.delivery.traffic.requestId | quote }}
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true

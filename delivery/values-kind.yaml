@@ -1,4 +1,5 @@
 backend:
+  sessionCookieSecure: false
   image:
     repository: request-tracker
     tag: canary-good-20261028015541

@@ -15,8 +15,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @AutoConfigureMetrics
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-class HealthEndpointIntegrationTest {
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
+        properties = "server.servlet.session.cookie.secure=false")
+class HealthEndpointIntegrationTest extends SupportApiTest {
 
     @Value("${local.server.port}")
     private int port;
@@ -45,7 +46,7 @@ class HealthEndpointIntegrationTest {
                 .GET()
                 .build();
 
-        HttpResponse<String> apiResponse = client.send(
+        HttpResponse<String> apiResponse = CLIENT.send(
                 apiRequest, HttpResponse.BodyHandlers.ofString());
         assertEquals(200, apiResponse.statusCode());
 

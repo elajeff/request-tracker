@@ -806,3 +806,6 @@ h1 {
   margin: 0;
   padding: 0;
 }
+
+.login-panel { max-width: 440px; margin: 3rem auto; padding: 2rem; }
+.login-panel .form-field { margin-bottom: 1rem; }

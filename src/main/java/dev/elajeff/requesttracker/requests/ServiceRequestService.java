@@ -13,6 +13,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import dev.elajeff.requesttracker.staff.StaffService;
+import dev.elajeff.requesttracker.security.CurrentAccount;
+import org.springframework.security.access.prepost.PreAuthorize;
 import dev.elajeff.requesttracker.staff.SupportStaff;
 
 @Service
@@ -20,10 +22,12 @@ public class ServiceRequestService {
 
     private final ServiceRequestRepository repository;
     private final StaffService staffService;
+    private final CurrentAccount currentAccount;
 
-    public ServiceRequestService(ServiceRequestRepository repository, StaffService staffService) {
+    public ServiceRequestService(ServiceRequestRepository repository, StaffService staffService, CurrentAccount currentAccount) {
         this.repository = repository;
         this.staffService = staffService;
+        this.currentAccount = currentAccount;
     }
 
     @Transactional
@@ -32,8 +36,12 @@ public class ServiceRequestService {
         ServiceRequestPriority selectedPriority =
                 priority == null ? ServiceRequestPriority.MEDIUM : priority;
 
-        ServiceRequest created = repository.create(title.strip(), description.strip(), selectedPriority);
-        repository.recordChange(created.id(), "CREATED", null, created.title());
+        var account = currentAccount.required();
+        if (!account.support() && selectedPriority != ServiceRequestPriority.MEDIUM) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only support may set priority");
+        }
+        ServiceRequest created = repository.create(title.strip(), description.strip(), selectedPriority, account.id());
+        recordChange(created.id(), "CREATED", null, created.title());
         return created;
     }
 
@@ -60,7 +68,7 @@ public class ServiceRequestService {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid queue cursor");
             }
         }
-        List<ServiceRequest> rows = repository.findPage(query.strip(), staffId, unassigned, beforeCreatedAt, beforeId, limit + 1);
+        List<ServiceRequest> rows = repository.findPage(query.strip(), staffId, unassigned, beforeCreatedAt, beforeId, limit + 1, ownerScope());
         boolean hasMore = rows.size() > limit;
         List<ServiceRequest> items = List.copyOf(rows.subList(0, Math.min(limit, rows.size())));
         String nextCursor = null;
@@ -69,17 +77,20 @@ public class ServiceRequestService {
             nextCursor = Base64.getUrlEncoder().withoutPadding().encodeToString(
                     (last.createdAt() + "," + last.id()).getBytes(StandardCharsets.UTF_8));
         }
-        return new RequestQueuePage(items, nextCursor, repository.counts());
+        return new RequestQueuePage(items, nextCursor, repository.counts(ownerScope()));
     }
 
     public ServiceRequest findById(UUID id) {
-        return repository.findById(id)
+        return repository.findById(id, ownerScope())
                 .orElseThrow(() -> new ServiceRequestNotFoundException(id));
     }
 
     @Transactional
     public ServiceRequest updateDetails(UUID id, String title, String description) {
         ServiceRequest current = findForUpdate(id);
+        if (!currentAccount.required().support() && current.status() != ServiceRequestStatus.NEW) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Requesters may edit details only while a request is NEW");
+        }
         String updatedTitle = title.strip();
         String updatedDescription = description.strip();
 
@@ -100,6 +111,7 @@ public class ServiceRequestService {
     }
 
     @Transactional
+    @PreAuthorize("hasRole('SUPPORT')")
     public ServiceRequest updateStatus(UUID id, ServiceRequestStatus status) {
         ServiceRequest current = findForUpdate(id);
 
@@ -131,6 +143,7 @@ public class ServiceRequestService {
     }
 
     @Transactional
+    @PreAuthorize("hasRole('SUPPORT')")
     public ServiceRequest updatePriority(UUID id, ServiceRequestPriority priority) {
         ServiceRequest current = findForUpdate(id);
 
@@ -149,6 +162,7 @@ public class ServiceRequestService {
     }
 
     @Transactional
+    @PreAuthorize("hasRole('SUPPORT')")
     public ServiceRequest updateAssignment(UUID id, UUID staffId) {
         ServiceRequest current = findForUpdate(id);
         if (Objects.equals(current.assigneeId(), staffId)) return current;
@@ -194,12 +208,20 @@ public class ServiceRequestService {
         }
     }
 
+    private UUID ownerScope() {
+        var account = currentAccount.required();
+        return account.support() ? null : account.id();
+    }
+
     private ServiceRequest findForUpdate(UUID id) {
-        return repository.findByIdForUpdate(id)
+        return repository.findByIdForUpdate(id, ownerScope())
                 .orElseThrow(() -> new ServiceRequestNotFoundException(id));
     }
 
     private void recordChange(UUID id, String field, String before, String after) {
-        if (!Objects.equals(before, after)) repository.recordChange(id, field, before, after);
+        if (!Objects.equals(before, after)) {
+            var actor = currentAccount.required();
+            repository.recordChange(id, field, before, after, actor.id(), actor.username());
+        }
     }
 }

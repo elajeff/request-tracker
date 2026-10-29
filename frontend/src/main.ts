@@ -27,6 +27,7 @@ interface RequestHistoryEntry {
   oldValue: string | null;
   newValue: string | null;
   changedAt: string;
+  actorUsername: string | null;
 }
 
 interface Page<T> {
@@ -88,14 +89,38 @@ let staffLoading = false;
 let staffLoadSequence = 0;
 const staffNameDrafts = new Map<string, string>();
 
+interface SessionView {
+  user: { id: string; username: string; role: "REQUESTER" | "SUPPORT" } | null;
+  csrfToken: string;
+  csrfHeaderName: string;
+}
+let session: SessionView | null = null;
+let sessionGeneration = 0;
+const isSupport = () => session?.user?.role === "SUPPORT";
+
 async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const generation = sessionGeneration;
   const headers = new Headers(options.headers);
+  if (options.method && !["GET", "HEAD"].includes(options.method) && session) {
+    headers.set(session.csrfHeaderName, session.csrfToken);
+  }
   if (options.body && !headers.has("Content-Type")) {
     headers.set("Content-Type", "application/json");
   }
 
-  const response = await fetch(path, { ...options, headers });
+  const response = await fetch(path, { ...options, headers, credentials: "same-origin" });
+  if (generation !== sessionGeneration) throw new Error("Session changed; response ignored.");
+  if (response.status === 401 && path !== "/api/session/login") {
+    clearSession("Your session ended. Sign in again.");
+    void refreshSession();
+    throw new Error("Sign in required.");
+  }
+  if (response.status === 403 && session?.user) {
+    await refreshSession();
+    if (generation !== sessionGeneration) throw new Error("Sign in required.");
+  }
   const text = await response.text();
+  if (generation !== sessionGeneration) throw new Error("Session changed; response ignored.");
 
   if (!response.ok) {
     let message = text || `${response.status} ${response.statusText}`;
@@ -299,7 +324,7 @@ function createRequestCard(request: ServiceRequest): HTMLElement {
   editActions.append(saveButton, cancelButton);
   editForm.append(editTitleField, editDescriptionField, editActions);
 
-  editButton.hidden = !editForm.hidden;
+  editButton.hidden = !editForm.hidden || (!isSupport() && request.status !== "NEW");
   const saveDraft = () => {
     drafts.set(request.id, { title: editTitle.value, description: editDescription.value });
   };
@@ -508,7 +533,7 @@ function createRequestCard(request: ServiceRequest): HTMLElement {
         const item = document.createElement("li");
         item.className = "history-entry";
         const label = document.createElement("strong");
-        label.textContent = `${new Date(entry.changedAt).toLocaleString()} · ${entry.field.toLowerCase()}`;
+        label.textContent = `${new Date(entry.changedAt).toLocaleString()} · ${entry.field.toLowerCase()} · ${entry.actorUsername ?? "Actor not recorded"}`;
         const values = document.createElement("p");
         values.textContent = entry.field === "CREATED" ? `Created: ${entry.newValue}`
           : `${entry.oldValue ?? "Unassigned"} → ${entry.newValue ?? "Unassigned"}`;
@@ -534,7 +559,12 @@ function createRequestCard(request: ServiceRequest): HTMLElement {
   history.append(historySummary, historyRefresh, historyContent, historyNotice, historyMore);
 
   controls.append(statusControl.field, priorityControl.field);
-  card.append(headingRow, description, meta, editButton, editForm, controls, assignmentForm, history);
+  controls.hidden = !isSupport();
+  assignmentForm.hidden = !isSupport();
+  const assignedLabel = document.createElement("p");
+  assignedLabel.textContent = `Assigned staff: ${request.assignee ?? "Unassigned"}`;
+  assignedLabel.hidden = isSupport();
+  card.append(headingRow, description, meta, editButton, editForm, controls, assignmentForm, assignedLabel, history);
 
   return card;
 }
@@ -577,6 +607,7 @@ function renderRequests(append = false): void {
 }
 
 async function loadRequests(append = false): Promise<void> {
+  if (!session?.user) return;
   window.clearTimeout(searchTimer);
   if (append && (requestsLoading || !nextCursor || searchInput.value.trim() !== activeQuery
       || staffFilter.value !== activeStaffFilter)) return;
@@ -661,7 +692,7 @@ createForm.addEventListener("submit", async (event) => {
       body: JSON.stringify({
         title,
         description,
-        priority: priorityInput.value
+        priority: isSupport() ? priorityInput.value : "MEDIUM"
       })
     });
 
@@ -684,8 +715,7 @@ createForm.addEventListener("submit", async (event) => {
 });
 
 updateCharacterCounts();
-void loadStaff();
-void loadRequests();
+
 
 function staffLabel(person: SupportStaff): string {
   return `${person.name.trim() ? person.name : "(blank legacy name)"} [${person.id}]${person.active ? "" : " — inactive"}`;
@@ -801,6 +831,7 @@ function renderStaff(): void {
 }
 
 async function loadStaff(append = false): Promise<void> {
+  if (!isSupport()) return;
   if (append && (staffLoading || !staffCursor)) return;
   const load = ++staffLoadSequence;
   staffLoading = true;
@@ -843,3 +874,108 @@ $("staff-create-form").addEventListener("submit", async (event) => {
 });
 staffMoreButton.addEventListener("click", () => void loadStaff(true));
 $("staff-refresh-button").addEventListener("click", () => void loadStaff());
+
+function clearSession(message: string): void {
+  ++sessionGeneration;
+  ++loadSequence;
+  ++staffLoadSequence;
+  ++dataRevision;
+  window.clearTimeout(searchTimer);
+  session = null;
+  requests = [];
+  staff = [];
+  drafts.clear();
+  assignmentDrafts.clear();
+  staffNameDrafts.clear();
+  nextCursor = null;
+  staffCursor = null;
+  activeQuery = "";
+  activeStaffFilter = "";
+  requestsLoading = false;
+  staffLoading = false;
+  counts = { total: 0, newCount: 0, inProgressCount: 0, resolvedCount: 0 };
+  requestList.replaceChildren();
+  $("staff-list").replaceChildren();
+  searchInput.value = "";
+  staffFilter.replaceChildren(new Option("All staff", ""), new Option("Unassigned", "unassigned"));
+  createForm.reset();
+  ($<HTMLFormElement>("staff-create-form")).reset();
+  updateCharacterCounts();
+  $("dashboard").hidden = true;
+  $("login-panel").hidden = false;
+  $("login-notice").textContent = message;
+  showNotice("");
+}
+
+async function refreshSession(): Promise<void> {
+  const generation = sessionGeneration;
+  try {
+    const response = await fetch("/api/session", { credentials: "same-origin", cache: "no-store" });
+    if (generation !== sessionGeneration) return;
+    if (response.status === 401) {
+      clearSession("Your session ended. Sign in again.");
+      void refreshSession();
+      return;
+    }
+    if (!response.ok) throw new Error("Could not connect. Use Retry connection.");
+    const loaded = await response.json() as SessionView;
+    if (generation !== sessionGeneration) return;
+    if (session?.user && session.user.id !== loaded.user?.id) {
+      clearSession("Your session ended. Sign in again.");
+    }
+    const wasSignedIn = !!session?.user;
+    session = loaded;
+    $<HTMLButtonElement>("login-button").disabled = false;
+    if (!loaded.user) {
+      if (!$("login-notice").textContent || $("login-notice").textContent === "Connecting…") {
+        $("login-notice").textContent = "Enter your username and password.";
+      }
+      return;
+    }
+    $("login-panel").hidden = true;
+    $("dashboard").hidden = false;
+    $("account-label").textContent = `${loaded.user.username} · ${loaded.user.role.toLowerCase()}`;
+    $("staff-directory").hidden = !isSupport();
+    $("staff-filter-field").hidden = !isSupport();
+    $("create-priority-field").hidden = !isSupport();
+    if (!wasSignedIn) {
+      void loadStaff();
+      void loadRequests();
+    }
+  } catch (error) {
+    if (generation === sessionGeneration) $("login-notice").textContent = errorMessage(error);
+  }
+}
+
+$("login-form").addEventListener("submit", async event => {
+  event.preventDefault();
+  const button = $<HTMLButtonElement>("login-button");
+  const password = $<HTMLInputElement>("login-password");
+  button.disabled = true;
+  try {
+    const body = new URLSearchParams({ username: $<HTMLInputElement>("login-username").value, password: password.value });
+    password.value = "";
+    await api<void>("/api/session/login", {
+      method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body,
+    });
+    clearSession("");
+    await refreshSession();
+  } catch (error) {
+    $("login-notice").textContent = errorMessage(error);
+    await refreshSession();
+  } finally {
+    password.value = "";
+    button.disabled = session === null;
+  }
+});
+$("logout-button").addEventListener("click", async () => {
+  try {
+    await api<void>("/api/session/logout", { method: "POST" });
+    clearSession("Signed out.");
+    await refreshSession();
+  } catch (error) {
+    showNotice(`Could not sign out: ${errorMessage(error)}`, "error");
+  }
+});
+$("session-refresh").addEventListener("click", () => void refreshSession());
+void refreshSession();

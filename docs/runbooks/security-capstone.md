@@ -21,7 +21,7 @@ Evidence is outside Git at `C:\Users\DESKTOP\request-tracker-backups\k3s-2026102
 
 ## Trust boundaries and limits
 
-This is a local, trusted-administrator lab, not an authenticated multi-tenant service. Application images can access their own database credentials and remain trusted. Namespace/node administrators, API-server proxy access, and debug tooling are outside the network-policy boundary. Secrets are not safe to print or commit; Kubernetes Secret encoding is not a claim of encryption at rest. No encryption-at-rest audit, vulnerability scan, penetration test, or production SLO assessment was performed.
+The recorded demonstration used a local, trusted-administrator lab before session authentication was added; see [authentication](../authentication.md) for current account boundaries. Application images can access their own database credentials and remain trusted. Namespace/node administrators, API-server proxy access, and debug tooling are outside the network-policy boundary. Secrets are not safe to print or commit; Kubernetes Secret encoding is not a claim of encryption at rest. No encryption-at-rest audit, vulnerability scan, penetration test, or production SLO assessment was performed.
 
 Restricted admission guards new pod creation; it does not remove existing pods or protect against an administrator changing namespace policy. The single-node local-path storage has no node-failure redundancy. Retention preserves credentials and storage, not backups, and does not survive namespace/cluster deletion. Repeated retained previews consume the lab quota. No existing retained pair should be deleted for the demonstration.
 

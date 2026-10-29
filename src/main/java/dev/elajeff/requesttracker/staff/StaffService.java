@@ -9,6 +9,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 @Service
+@org.springframework.security.access.prepost.PreAuthorize("hasRole('SUPPORT')")
 public class StaffService {
     private final StaffRepository repository;
 

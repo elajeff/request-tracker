@@ -1,7 +1,6 @@
 package dev.elajeff.requesttracker;
 
 import java.net.URI;
-import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
@@ -22,9 +21,9 @@ import tools.jackson.databind.json.JsonMapper;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-class StaffIntegrationTest {
-    private static final HttpClient CLIENT = HttpClient.newHttpClient();
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
+        properties = "server.servlet.session.cookie.secure=false")
+class StaffIntegrationTest extends SupportApiTest {
     @Value("${local.server.port}") private int port;
     @Autowired private JsonMapper json;
     @Autowired private JdbcTemplate jdbc;
@@ -154,7 +153,7 @@ class StaffIntegrationTest {
             UUID unassigned = UUID.randomUUID();
             jdbc.update("INSERT INTO " + schema + ".service_requests (id,title,description) VALUES (?, 'Unassigned', 'Keep null')", unassigned);
             List<Map<String, Object>> history = jdbc.queryForList("SELECT * FROM " + schema + ".request_history ORDER BY id");
-            Flyway.configure().dataSource(dataSource).schemas(schema).defaultSchema(schema).load().migrate();
+            Flyway.configure().dataSource(dataSource).schemas(schema).defaultSchema(schema).target("5").load().migrate();
             assertEquals(labels.size(), jdbc.queryForObject("SELECT count(*) FROM " + schema + ".support_staff", Integer.class));
             for (int i = 0; i < requests.size(); i++) {
                 String name = jdbc.queryForObject("SELECT s.name FROM " + schema + ".service_requests r JOIN " + schema
