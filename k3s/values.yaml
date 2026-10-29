@@ -2,11 +2,11 @@ backend:
   sessionCookieSecure: false
   image:
     repository: request-tracker
-    tag: k3s-e4a0d80-20261028063718
+    tag: auth-08e4a87-20261029041407
 frontend:
   image:
     repository: request-tracker-frontend
-    tag: k3s-e4a0d80-20261028063718
+    tag: auth-08e4a87-20261029041407
 postgresql:
   existingSecret: request-tracker-k3s-db
   persistence:

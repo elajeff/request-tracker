@@ -1,0 +1,13 @@
+{
+  "spec": {
+    "replicas": 0,
+    "progressDeadlineAbort": false,
+    "strategy": {
+      "canary": {
+        "steps": [],
+        "maxSurge": 0,
+        "maxUnavailable": "100%"
+      }
+    }
+  }
+}

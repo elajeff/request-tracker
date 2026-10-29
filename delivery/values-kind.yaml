@@ -2,13 +2,14 @@ backend:
   sessionCookieSecure: false
   image:
     repository: request-tracker
-    tag: canary-good-20261028015541
+    tag: auth-08e4a87-20261029041407
 frontend:
   image:
     repository: request-tracker-frontend
-    tag: release-5ffe039-20261028015541
+    tag: auth-08e4a87-20261029041407
 delivery:
   enabled: true
   replicas: 4
   traffic:
     enabled: false
+    accountSecret: request-tracker-auth-traffic
