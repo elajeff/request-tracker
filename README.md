@@ -129,6 +129,20 @@ docker compose stop postgres
 
 PostgreSQL data is stored in a named Docker volume and remains after stopping the container. `docker compose down -v` deletes that volume and its data, so do not use `-v` unless you deliberately want to reset the local database.
 
+## Automated browser workflows
+
+With Node.js 24 and Docker Compose available, run from the repository root:
+
+```powershell
+node e2e/run.mjs
+```
+
+The command builds the backend, dashboard, and Chromium-only test image, waits for functional readiness through nginx, and runs four independent UI journeys with synthetic records. The locked Playwright package installs its matching Chromium headless shell inside the image; no host browser installation is needed. Coverage includes create/edit persistence, staff assignment and filtering, status/priority history, and queue/history pagination under new arrivals. Detailed business-rule checks remain in the backend suite.
+
+Each run uses a random Compose project, a private network with no host ports, and a fresh PostgreSQL database in memory. It never connects to development or Kubernetes databases. Cleanup removes only that run's containers, images, network, and temporary storage, including on ordinary failure or interruption; base images/build cache remain. Docker must stay available for cleanup.
+
+Reports are written to `test-results/browser/<run>/`. Failures retain Playwright traces, screenshots, and stack logs containing only the synthetic test environment. Database credentials are not sent through browser/API requests or copied into reports. Tests have no retries. The command preserves the failing command's exit code; cleanup failure also fails an otherwise successful run. GitHub Actions runs the same command and retains artifacts for seven days. Optional Playwright arguments can follow the command, for example `node e2e/run.mjs --grep "create and edit"`.
+
 ## Development workflow
 
 Project work is tracked through GitHub Issues. Changes are developed on short-lived branches and submitted through pull requests that summarize the change, report the verification performed, and describe relevant risks and rollback considerations.

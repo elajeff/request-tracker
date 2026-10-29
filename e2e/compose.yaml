@@ -1,0 +1,41 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: browser_tests
+      POSTGRES_USER: browser_tests
+      POSTGRES_PASSWORD: disposable-test-only
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U browser_tests -d browser_tests"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    mem_limit: 256m
+
+  request-tracker:
+    build: ..
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/browser_tests
+      SPRING_DATASOURCE_USERNAME: browser_tests
+      SPRING_DATASOURCE_PASSWORD: disposable-test-only
+    depends_on:
+      postgres:
+        condition: service_healthy
+    mem_limit: 1g
+
+  frontend:
+    build: ../frontend
+    depends_on:
+      - request-tracker
+    mem_limit: 128m
+
+  tests:
+    build: .
+    environment:
+      CI: "true"
+    volumes:
+      - "${E2E_RESULTS_DIR:?Run node e2e/run.mjs}:/results"
+    shm_size: 1gb
+    mem_limit: 2g

@@ -203,6 +203,7 @@ function createRequestCard(request: ServiceRequest): HTMLElement {
   const card = document.createElement("article");
   card.className = "request-card";
   card.dataset.requestId = request.id;
+  card.setAttribute("aria-labelledby", `request-title-${request.id}`);
 
   const headingRow = document.createElement("div");
   headingRow.className = "request-heading-row";
@@ -211,6 +212,7 @@ function createRequestCard(request: ServiceRequest): HTMLElement {
   titleBlock.className = "request-title-block";
 
   const title = document.createElement("h3");
+  title.id = `request-title-${request.id}`;
   title.className = "request-title";
   title.textContent = request.title;
 
@@ -476,7 +478,9 @@ function createRequestCard(request: ServiceRequest): HTMLElement {
   history.className = "request-history";
   const historySummary = document.createElement("summary");
   historySummary.textContent = "Change history";
-  const historyContent = document.createElement("div");
+  const historyContent = document.createElement("ol");
+  historyContent.className = "history-list";
+  historyContent.setAttribute("aria-label", `Change history for ${request.title}`);
   const historyNotice = document.createElement("p");
   historyNotice.setAttribute("role", "status");
   const historyMore = document.createElement("button");
@@ -501,7 +505,7 @@ function createRequestCard(request: ServiceRequest): HTMLElement {
       const page = await api<Page<RequestHistoryEntry>>(`/api/requests/${request.id}/history?${parameters}`);
       if (!append) historyContent.replaceChildren();
       for (const entry of page.items) {
-        const item = document.createElement("div");
+        const item = document.createElement("li");
         item.className = "history-entry";
         const label = document.createElement("strong");
         label.textContent = `${new Date(entry.changedAt).toLocaleString()} · ${entry.field.toLowerCase()}`;
