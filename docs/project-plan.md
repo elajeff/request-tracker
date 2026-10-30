@@ -1,112 +1,33 @@
-# Project Plan
+# Project plan
 
-## Goal
+## Goal and constraints
 
-Build and maintain a useful service-request application while practising a realistic development-to-operations workflow on free, local infrastructure wherever possible.
+Maintain a support-request application and study its development, testing and operation on local infrastructure. The application is a modular monolith; infrastructure serves specific learning or engineering needs. Labs use synthetic data and do not depend on paid services.
 
-The repository is also a learning record. Each completed milestone should have reproducible steps and evidence, such as passing tests, CI results, screenshots, logs, or a tested runbook. Do not claim an exercise was completed if it was only configured but not run.
+## Completed work
 
-## Constraints
+| Area | Reference |
+| --- | --- |
+| Application and tests | Request workflows, staff, history, pagination; backend and isolated browser tests in CI |
+| Kubernetes | [kind](kind-deployment.md), Helm probes/limits, persistent storage and service accounts |
+| Operations | [Monitoring](monitoring.md), [recovery](runbooks/local-recovery.md), [delivery](runbooks/delivery.md) |
+| Distribution practice | Selected deployment/recovery checks on [k3s](runbooks/k3s.md) through k3d |
+| Controller | [PreviewEnvironment](../preview-controller/README.md) lifecycle, ownership, expiry, retention and RBAC |
+| Authentication | [Session/CSRF protection](authentication.md), REQUESTER/SUPPORT roles and ownership |
+| Milestone C | [React deployment](verification/react-deployment.md) and [authenticated canary verification](verification/canary-release.md) |
 
-- Do not depend on paid services, expiring cloud credits, paid certification exams, AI APIs, or local AI models.
-- The core application and Kubernetes labs must be runnable on the developer's own computer.
-- Use GitHub as the project source of truth: Issues, branches, pull requests, CI, commits, releases, and documentation.
-- Prefer a modular monolith. Add infrastructure only when there is a specific learning or engineering reason.
-- Keep implementation complexity appropriate to the demonstrated need; avoid unnecessary abstractions and microservices.
-- Use only synthetic/demo data. Never commit credentials, tokens, real personal data, database dumps, or private configuration.
+Milestone C is complete. Database migration V6 defines authentication storage; the next project release is v0.2.0. Source-only release preparation is tracked in the [release checklist](release-checklist.md).
 
-## Planned application
+## Remaining work
 
-Request Tracker is a service-request management system for a small organization. Employees can submit a request; support staff can review, assign, prioritize, update, and resolve it. Changes to important request fields should be traceable.
+- Migrate the remaining request dashboard to React incrementally.
+- Replace full-directory browser-memory staff search with bounded server-side search.
+- Investigate unresolved transient latency and diagnostic-route network failures.
+- Define SLOs from representative measurements.
+- Extend configuration-error and whole-cluster recovery coverage.
+- Consider RKE2 and further security labs when local capacity permits.
+- Prepare source-only v0.2.0 notes and inventory; binaries/images and clean-machine bundle verification remain deferred.
 
-The initial backend will be Java 21 with Spring Boot and PostgreSQL. A TypeScript frontend will be added after the first end-to-end API slice is working. Database schema changes will use migrations.
+## Contribution checks
 
-## Milestones
-
-### 0. Repository and team workflow
-
-- Create this repository with a clear README and project plan.
-- Use Issues with acceptance criteria for work items.
-- Use branches and pull requests for changes, including solo work; perform an explicit self-review when no peer is available.
-- Add automated CI checks with the first application code.
-- Maintain decision records for important choices and note actual verification results.
-
-### 1. First working application slice
-
-- Add a minimal Spring Boot backend and health endpoint.
-- Commit the Maven wrapper so a separate Maven installation is not required.
-- Add a small test set and automated CI.
-- Document the local run and test commands.
-
-### 2. Application and database
-
-- Add PostgreSQL and versioned schema migrations.
-- Implement create, list, retrieve, and status-update request workflows.
-- Validate inputs and enforce business rules in the application layer.
-- Add unit and integration tests for normal behavior and edge cases.
-- Add the frontend after API contracts and behavior are stable.
-
-### 3. Container and CI
-
-- Create a reproducible container image.
-- Use Docker Compose for a convenient local application/database environment.
-- Run tests and image/build validation in GitHub Actions.
-- Keep secrets out of source, image layers, logs, and artifacts.
-
-### 4. Kubernetes with kind and Helm
-
-- [x] Deploy the frontend, API, and PostgreSQL to local `kind` through Helm.
-- [x] Configure probes, resource limits, Services, persistent storage, ConfigMap/Secret configuration, and a ServiceAccount without API-token automount.
-- [ ] Exercise restart, configuration-error, and database-connectivity failure/recovery scenarios.
-
-### 5. Observability and progressive delivery
-
-- [x] Add application metrics and a local Prometheus/Grafana dashboard.
-- [x] Add tested local availability, error-rate, and latency alerts.
-- [ ] Define service-level objectives from measured application behavior.
-- [x] Use Argo CD for GitOps synchronization and verify controlled drift reconciliation.
-- [x] Use Argo Rollouts for successful canary promotion and automatic abort under measured HTTP traffic; see [delivery results](runbooks/delivery.md).
-- Document a failure, diagnosis, corrective change, and recovery.
-
-### 6. Distribution practice
-
-- [x] Repeat selected deployment, recovery, promotion, and abort exercises on k3s; see [verified results](runbooks/k3s.md).
-- Compare selected behavior with RKE2 if local resources allow.
-- Record only observed differences; do not imply cloud-provider deployment unless it was actually performed.
-
-### 7. Advanced controller and operational capstone
-
-- [x] Implement a namespaced `PreviewEnvironment` v1 controller with isolated resources; see [API and verification](../preview-controller/README.md).
-- [x] Verify idempotency, retry behavior, invalid specifications, status conditions, retention/cleanup, and lab RBAC.
-- Complete targeted CKA/CKAD/CKS-style practice labs without requiring paid exams.
-- Test database backup and restore, document cluster recovery procedures, and run selected failure/security scenarios.
-- Publish a final walkthrough, architecture documentation, runbooks, and a release when the product is sufficiently complete.
-
-### V0.2.0 Milestone C: completed runtime verification
-
-- [x] Record the four-frontend React deployment and deployed browser acceptance, preserving the initial observer failure, expected session-loss 401/client abort, counts, fixtures and limitations.
-- [x] Verify authenticated V6 progressive promotion and automatic abort on kind, with candidate-specific analysis and strict four-ready-candidate acceptance.
-- [x] Quiesce/recount/capture final traffic before pruning; restore main `704354c` Healthy/Synced and strictly preserve application/account/Flyway rows, settings, Secrets, storage, retained resources and reconciliation policy.
-
-[Milestone C evidence](runbooks/v6-kind-progressive.md#completed-approved-v6-exercise-milestone-c-closeout) records 23,956 requests including 657 injected fault responses and retains all earlier failures. K3s was untouched. The empirical timing budget is not a worst-case guarantee; the earlier latency remains unresolved and React search still loads the directory into browser memory. Source-only v0.2.0 preparation is ready; integration/current CI review and explicit tag/release authorization remain publication gates.
-
-## Out of scope for the initial version
-
-- Paid or always-on cloud infrastructure.
-- Running EKS, AKS, and GKE concurrently.
-- Microservices solely to increase the technology count.
-- Kubernetes operators before the basic deployment and rollout workflow is reliable.
-- Claims of production scale without measured evidence.
-
-## Definition of done for a change
-
-- Requirements and acceptance criteria are clear.
-- The implementation is focused and reviewed for unnecessary complexity.
-- Relevant tests are added or updated and actually run.
-- `git diff --check` passes and no secrets or generated artifacts are included.
-- Documentation and operational consequences are updated where necessary.
-- The pull request records verification, remaining risks, and rollback considerations.
-
-## Progress tracking
-
-GitHub Issues and pull requests are the task tracker. Update this plan when a milestone is genuinely complete. Keep design rationale in `docs/decisions/` and repeatable operational procedures in `docs/runbooks/`.
+Changes require clear acceptance criteria, a focused implementation, relevant tests, updated documentation and review of security and operational effects. CI and `git diff --check` must pass. Issues track work, decision records explain design choices, and runbooks describe repeatable procedures.

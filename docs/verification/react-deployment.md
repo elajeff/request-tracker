@@ -1,6 +1,6 @@
 # React staff frontend deployment verification
 
-Merged main: `704354cb5c4f94e580817c28487986cc09de1ffb` (approved release tree unchanged).
+Verified revision: `704354cb5c4f94e580817c28487986cc09de1ffb`.
 Source frontend revision: `b5b0ad152cbe75ced040c2ae57a2b99601d96609`.
 Image on all four frontends: `request-tracker-frontend:react-b5b0ad152cbe75ced040c2ae57a2b99601d96609`.
 Local build OCI index: `sha256:85f2b5195a6e48ce580dedf44c7bc6f16af08bdb01dbb15c8a199a623d4739ba`.
@@ -30,12 +30,10 @@ The automatic Argo rollout began before observation. Request coverage is not cla
 
 All pre-existing requests, staff, history, account roles/enabled flags/credential fingerprints and Flyway rows matched by stable ID and every field. Backend/monitoring/PostgreSQL pod identities, images and restart counts; backend Deployment/Rollout specifications; Services; application/database Secrets; configuration; PVCs; and retained preview resources were unchanged. Helm release metadata advanced as expected. JDBC sessions changed through the planned logins/logouts.
 
-Intentional fixtures remain listed in `browser-fixtures.json`: four new requests, four new staff records and twelve associated history entries across the two clusters; no accounts or migrations were added. Newly created staff are active and requests are unassigned at completion. Earlier synthetic request `317b3e54-2334-43c3-a52b-9383e163ff8f`, history 22 and disabled account `smoke-react-81d6a17f` were pre-existing records and remain unchanged. No fixtures were blindly deleted.
+Intentional fixtures comprise four new requests, four new staff records and twelve associated history entries across the two clusters; no accounts or migrations were added. At completion, newly created staff were active and requests were unassigned. Earlier synthetic request `317b3e54-2334-43c3-a52b-9383e163ff8f`, history 22 and a disabled synthetic account were pre-existing records and remain unchanged. No fixtures were blindly deleted.
 
 ## Limits
 
 - Deployed automated browser acceptance is now completed for the listed workflows. No manual human acceptance or video recording is claimed.
 - Live directories remained below 25 records; bulk page-boundary coverage was not repeated on live data. Prior isolated pagination tests remain separate evidence. Staff search still loads the full directory into browser memory.
-- At this frontend-only checkpoint V6 progressive promotion/automatic abort remained outstanding. The subsequent [kind-only Milestone C exercise](v6-kind-progressive.md#completed-approved-v6-exercise-milestone-c-closeout) completed it separately; frontend rolling updates and this API window do not establish those results.
-
-Detailed results: `final-verification.json`, `browser-result.json`, `browser-requests.json`, `api-window.json`, before/after snapshots and per-route screenshots. No GitHub writes were performed.
+- At this frontend-only checkpoint V6 progressive promotion/automatic abort remained outstanding. The subsequent [kind-only Milestone C exercise](canary-release.md) completed it separately; frontend rolling updates and this API window do not establish those results.

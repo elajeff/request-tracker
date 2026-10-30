@@ -1,179 +1,88 @@
 # Request Tracker
 
-Request Tracker is a service-request management application used to practise the full software development lifecycle: maintainable application code, automated testing, container builds, Kubernetes deployment, progressive delivery, observability, security, and recovery.
+Support request management application built with Java 21, Spring Boot, PostgreSQL, React and TypeScript.
 
-**Current functionality:** a Java 21 / Spring Boot API backed by PostgreSQL, plus a TypeScript/Vite dashboard for creating, searching, editing, and updating service requests. Docker Compose and Helm support local deployment. Local monitoring, verified Argo CD/Rollouts delivery, kind/k3s recovery exercises, and an isolated PreviewEnvironment controller are implemented; see the [release checklist](docs/release-checklist.md).
+## Features and architecture
 
-## Application
+- Create, search, edit, prioritize, assign and resolve support requests.
+- REQUESTER/SUPPORT sessions, CSRF protection and account-scoped access.
+- Active/inactive staff directory, assignment validation and persistent change history.
+- Cursor pagination for requests, staff and history.
+- Compose/Helm deployment, Prometheus/Grafana monitoring and Argo canary delivery.
+- An isolated PreviewEnvironment controller for local Kubernetes labs.
 
-Employees can submit service requests. The dashboard supports searching the queue, editing titles and descriptions, changing priority, and advancing status from `NEW` to `IN_PROGRESS` to `RESOLVED`. Requests can be assigned to persistent active/inactive staff directory records; new assignments to inactive staff are rejected. Each request shows persistent change history for its details, status, priority, and assignment. Staff names are not login identities. Session login and backend-enforced REQUESTER/SUPPORT permissions are described in [authentication](docs/authentication.md).
+The backend is a modular monolith using JDBC and Flyway. A same-origin Vite/nginx dashboard proxies API calls to Spring Boot. React owns staff management; the request dashboard remains TypeScript. PostgreSQL stores application data and shared sessions.
 
-Implemented API:
+## Development
 
-- `POST /api/requests` — create a request.
-- `GET /api/requests` — list requests, newest first.
-- `GET /api/requests/{id}` — retrieve a request by UUID.
-- `PUT /api/requests/{id}` — update a request title and description.
-- `PATCH /api/requests/{id}/status` — advance request status.
-- `PATCH /api/requests/{id}/priority` — update request priority.
-- `PATCH /api/requests/{id}/assignment` — assign, reassign, or unassign support staff.
-- `GET /api/requests/{id}/history` — list recorded changes, newest first.
-- `GET /actuator/health` — application health.
-- `GET /actuator/prometheus` - application metrics in Prometheus format.
+Requirements: Java 21, Node.js 24, Docker with Compose, and internet access for initial dependency downloads. The repository includes the Maven wrapper.
 
-Queue and history GET responses contain `items` and `nextCursor` (null at the end), replacing the previous bare arrays. Both accept `limit` (default 25, range 1–100) and the returned `cursor`. Queue search uses `q` across all titles, descriptions, UUIDs, and assignees, case-insensitively with literal substring matching. Queue responses also contain account-scoped `counts` (`total`, `newCount`, `inProgressCount`, `resolvedCount`).
+To run the packaged backend and PostgreSQL:
 
-Use **Load more requests** or **Load older changes** to append pages. Search and Refresh restart from the newest results. Queue order is creation time then UUID descending; history uses descending change IDs. Cursors avoid shifts from new arrivals but do not freeze edits to search results.
+```powershell
+docker compose up --build -d --wait
+```
 
-A new request has a title, description, UUID, creation timestamp, and `NEW` status. Titles must be 1–120 characters and descriptions 1–2000 characters. The API requires a locally provisioned session account. Requesters see only their own requests and edit details only while NEW; support manages all requests and staff. This remains a local-lab application.
+The API listens at `http://localhost:8080`; health is at `/actuator/health`. View logs with `docker compose logs -f app`. `docker compose down` preserves the database volume; adding `-v` deletes it.
 
-## Metrics
-
-Spring Boot exposes HTTP request, JVM, and runtime metrics at `/actuator/prometheus`.
-
-This endpoint is unauthenticated and intended for local or cluster-internal monitoring. Do not expose it publicly without access controls. For the optional local collector and provisioned Grafana dashboard, see [local monitoring](docs/monitoring.md).
-
-## Technology and roadmap
-
-- Java 21, Spring Boot, PostgreSQL, JDBC, and Flyway migrations.
-- A TypeScript/Vite dashboard with a development proxy to the Spring Boot API.
-- Reproducible local development with Docker Compose.
-- CI with GitHub Actions for backend verification, frontend builds, and container image builds.
-- Helm deployment to local `kind`, with probes, resource limits, persistent PostgreSQL storage, ConfigMap/Secret configuration, and a ServiceAccount without API-token automount.
-- Verified deployment/recovery exercises on kind and k3s; RKE2 is deferred for v0.1.0.
-- Helm, Argo CD, Argo Rollouts, Prometheus, and Grafana.
-- Security checks, backup/restore exercises, incident runbooks, and a small custom Kubernetes controller.
-
-These roadmap items are not claims that the capabilities already exist. See [`docs/project-plan.md`](docs/project-plan.md).
-
-## Run with Docker Compose
-
-Requires Docker Desktop with Docker Compose.
-
-Start the backend and PostgreSQL:
-
-    docker compose up --build -d --wait
-
-The API is available at http://localhost:8080.
-Check http://localhost:8080/actuator/health for health status.
-
-View backend logs with `docker compose logs -f app`.
-Stop the containers with `docker compose down`.
-PostgreSQL data remains in its named volume.
-Running `docker compose down -v` deletes that data.
-
-## Deploy to Kubernetes with kind
-
-See [the local Kubernetes guide](docs/kind-deployment.md) for deployment, verification, dashboard access, and cleanup. Kubernetes has a database volume separate from Docker Compose.
-
-## Run locally
-
-Requires Java 21, Docker Desktop with Docker Compose, and an internet connection for the initial dependency downloads.
-
-Start PostgreSQL from the repository root:
+For host development, start PostgreSQL and Spring Boot:
 
 ```powershell
 docker compose up -d --wait postgres
-```
-
-Run backend verification against a separate disposable PostgreSQL database, configured through `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME` and `SPRING_DATASOURCE_PASSWORD`:
-
-```powershell
-.\mvnw.cmd --batch-mode --no-transfer-progress verify
-```
-
-Start the backend:
-
-```powershell
 $env:SESSION_COOKIE_SECURE = "false" # Local HTTP only
 .\mvnw.cmd spring-boot:run
 ```
 
-The API is available at `http://localhost:8080`. Local-development database credentials are defined in `compose.yaml` and `application.properties`; override them with environment variables outside local development.
-
-## Accounts and API access
-
-Build the application and [provision SUPPORT and REQUESTER accounts](docs/authentication.md#local-provisioning) before signing in. No default login is installed. Use the dashboard through its Vite/nginx proxy.
-
-API clients must retain cookies, fetch `/api/session`, and send the returned CSRF header with login and all subsequent state-changing calls. Fetch a new CSRF token after login. See the [session protocol and permission matrix](docs/authentication.md#session-and-csrf-protocol).
-
-Stop PostgreSQL when finished:
-
-```powershell
-docker compose stop postgres
-```
-
-PostgreSQL data is stored in a named Docker volume and remains after stopping the container. `docker compose down -v` deletes that volume and its data, so do not use `-v` unless you deliberately want to reset the local database.
-
-## Automated browser workflows
-
-With Node.js 24 and Docker Compose available, run from the repository root:
-
-```powershell
-node e2e/run.mjs
-```
-
-The command builds the backend, dashboard, and Chromium-only test image, waits for functional readiness through nginx, and runs ten independent UI journeys with synthetic records. The locked Playwright package installs its matching Chromium headless shell inside the image; no host browser installation is needed. Coverage includes SUPPORT create/edit persistence, staff assignment and filtering, status/priority history, queue/history pagination under new arrivals, REQUESTER ownership and edit restrictions, logout, and session-loss recovery. The session-loss fixture invalidates the session through a separate HTTP client; it does not wait for the idle timeout. The React journeys also cover rename/deactivate/reactivate, directory pagination/search, validation, load/save failures, session clearing and assignment consistency. Detailed business-rule checks remain in the backend suite.
-
-Each run uses a random Compose project, a private network with no host ports, and a fresh PostgreSQL database in memory. It never connects to development or Kubernetes databases. Cleanup removes only that run's containers, images, network, and temporary storage, including on ordinary failure or interruption; base images/build cache remain. Docker must stay available for cleanup.
-
-Reports are written to `test-results/browser/<run>/`. Failures retain screenshots, JSON results, sanitized error contexts and stack logs from the synthetic environment. Authenticated traces are disabled because they contain reusable session material. Random test passwords are redacted from textual artifacts; database credentials are not sent through browser/API requests. Tests have no retries. The command preserves the failing command's exit code; cleanup failure also fails an otherwise successful run. GitHub Actions runs the same command and retains artifacts for seven days. Optional Playwright arguments can follow the command, for example `node e2e/run.mjs --grep "create and edit"`.
-
-The browser container uses the invoking Linux UID/GID (1000 on Windows) so the host can sanitize its reports. GitHub uploads artifacts only after sanitization succeeds.
-
-## Development workflow
-
-Project work is tracked through GitHub Issues. Changes are developed on short-lived branches and submitted through pull requests that summarize the change, report the verification performed, and describe relevant risks and rollback considerations.
-
-## License
-
-No license has been selected yet. Until one is added, do not assume that the source is licensed for reuse.
-
-## Web dashboard (development)
-
-The Vite frontend uses React/TypeScript for staff management and TypeScript for the request dashboard. Both use the existing session/CSRF client and same-origin development/nginx proxies.
-
-Prerequisites: Java 21, Docker Desktop, and Node.js.
-
-1. Start PostgreSQL from the project directory:
-
-   ```powershell
-   docker compose up -d --wait postgres
-   ```
-
-2. Start Spring Boot from the project directory in a terminal dedicated to the backend:
-
-   ```powershell
-   $env:SESSION_COOKIE_SECURE = "false" # Local HTTP only
-   .\mvnw.cmd spring-boot:run
-   ```
-
-3. Start the frontend from the project directory in a separate terminal:
-
-   ```powershell
-   npm.cmd ci --prefix frontend
-   npm.cmd run dev --prefix frontend
-   ```
-
-4. Open `http://127.0.0.1:5173`.
-
-To build the frontend, run from the project directory:
+Start the dashboard in another terminal:
 
 ```powershell
 npm.cmd ci --prefix frontend
-npm.cmd run build --prefix frontend
+npm.cmd run dev --prefix frontend
 ```
 
-## Assignment and history
+Open `http://127.0.0.1:5173`. Build the frontend with `npm.cmd run build --prefix frontend`.
 
-Open **Manage support staff** beside the queue to create, rename, deactivate, or reactivate directory records. Names are 1–120 characters; duplicate names are allowed and IDs distinguish records. These are not authenticated users. Use **Load more staff** for additional directory records and selector options. **Search staff** matches names or IDs across the directory by fetching remaining cursor pages (25 records per request); the API has no server-side staff search. A full search therefore loads the directory into browser memory.
+[Provision SUPPORT and REQUESTER accounts](docs/authentication.md#local-provisioning) before signing in; no default login is installed. Local database defaults are defined in `compose.yaml` and `application.properties`; override them outside development. API clients retain cookies, fetch `/api/session` before login, then fetch a new CSRF token after login for state-changing calls.
 
-React exclusively owns `staff-management-root`; the request dashboard receives saved staff records and loaded pages to update assignment options. Session loss unmounts the directory and clears its drafts. Loading, empty, validation and error states are explicit; failed writes require a manual retry.
+## API and data
 
-Choose active staff or **Unassigned** on a request. Deactivation preserves existing assignments but blocks new ones; reassignment and unassignment remain available. The staff filter includes inactive records and combines with search and pagination. Totals remain global. Expand **Change history** to load older changes or refresh.
+| Resource | Operations |
+| --- | --- |
+| `/api/requests` | Create and list; search with `q`, filter with `staffId` or `unassigned` |
+| `/api/requests/{id}` | Retrieve and edit details |
+| `/api/requests/{id}/{status,priority,assignment}` | Update the selected field |
+| `/api/requests/{id}/history` | Read persistent changes |
+| `/api/staff` and `/api/staff/{id}` | List, create and rename staff; `/active` changes availability |
+| `/api/session` | Session/CSRF bootstrap; `/login` and `/logout` manage authentication |
 
-Staff API: `POST /api/staff` and `PUT /api/staff/{id}` accept `{"name":"Alex Support"}`; `PATCH /api/staff/{id}/active` accepts `{"active":false}` (or true). `GET /api/staff` uses `limit`/`cursor` pagination, ordered by UUID. There is no delete endpoint. Assignment now accepts `{"staffId":"UUID"}` or `{"unassign":true}` instead of a free-text name. Queue filters use `staffId=UUID` or `unassigned=true`, not both.
+Queue/history pages contain `items` and `nextCursor`; `limit` defaults to 25 (range 1-100). Queue counts are account-scoped. New requests start at NEW and progress through IN_PROGRESS to RESOLVED. See [authentication](docs/authentication.md) for the permission matrix and [staff/history](docs/staff-management.md) for assignment rules and migration behavior.
 
-Migration V5 copies every non-null legacy assignment exactly into a separate inactive staff record, linked to its request. Even equal names are not merged; review and reactivate, rename, or reassign them. Blank legacy names must be renamed before activation. The old text column is replaced only after copying its values; history rows are untouched. New assignment history captures name and staff ID at change time, in the same transaction. Renaming staff updates the current display without rewriting historical values. No-op/rejected updates add no history. History starts at V3. V6 adds authenticated actor snapshots for new API changes; older changes remain unattributed. It is not a tamper-proof audit log.
+## Testing
 
-V5 requires the matching backend and dashboard; the previous free-text-assignment backend cannot run against the new schema.
+Run backend tests against a separate disposable PostgreSQL database configured through `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME` and `SPRING_DATASOURCE_PASSWORD`:
+
+```powershell
+.\mvnw.cmd --batch-mode --no-transfer-progress verify
+python -m unittest discover -s delivery -p 'test_*.py'
+python -m unittest discover -s preview-controller -p 'test_*.py'
+node e2e/run.mjs
+```
+
+The browser command builds an isolated backend/nginx/Chromium stack with memory-backed PostgreSQL. Ten UI journeys cover requests, staff, pagination, ownership and session loss. It uses synthetic credentials and records, has no retries and cleans up its own resources. Sanitized reports are written to `test-results/browser/`; authenticated traces are disabled. GitHub Actions runs backend, frontend, browser, container and chart checks.
+
+## Deployment and documentation
+
+- [kind deployment](docs/kind-deployment.md), [k3s lab](docs/runbooks/k3s.md) and [preview controller](preview-controller/README.md)
+- [Monitoring](docs/monitoring.md), [recovery](docs/runbooks/local-recovery.md) and [security](docs/runbooks/security-capstone.md)
+- [Canary delivery](docs/runbooks/delivery.md) and [authenticated canary procedure](docs/runbooks/v6-kind-progressive.md)
+- [React verification](docs/verification/react-deployment.md), [canary verification](docs/verification/canary-release.md), [project plan](docs/project-plan.md) and [release checklist](docs/release-checklist.md)
+
+Metrics at `/actuator/prometheus` require no login and belong on loopback or cluster-internal routes. External exposure requires access controls.
+
+## Limitations
+
+This is a local-lab application with single-node storage, no production SLOs and no zero-downtime guarantee. Staff search loads the directory into browser memory. The 300-second canary observation budget is empirical; transient backend latency and diagnostic-route failures remain unresolved. Database migration V6 provides authentication storage; v0.2.0 names the next project release.
+
+## License
+
+No license has been selected. The source is not licensed for reuse.

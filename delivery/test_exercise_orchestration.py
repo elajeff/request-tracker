@@ -88,7 +88,7 @@ class OrchestrationTest(unittest.TestCase):
                                 clock=lambda: next(ticks), push=push)
         push.assert_not_called()
 
-    def test_approval_pause_expired_certificate_cannot_be_reused(self):
+    def test_publication_delay_expired_certificate_cannot_be_reused(self):
         self.certify()
         preflight, push = Mock(), Mock()
         with self.assertRaises(gates.GateError):

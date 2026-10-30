@@ -17,4 +17,3 @@ Start with one Spring Boot application and PostgreSQL. Keep clear boundaries bet
 - Database transactions and business rules can be tested without coordinating several services.
 - The same container and Helm chart can be reused for cluster-distribution exercises.
 - Separate services or additional infrastructure can be introduced later only when a demonstrated requirement justifies them.
-- This choice does not imply that the application is already implemented or deployed.

@@ -20,7 +20,7 @@ The fixed lab namespace has a ResourceQuota. Status exposes a Ready condition, g
 
 For retained-data recovery, identify the matching PVC/Secret pair by its original owner-UID label. Mount that PVC in a separate PostgreSQL 17 recovery pod at `/var/lib/postgresql/data`, set `PGDATA=/var/lib/postgresql/data/pgdata`, and reference the retained Secret's username/password keys. Use UID/GID/fsGroup 70, a disabled service-account token, and no Service. Never generate replacement credentials or run a second PostgreSQL process against a mounted live database. The recorded readback used this procedure and removed only its temporary recovery pod afterward.
 
-Intentional disposal requires a backup and confirmation that no pod mounts the PVC. Inspect the exact PVC/Secret names, UIDs, and original owner-UID label using the isolated kubeconfig and `k3d-request-tracker-k3s` context, then delete only that confirmed pair in `preview-lab`. Avoid namespace deletion and broad label-based cleanup. No retained pair was disposed during integration review.
+Intentional disposal requires a backup and confirmation that no pod mounts the PVC. Inspect the exact PVC/Secret names, UIDs, and original owner-UID label using the isolated kubeconfig and `k3d-request-tracker-k3s` context, then delete only that confirmed pair in `preview-lab`. Avoid namespace deletion and broad label-based cleanup.
 
 ## Run and verify
 
@@ -44,7 +44,7 @@ On 28 October 2026, nine initial unit tests passed; integration review added exp
 
 TTL expiry with explicit `Delete` removed its disposable workloads, PVC, and credentials. Default-retention deletion removed workloads but kept the original PVC/Secret. A separate temporary PostgreSQL pod read the original request from retained storage, then was removed. Recreating the CR name used independent resources. The lifecycle runner stopped before its final ownership/RBAC assertions; its aggregate completion assertion was not reached. Separately executed ownership checks observed `OwnershipConflict` and confirmed that finalization preserved the foreign Service while deleting owned disposable resources. Separate impersonation checks denied existing application-namespace access and CRD administration.
 
-The original live verification used `request-tracker-preview-controller:lab-v7`. Initial runtime revisions failed due to a missing process username, cluster-discovery permissions, and incorrect status-subresource use; these were corrected before final verification. A concurrent credential-creation race was also corrected and regression-tested. Lifecycle, ownership/RBAC, retained-data readback, and final-state observations are stored separately outside Git at `C:\Users\DESKTOP\request-tracker-backups\k3s-20261028-064246\preview-controller`.
+The original live verification used `request-tracker-preview-controller:lab-v7`. Initial runtime revisions failed due to a missing process username, cluster-discovery permissions, and incorrect status-subresource use; these were corrected before final verification. A concurrent credential-creation race was also corrected and regression-tested. Lifecycle, ownership/RBAC, retained-data readback, and final-state observations are stored separately in private storage outside Git.
 
 The original verification ended with a Ready controller, no active previews, and one intentionally retained PVC/credential Secret pair. Kind and k3s application data and Argo health/sync state were unchanged. No release exercises were repeated. Manual dashboard acceptance remains recorded separately; these controller checks do not add automated browser coverage.
 
@@ -54,7 +54,6 @@ The image `request-tracker-preview-controller:37969db-live-20261028182422` was b
 
 A separate temporary PostgreSQL pod read the newly retained request after preview deletion, then was removed. The pre-existing retained PVC/Secret pair preserved its UIDs and content hashes, and both kind/k3s application datasets matched their before-run snapshots. Final lab state: one Ready controller at one replica, zero active previews, and two intentionally retained PVC/credential Secret pairs. No generated credential values were found in controller logs. The default context remained `kind-request-tracker`.
 
-Runner stdout/stderr, exit status, lifecycle records, readback, and preservation checks are outside Git at `C:\Users\DESKTOP\request-tracker-backups\k3s-20261028-064246\reviewed-e2e-20261028-182421`. The immutable image was selected with an explicit lab Deployment override; the original `lab.yaml` image tag was not rewritten.
 
 
 The security/capstone review adds restricted Pod Security admission for `preview-lab` at policy version v1.37 and digest-pins PostgreSQL. See [review results and demonstration](../docs/runbooks/security-capstone.md).

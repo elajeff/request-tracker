@@ -16,6 +16,14 @@ import urllib.request
 import uuid
 
 
+WORKER_COUNT = 4
+REQUEST_TIMEOUT_SECONDS = 3  # Socket limit for each request; failures are counted, never retried.
+REQUEST_INTERVAL_SECONDS = 0.2
+DRAIN_TIMEOUT_SECONDS = 12  # Bounds shutdown across all workers, not each worker separately.
+EXERCISE_TIMEOUT_SECONDS = 900  # Fail if the exercise reaches its overall traffic bound.
+BASELINE_SECONDS = 120
+
+
 class Quiesced(Exception):
     pass
 
@@ -98,7 +106,7 @@ class Accounting:
     def worker_ready(self, worker_id):
         with self.lock:
             self.ready_workers.add(worker_id)
-            if self.ready_workers != {0, 1, 2, 3} or self.failure or (self.directory / "ready.json").exists():
+            if self.ready_workers != set(range(WORKER_COUNT)) or self.failure or (self.directory / "ready.json").exists():
                 return
             self.raw.flush()
             os.fsync(self.raw.fileno())
@@ -119,7 +127,7 @@ class Accounting:
         with self.lock:
             self.stop.set()
 
-    def finalize(self, workers, timeout=12):
+    def finalize(self, workers, timeout=DRAIN_TIMEOUT_SECONDS):
         self.quiesce()
         deadline = time.monotonic() + timeout
         for worker in workers:
@@ -164,7 +172,7 @@ def worker(accounting, base, username, password, request_id, worker_id=0, baseli
                          "X-Request-ID": accounting.run_id + "-" + str(accounting.context.identity),
                          "User-Agent": "V6Exercise/" + accounting.run_id + "-" + str(accounting.context.identity),
                          **(headers or {})})
-            with client.open(request, timeout=3) as response:
+            with client.open(request, timeout=REQUEST_TIMEOUT_SECONDS) as response:
                 body = response.read()
                 return response.status, json.loads(body) if parse else None
         phase_file = accounting.directory / "phase"
@@ -205,7 +213,7 @@ def worker(accounting, base, username, password, request_id, worker_id=0, baseli
             if status == "http:401":
                 return
             index += 1
-            accounting.stop.wait(max(0, 0.2 - (time.monotonic() - started)))
+            accounting.stop.wait(max(0, REQUEST_INTERVAL_SECONDS - (time.monotonic() - started)))
     except Quiesced:
         pass
     except Exception:
@@ -213,7 +221,6 @@ def worker(accounting, base, username, password, request_id, worker_id=0, baseli
 
 
 def install_shutdown_handlers(accounting):
-    # Signals request shutdown; main performs the bounded drain and remains alive.
     for name in (signal.SIGTERM, signal.SIGINT):
         signal.signal(name, lambda *_: accounting.stop.set())
 
@@ -223,7 +230,7 @@ def run():
     install_shutdown_handlers(accounting)
     baseline = os.environ.get("TRAFFIC_BASELINE_SECONDS")
     if baseline is not None:
-        if baseline != "120" or os.environ.get("TRAFFIC_ROUTE") not in {"host", "cluster"}:
+        if baseline != str(BASELINE_SECONDS) or os.environ.get("TRAFFIC_ROUTE") not in {"host", "cluster"}:
             raise ValueError("Baseline requires 120 seconds and a known route")
         attempt = str(uuid.UUID(os.environ["TRAFFIC_ATTEMPT_ID"]))
         base = os.environ.get("TRAFFIC_BASE_URL", "")
@@ -232,15 +239,15 @@ def run():
                 or parsed.fragment or parsed.path not in {"", "/"} or not parsed.hostname):
             raise ValueError("Invalid baseline frontend address")
         accounting.baseline = {"attemptId": attempt, "route": os.environ["TRAFFIC_ROUTE"],
-            "context": "kind-request-tracker", "requestedSeconds": 120,
+            "context": "kind-request-tracker", "requestedSeconds": BASELINE_SECONDS,
             "baseUrl": base, "startedAtNs": time.time_ns()}
     workers = [threading.Thread(target=worker, args=(accounting,
         os.environ.get("TRAFFIC_BASE_URL", "http://request-tracker-delivery-frontend:80"),
         os.environ["TRAFFIC_USERNAME"], os.environ["TRAFFIC_PASSWORD"],
-        os.environ["TRAFFIC_REQUEST_ID"], worker_id, baseline is not None), daemon=True) for worker_id in range(4)]
+        os.environ["TRAFFIC_REQUEST_ID"], worker_id, baseline is not None), daemon=True) for worker_id in range(WORKER_COUNT)]
     for thread in workers:
         thread.start()
-    deadline = time.monotonic() + (120 if baseline is not None else 900)
+    deadline = time.monotonic() + (BASELINE_SECONDS if baseline is not None else EXERCISE_TIMEOUT_SECONDS)
     while not accounting.stop.wait(0.1):
         if (accounting.directory / "quiesce").exists() or time.monotonic() >= deadline:
             if time.monotonic() >= deadline and baseline is None:
