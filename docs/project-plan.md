@@ -82,6 +82,14 @@ The initial backend will be Java 21 with Spring Boot and PostgreSQL. A TypeScrip
 - Test database backup and restore, document cluster recovery procedures, and run selected failure/security scenarios.
 - Publish a final walkthrough, architecture documentation, runbooks, and a release when the product is sufficiently complete.
 
+### V0.2.0 Milestone C: completed runtime verification
+
+- [x] Record the four-frontend React deployment and deployed browser acceptance, preserving the initial observer failure, expected session-loss 401/client abort, counts, fixtures and limitations.
+- [x] Verify authenticated V6 progressive promotion and automatic abort on kind, with candidate-specific analysis and strict four-ready-candidate acceptance.
+- [x] Quiesce/recount/capture final traffic before pruning; restore main `704354c` Healthy/Synced and strictly preserve application/account/Flyway rows, settings, Secrets, storage, retained resources and reconciliation policy.
+
+[Milestone C evidence](runbooks/v6-kind-progressive.md#completed-approved-v6-exercise-milestone-c-closeout) records 23,956 requests including 657 injected fault responses and retains all earlier failures. K3s was untouched. The empirical timing budget is not a worst-case guarantee; the earlier latency remains unresolved and React search still loads the directory into browser memory. Source-only v0.2.0 preparation is ready; integration/current CI review and explicit tag/release authorization remain publication gates.
+
 ## Out of scope for the initial version
 
 - Paid or always-on cloud infrastructure.

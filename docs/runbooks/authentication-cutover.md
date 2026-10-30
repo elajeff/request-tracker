@@ -71,7 +71,7 @@ Helm `v4.3.1+gc0d08d0` initially failed kind revision 4 because server-side appl
 helm --kube-context kind-request-tracker -n request-tracker upgrade request-tracker helm/request-tracker --server-side=false --reset-then-reuse-values --set backend.image.tag=auth-08e4a87-20261029041407 --set frontend.image.tag=auth-08e4a87-20261029041407 --set backend.sessionCookieSecure=false --wait --timeout 180s
 ```
 
-Evidence is outside Git under `C:/Users/DESKTOP/request-tracker-backups/`:
+Evidence is retained privately outside Git:
 
 - `auth-repair-20261029-075800`: failed-release snapshots and disposable selector/ownership verification.
 - `authentication-kind-20261029-053946`: final pre-V6 backup, successful isolated restore/V6 rehearsal, and all 177 first-attempt probes (7 HTTP 200, 169 HTTP 502, 1 network failure). The attempt stopped after 90.31 seconds and retained maintenance.
@@ -118,3 +118,11 @@ Routes reopened once at approximately 06:39:48.810 UTC. The distinct window star
 Both frontend Services have one ready endpoint and no maintenance selector. Baseline backend/frontends are 1/1, delivery is 4/4, and Argo is Healthy/Synced at `74f76833fbd683e541b245d480d810ea8bd12b3e`, tracking main with the retained database Secret parameter. Existing Secrets/settings/PVCs, retained preview resources, PostgreSQL restart count, Rollout UID and original evidence hashes are unchanged. Helm remains revision 2. No migration, restore, provisioning, workload replacement or kind operation was repeated.
 
 Earlier acceptance evidence is reused. No new authenticated dashboard browser check or authenticated progressive-promotion/automatic-abort exercise was performed; the earlier manual dashboard acceptance remains recorded. The original ambiguous 401 and every earlier failure count remain failures in their original evidence.
+
+## Subsequent React frontend verification
+
+The frontend-only deployment and deployed browser acceptance completed at main `704354c`; see [the full counts, preservation checks and limitations](react-staff-deployment.md). This supersedes the earlier browser-verification status only. All cutover failures above remain unchanged. V6 promotion/automatic abort was still pending at that frontend-only checkpoint; its later kind-only completion is recorded below.
+
+## Subsequent Milestone C completion
+
+On 30 October 2026 the bounded kind-only V6 exercise passed fresh authenticated baselines, strict 4/4 candidate promotion, both analyses, automatic faulty-candidate abort, full pre-prune traffic accounting and main-based restoration/preservation. See [the exact counts and closure](v6-kind-progressive.md#completed-approved-v6-exercise-milestone-c-closeout). No cutover, migration, provisioning or historical k3s exercise was repeated. All failures above and from the later halted attempts remain recorded. Kind ended Healthy/Synced at `704354c`; k3s remained untouched. Source-only v0.2.0 preparation can proceed, with source integration/CI and release publication gates still pending.

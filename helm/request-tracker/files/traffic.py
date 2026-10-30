@@ -1,62 +1,260 @@
+"""Bounded authenticated traffic with an explicit, retained quiesce checkpoint."""
 import collections
+import hashlib
 import http.cookiejar
+import http.client
 import json
 import os
+from pathlib import Path
+import signal
+import socket
 import threading
 import time
 import urllib.error
 import urllib.parse
 import urllib.request
-
-counts = collections.Counter()
-lock = threading.Lock()
-base = os.environ.get("TRAFFIC_BASE_URL", "http://request-tracker-delivery:8080")
-paths = ["/api/requests?limit=5", "/api/staff?limit=5",
-         "/api/requests/" + os.environ["TRAFFIC_REQUEST_ID"] + "/history?limit=5"]
+import uuid
 
 
-def login(client):
-    with client.open(base + "/api/session", timeout=3) as response:
-        session = json.load(response)
-    data = urllib.parse.urlencode({"username": os.environ["TRAFFIC_USERNAME"],
-                                   "password": os.environ["TRAFFIC_PASSWORD"]}).encode()
-    request = urllib.request.Request(base + "/api/session/login", data=data,
-                                     headers={session["csrfHeaderName"]: session["csrfToken"]})
-    with client.open(request, timeout=3) as response:
-        if response.status != 204:
-            raise RuntimeError("Traffic account login failed")
+class Quiesced(Exception):
+    pass
 
 
-def worker():
-    index = 0
-    client = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()))
-    authenticated = False
-    while True:
-        started = time.monotonic()
-        request = urllib.request.Request(base + paths[index % len(paths)],
-                                         headers={"Connection": "close"})
+def outcome(error):
+    reason = error.reason if isinstance(error, urllib.error.URLError) else error
+    if isinstance(reason, (TimeoutError, socket.timeout)):
+        return "timeout"
+    if isinstance(reason, (ConnectionError, socket.gaierror)):
+        return "connection-error"
+    return "network-error"
+
+
+class Accounting:
+    def __init__(self, directory):
+        self.directory = Path(directory)
+        self.directory.mkdir(parents=True, exist_ok=True)
+        # Exclusive creation prevents accidental evidence reuse after a restart.
+        self.raw = (self.directory / "requests.ndjson").open("x", encoding="utf-8", newline="\n")
+        self.run_id = str(uuid.uuid4())
+        self.lock = threading.Lock()
+        self.stop = threading.Event()
+        self.started = 0
+        self.completed = 0
+        self.counts = collections.Counter()
+        self.final = None
+        self.failed = False
+        self.context = threading.local()
+        self.ready_workers = set()
+        self.failure = None
+        self.baseline = None
+
+    def atomic_json(self, name, value):
+        temporary = self.directory / (name + ".tmp")
+        with temporary.open("w", encoding="utf-8") as output:
+            json.dump(value, output, sort_keys=True)
+            output.flush()
+            os.fsync(output.fileno())
+        temporary.replace(self.directory / name)
+
+    def emit(self, event):
+        self.raw.write(json.dumps({"runId": self.run_id, **event}, sort_keys=True) + "\n")
+        self.raw.flush()
+
+    def request(self, operation, send, phase="setup"):
+        with self.lock:
+            if self.stop.is_set():
+                raise Quiesced()
+            self.started += 1
+            identity = self.started
+            self.emit({"event": "started", "id": identity, "operation": operation,
+                       "phase": phase, "worker": getattr(self.context, "worker", None),
+                       "timeNs": time.time_ns()})
+        self.context.identity = identity
+        value = None
         try:
-            if not authenticated:
-                login(client)
-                authenticated = True
-            with client.open(request, timeout=3) as response:
-                response.read()
-                status = response.status
+            status, value = send()
+            result = "http:" + str(status)
         except urllib.error.HTTPError as error:
-            status = error.code
-            if status == 401:
-                authenticated = False
-        except OSError:
-            status = "network-error"
-        with lock:
-            counts[str(status)] += 1
-        index += 1
-        time.sleep(max(0, 0.2 - (time.monotonic() - started)))
+            result = "http:" + str(error.code)
+            error.close()
+        except (OSError, TimeoutError, http.client.HTTPException) as error:
+            result = outcome(error)
+        except Exception:
+            # Never serialize exception messages: they can contain credentials/URLs.
+            result = "client-error"
+        with self.lock:
+            self.completed += 1
+            self.counts[result] += 1
+            self.emit({"event": "completed", "id": identity, "outcome": result,
+                       "timeNs": time.time_ns()})
+            expected = "http:204" if operation == "login" else "http:200"
+            allowed_fault = (phase in {"fault", "restore"} and operation in {"queue", "staff", "history"}
+                             and result == "http:500")
+            if result != expected and not allowed_fault and self.failure is None:
+                self.failure = {"runId": self.run_id, "id": identity, "outcome": result}
+                self.atomic_json("traffic-failure.json", self.failure)
+        return result, value
+
+    def worker_ready(self, worker_id):
+        with self.lock:
+            self.ready_workers.add(worker_id)
+            if self.ready_workers != {0, 1, 2, 3} or self.failure or (self.directory / "ready.json").exists():
+                return
+            self.raw.flush()
+            os.fsync(self.raw.fileno())
+            raw = (self.directory / "requests.ndjson").read_bytes()
+            # Frozen readiness checkpoint: later requests cannot invalidate its hash.
+            with (self.directory / "ready.ndjson").open("xb") as output:
+                output.write(raw)
+                output.flush()
+                os.fsync(output.fileno())
+            self.atomic_json("ready.json", {"version": 1, "runId": self.run_id,
+                "readyAtNs": time.time_ns(), "workers": sorted(self.ready_workers),
+                "started": self.started, "completed": self.completed,
+                "inFlight": self.started - self.completed,
+                "rawSha256": hashlib.sha256(raw).hexdigest()})
+
+    def quiesce(self):
+        # Admission and stop share a lock: no request can start after this returns.
+        with self.lock:
+            self.stop.set()
+
+    def finalize(self, workers, timeout=12):
+        self.quiesce()
+        deadline = time.monotonic() + timeout
+        for worker in workers:
+            worker.join(max(0, deadline - time.monotonic()))
+        with self.lock:
+            if self.final is not None:
+                return self.final
+            self.raw.flush()
+            os.fsync(self.raw.fileno())
+            self.final = {"version": 1, "runId": self.run_id,
+                          "complete": not self.failed and self.started == self.completed and not any(w.is_alive() for w in workers),
+                          "started": self.started, "completed": self.completed,
+                          "inFlight": self.started - self.completed,
+                          "outcomes": dict(self.counts),
+                          "rawSha256": hashlib.sha256((self.directory / "requests.ndjson").read_bytes()).hexdigest()}
+            if self.baseline is not None:
+                self.final["baseline"] = dict(self.baseline)
+            temporary = self.directory / "summary.tmp"
+            with temporary.open("w", encoding="utf-8") as output:
+                json.dump(self.final, output, sort_keys=True)
+                output.flush()
+                os.fsync(output.fileno())
+            temporary.replace(self.directory / "summary.json")
+            print(json.dumps({"event": "final", **self.final}), flush=True)
+            return self.final
 
 
-for _ in range(2):
-    threading.Thread(target=worker, daemon=True).start()
-while True:
-    time.sleep(10)
-    with lock:
-        print(json.dumps(dict(counts)), flush=True)
+class NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, *args, **kwargs):
+        return None
+
+
+def worker(accounting, base, username, password, request_id, worker_id=0, baseline=False):
+    accounting.context.worker = worker_id
+    client = urllib.request.build_opener(urllib.request.ProxyHandler({}), NoRedirect(),
+        urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()))
+
+    def call(operation, path, data=None, headers=None, parse=False):
+        def send():
+            request = urllib.request.Request(base + path, data=data,
+                headers={"Connection": "close",
+                         "X-Request-ID": accounting.run_id + "-" + str(accounting.context.identity),
+                         "User-Agent": "V6Exercise/" + accounting.run_id + "-" + str(accounting.context.identity),
+                         **(headers or {})})
+            with client.open(request, timeout=3) as response:
+                body = response.read()
+                return response.status, json.loads(body) if parse else None
+        phase_file = accounting.directory / "phase"
+        phase = phase_file.read_text().strip() if phase_file.exists() else ("baseline" if baseline else "setup")
+        if phase not in {"setup", "baseline", "healthy", "fault", "restore", "main"}:
+            phase = "unknown"
+        return accounting.request(operation, send, phase)
+
+    try:
+        status, session = call("session-bootstrap", "/api/session", parse=True)
+        if status != "http:200":
+            return
+        data = urllib.parse.urlencode({"username": username, "password": password}).encode()
+        status, _ = call("login", "/api/session/login", data,
+            {session["csrfHeaderName"]: session["csrfToken"],
+             "Content-Type": "application/x-www-form-urlencoded"})
+        if status != "http:204":
+            return
+        status, session = call("session-refresh", "/api/session", parse=True)
+        if status != "http:200" or not session.get("user") or not session.get("csrfToken"):
+            accounting.failed = True
+            return
+        paths = [("queue", "/api/requests?limit=5"), ("staff", "/api/staff?limit=5"),
+                 ("history", "/api/requests/" + request_id + "/history?limit=5")]
+        if baseline:
+            paths[1] = ("session-refresh", "/api/session")
+        index = 0
+        while not accounting.stop.is_set():
+            started = time.monotonic()
+            operation, path = paths[index % len(paths)]
+            status, value = call(operation, path, parse=operation == "session-refresh")
+            if operation == "session-refresh" and status == "http:200" and not value.get("user"):
+                accounting.failed = True
+                return
+            if operation == "queue" and status == "http:200":
+                accounting.worker_ready(worker_id)
+            # No retry/re-login: authentication loss stops this worker and fails the gate.
+            if status == "http:401":
+                return
+            index += 1
+            accounting.stop.wait(max(0, 0.2 - (time.monotonic() - started)))
+    except Quiesced:
+        pass
+    except Exception:
+        accounting.failed = True
+
+
+def install_shutdown_handlers(accounting):
+    # Signals request shutdown; main performs the bounded drain and remains alive.
+    for name in (signal.SIGTERM, signal.SIGINT):
+        signal.signal(name, lambda *_: accounting.stop.set())
+
+
+def run():
+    accounting = Accounting(os.environ.get("TRAFFIC_EVIDENCE_DIR", "/evidence"))
+    install_shutdown_handlers(accounting)
+    baseline = os.environ.get("TRAFFIC_BASELINE_SECONDS")
+    if baseline is not None:
+        if baseline != "120" or os.environ.get("TRAFFIC_ROUTE") not in {"host", "cluster"}:
+            raise ValueError("Baseline requires 120 seconds and a known route")
+        attempt = str(uuid.UUID(os.environ["TRAFFIC_ATTEMPT_ID"]))
+        base = os.environ.get("TRAFFIC_BASE_URL", "")
+        parsed = urllib.parse.urlsplit(base)
+        if (parsed.scheme != "http" or parsed.username or parsed.password or parsed.query
+                or parsed.fragment or parsed.path not in {"", "/"} or not parsed.hostname):
+            raise ValueError("Invalid baseline frontend address")
+        accounting.baseline = {"attemptId": attempt, "route": os.environ["TRAFFIC_ROUTE"],
+            "context": "kind-request-tracker", "requestedSeconds": 120,
+            "baseUrl": base, "startedAtNs": time.time_ns()}
+    workers = [threading.Thread(target=worker, args=(accounting,
+        os.environ.get("TRAFFIC_BASE_URL", "http://request-tracker-delivery-frontend:80"),
+        os.environ["TRAFFIC_USERNAME"], os.environ["TRAFFIC_PASSWORD"],
+        os.environ["TRAFFIC_REQUEST_ID"], worker_id, baseline is not None), daemon=True) for worker_id in range(4)]
+    for thread in workers:
+        thread.start()
+    deadline = time.monotonic() + (120 if baseline is not None else 900)
+    while not accounting.stop.wait(0.1):
+        if (accounting.directory / "quiesce").exists() or time.monotonic() >= deadline:
+            if time.monotonic() >= deadline and baseline is None:
+                accounting.failed = True
+            accounting.quiesce()
+        if not any(thread.is_alive() for thread in workers):
+            accounting.quiesce()
+    if accounting.baseline is not None:
+        accounting.baseline["endedAtNs"] = time.time_ns()
+    accounting.finalize(workers)
+    # Explicit quiesce does not exit/restart the container. Capture files BEFORE prune.
+    while True:
+        time.sleep(1)
+
+
+if __name__ == "__main__":
+    run()
