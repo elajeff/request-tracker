@@ -53,3 +53,16 @@ Do not include database dumps, kubeconfigs, credentials, `.env` files, raw diagn
 - [ ] Review/merge release documentation, check its CI, and fetch the resulting main commit.
 - [ ] Confirm the exact final main SHA, source inventory, sanitized release notes, and tag availability after documentation integration. A future merge SHA cannot be named in advance.
 - [ ] Obtain explicit authorization before creating/pushing the annotated `v0.1.0` tag or publishing a source-only GitHub Release.
+
+## Subsequent source-only v0.2.0 preparation readiness
+
+The v0.1.0 proposal/gates above remain their historical scope. Milestone C runtime verification completed on 30 October 2026; [the closeout](runbooks/v6-kind-progressive.md#completed-approved-v6-exercise-milestone-c-closeout) records authenticated kind V6 promotion/automatic abort, 23,956 requests including 657 injected HTTP 500s, validated final accounting and preserved main-based Healthy/Synced state. All earlier failures and unresolved latency/search limitations remain documented; no zero-downtime or production-readiness claim follows.
+
+The project is ready to **prepare** a source-only v0.2.0 release: curate the source inventory, sanitized verification summary and release notes. This execution created no v0.2.0 tag, GitHub Release, registry image or binary publication. Image/binary distribution, clean-machine bundle verification and bit-identical build guarantees remain deferred.
+
+- [x] Complete Milestone C's bounded runtime verification and local factual closeout.
+- [ ] Review/integrate the focused source/documentation changes and check current CI.
+- [ ] Prepare/review the exact final source inventory, release notes, target SHA and tag availability.
+- [ ] Obtain explicit authorization before creating/pushing a v0.2.0 tag or publishing a Release.
+
+Proposed publication excludes demo-only values/fault-stage changes and all credentials, backups, raw diagnostics, generated evidence, dependencies and image/binary archives. The runtime execution created no PR and did not push its local closeout documentation. The focused review branch carries the subsequent integration changes.
