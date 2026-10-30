@@ -2,7 +2,7 @@ backend:
   sessionCookieSecure: false
   image:
     repository: request-tracker
-    tag: v6-fault-704354c-deadline
+    tag: auth-08e4a87-20261029041407
 frontend:
   image:
     repository: request-tracker-frontend
@@ -11,6 +11,5 @@ delivery:
   enabled: true
   replicas: 4
   traffic:
-    enabled: true
+    enabled: false
     accountSecret: request-tracker-auth-traffic
-    requestId: "2eb623c8-0cae-4fe1-8efd-aa28c4be6b45"
