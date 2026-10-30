@@ -75,7 +75,7 @@ The browser command builds an isolated backend/nginx/Chromium stack with memory-
 - [kind deployment](docs/kind-deployment.md), [k3s lab](docs/runbooks/k3s.md) and [preview controller](preview-controller/README.md)
 - [Monitoring](docs/monitoring.md), [recovery](docs/runbooks/local-recovery.md) and [security](docs/runbooks/security-capstone.md)
 - [Canary delivery](docs/runbooks/delivery.md) and [authenticated canary procedure](docs/runbooks/v6-kind-progressive.md)
-- [React verification](docs/verification/react-deployment.md), [canary verification](docs/verification/canary-release.md), [project plan](docs/project-plan.md) and [release checklist](docs/release-checklist.md)
+- [React staff verification](docs/verification/react-deployment.md), [full dashboard deployment](docs/verification/react-dashboard-deployment.md), [canary verification](docs/verification/canary-release.md), [project plan](docs/project-plan.md) and [release checklist](docs/release-checklist.md)
 
 Metrics at `/actuator/prometheus` require no login and belong on loopback or cluster-internal routes. External exposure requires access controls.
 
