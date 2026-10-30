@@ -17,6 +17,7 @@ import urllib.error
 import http.client
 
 from traffic_accounting import validate
+from exercise_orchestration import validate_readiness
 
 spec = importlib.util.spec_from_file_location("traffic", Path(__file__).resolve().parents[1] /
     "helm/request-tracker/files/traffic.py")
@@ -164,10 +165,13 @@ class AccountingTest(unittest.TestCase):
 
     def test_process_quiesces_and_retains_capturable_evidence_without_exiting(self):
         class Handler(BaseHTTPRequestHandler):
+            wire_ids = []
+
             def log_message(self, *args):
                 pass
 
             def do_GET(self):
+                self.wire_ids.append(self.headers.get("X-Request-ID"))
                 if self.path == "/api/session":
                     body = json.dumps({"user": {"role": "SUPPORT"},
                         "csrfHeaderName": "X-CSRF-TOKEN", "csrfToken": "synthetic-token"}).encode()
@@ -178,6 +182,7 @@ class AccountingTest(unittest.TestCase):
                 self.wfile.write(body)
 
             def do_POST(self):
+                self.wire_ids.append(self.headers.get("X-Request-ID"))
                 valid = self.headers.get("X-CSRF-TOKEN") == "synthetic-token"
                 self.rfile.read(int(self.headers.get("Content-Length", 0)))
                 self.send_response(204 if valid else 403)
@@ -196,12 +201,14 @@ class AccountingTest(unittest.TestCase):
             deadline = time.monotonic() + 8
             raw_path = evidence / "requests.ndjson"
             while time.monotonic() < deadline:
-                if raw_path.exists() and b'"operation": "history"' in raw_path.read_bytes():
+                if (evidence / "ready.json").exists() and raw_path.exists() and b'"operation": "history"' in raw_path.read_bytes():
                     break
                 self.assertIsNone(process.poll())
                 time.sleep(0.02)
             else:
                 self.fail("Local traffic did not start")
+            validate_readiness(json.loads((evidence / "ready.json").read_text()),
+                               (evidence / "ready.ndjson").read_bytes())
             (evidence / "quiesce").touch()
             while not (evidence / "summary.json").exists() and time.monotonic() < deadline:
                 time.sleep(0.02)
@@ -216,6 +223,9 @@ class AccountingTest(unittest.TestCase):
             for name in ["requests.ndjson", "summary.json"]:
                 (copied / name).write_bytes((evidence / name).read_bytes())
             self.assertEqual(validate(copied), summary)
+            self.assertEqual(len(Handler.wire_ids), len(set(Handler.wire_ids)))
+            self.assertEqual(set(Handler.wire_ids),
+                {summary["runId"] + "-" + str(i) for i in range(1, summary["completed"] + 1)})
             for sensitive in [b"synthetic-password", b"synthetic-token", b"synthetic-user"]:
                 self.assertNotIn(sensitive, raw)
         finally:

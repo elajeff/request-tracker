@@ -43,6 +43,18 @@ class Accounting:
         self.counts = collections.Counter()
         self.final = None
         self.failed = False
+        self.context = threading.local()
+        self.ready_workers = set()
+        self.failure = None
+        self.baseline = None
+
+    def atomic_json(self, name, value):
+        temporary = self.directory / (name + ".tmp")
+        with temporary.open("w", encoding="utf-8") as output:
+            json.dump(value, output, sort_keys=True)
+            output.flush()
+            os.fsync(output.fileno())
+        temporary.replace(self.directory / name)
 
     def emit(self, event):
         self.raw.write(json.dumps({"runId": self.run_id, **event}, sort_keys=True) + "\n")
@@ -55,7 +67,9 @@ class Accounting:
             self.started += 1
             identity = self.started
             self.emit({"event": "started", "id": identity, "operation": operation,
-                       "phase": phase, "timeNs": time.time_ns()})
+                       "phase": phase, "worker": getattr(self.context, "worker", None),
+                       "timeNs": time.time_ns()})
+        self.context.identity = identity
         value = None
         try:
             status, value = send()
@@ -73,7 +87,32 @@ class Accounting:
             self.counts[result] += 1
             self.emit({"event": "completed", "id": identity, "outcome": result,
                        "timeNs": time.time_ns()})
+            expected = "http:204" if operation == "login" else "http:200"
+            allowed_fault = (phase in {"fault", "restore"} and operation in {"queue", "staff", "history"}
+                             and result == "http:500")
+            if result != expected and not allowed_fault and self.failure is None:
+                self.failure = {"runId": self.run_id, "id": identity, "outcome": result}
+                self.atomic_json("traffic-failure.json", self.failure)
         return result, value
+
+    def worker_ready(self, worker_id):
+        with self.lock:
+            self.ready_workers.add(worker_id)
+            if self.ready_workers != {0, 1, 2, 3} or self.failure or (self.directory / "ready.json").exists():
+                return
+            self.raw.flush()
+            os.fsync(self.raw.fileno())
+            raw = (self.directory / "requests.ndjson").read_bytes()
+            # Frozen readiness checkpoint: later requests cannot invalidate its hash.
+            with (self.directory / "ready.ndjson").open("xb") as output:
+                output.write(raw)
+                output.flush()
+                os.fsync(output.fileno())
+            self.atomic_json("ready.json", {"version": 1, "runId": self.run_id,
+                "readyAtNs": time.time_ns(), "workers": sorted(self.ready_workers),
+                "started": self.started, "completed": self.completed,
+                "inFlight": self.started - self.completed,
+                "rawSha256": hashlib.sha256(raw).hexdigest()})
 
     def quiesce(self):
         # Admission and stop share a lock: no request can start after this returns.
@@ -96,6 +135,8 @@ class Accounting:
                           "inFlight": self.started - self.completed,
                           "outcomes": dict(self.counts),
                           "rawSha256": hashlib.sha256((self.directory / "requests.ndjson").read_bytes()).hexdigest()}
+            if self.baseline is not None:
+                self.final["baseline"] = dict(self.baseline)
             temporary = self.directory / "summary.tmp"
             with temporary.open("w", encoding="utf-8") as output:
                 json.dump(self.final, output, sort_keys=True)
@@ -111,19 +152,23 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
         return None
 
 
-def worker(accounting, base, username, password, request_id):
+def worker(accounting, base, username, password, request_id, worker_id=0, baseline=False):
+    accounting.context.worker = worker_id
     client = urllib.request.build_opener(urllib.request.ProxyHandler({}), NoRedirect(),
         urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()))
 
     def call(operation, path, data=None, headers=None, parse=False):
         def send():
             request = urllib.request.Request(base + path, data=data,
-                headers={"Connection": "close", **(headers or {})})
+                headers={"Connection": "close",
+                         "X-Request-ID": accounting.run_id + "-" + str(accounting.context.identity),
+                         "User-Agent": "V6Exercise/" + accounting.run_id + "-" + str(accounting.context.identity),
+                         **(headers or {})})
             with client.open(request, timeout=3) as response:
                 body = response.read()
                 return response.status, json.loads(body) if parse else None
         phase_file = accounting.directory / "phase"
-        phase = phase_file.read_text().strip() if phase_file.exists() else "setup"
+        phase = phase_file.read_text().strip() if phase_file.exists() else ("baseline" if baseline else "setup")
         if phase not in {"setup", "baseline", "healthy", "fault", "restore", "main"}:
             phase = "unknown"
         return accounting.request(operation, send, phase)
@@ -144,11 +189,18 @@ def worker(accounting, base, username, password, request_id):
             return
         paths = [("queue", "/api/requests?limit=5"), ("staff", "/api/staff?limit=5"),
                  ("history", "/api/requests/" + request_id + "/history?limit=5")]
+        if baseline:
+            paths[1] = ("session-refresh", "/api/session")
         index = 0
         while not accounting.stop.is_set():
             started = time.monotonic()
             operation, path = paths[index % len(paths)]
-            status, _ = call(operation, path)
+            status, value = call(operation, path, parse=operation == "session-refresh")
+            if operation == "session-refresh" and status == "http:200" and not value.get("user"):
+                accounting.failed = True
+                return
+            if operation == "queue" and status == "http:200":
+                accounting.worker_ready(worker_id)
             # No retry/re-login: authentication loss stops this worker and fails the gate.
             if status == "http:401":
                 return
@@ -169,20 +221,35 @@ def install_shutdown_handlers(accounting):
 def run():
     accounting = Accounting(os.environ.get("TRAFFIC_EVIDENCE_DIR", "/evidence"))
     install_shutdown_handlers(accounting)
+    baseline = os.environ.get("TRAFFIC_BASELINE_SECONDS")
+    if baseline is not None:
+        if baseline != "120" or os.environ.get("TRAFFIC_ROUTE") not in {"host", "cluster"}:
+            raise ValueError("Baseline requires 120 seconds and a known route")
+        attempt = str(uuid.UUID(os.environ["TRAFFIC_ATTEMPT_ID"]))
+        base = os.environ.get("TRAFFIC_BASE_URL", "")
+        parsed = urllib.parse.urlsplit(base)
+        if (parsed.scheme != "http" or parsed.username or parsed.password or parsed.query
+                or parsed.fragment or parsed.path not in {"", "/"} or not parsed.hostname):
+            raise ValueError("Invalid baseline frontend address")
+        accounting.baseline = {"attemptId": attempt, "route": os.environ["TRAFFIC_ROUTE"],
+            "context": "kind-request-tracker", "requestedSeconds": 120,
+            "baseUrl": base, "startedAtNs": time.time_ns()}
     workers = [threading.Thread(target=worker, args=(accounting,
         os.environ.get("TRAFFIC_BASE_URL", "http://request-tracker-delivery-frontend:80"),
         os.environ["TRAFFIC_USERNAME"], os.environ["TRAFFIC_PASSWORD"],
-        os.environ["TRAFFIC_REQUEST_ID"]), daemon=True) for _ in range(4)]
+        os.environ["TRAFFIC_REQUEST_ID"], worker_id, baseline is not None), daemon=True) for worker_id in range(4)]
     for thread in workers:
         thread.start()
-    deadline = time.monotonic() + 900
+    deadline = time.monotonic() + (120 if baseline is not None else 900)
     while not accounting.stop.wait(0.1):
         if (accounting.directory / "quiesce").exists() or time.monotonic() >= deadline:
-            if time.monotonic() >= deadline:
+            if time.monotonic() >= deadline and baseline is None:
                 accounting.failed = True
             accounting.quiesce()
         if not any(thread.is_alive() for thread in workers):
             accounting.quiesce()
+    if accounting.baseline is not None:
+        accounting.baseline["endedAtNs"] = time.time_ns()
     accounting.finalize(workers)
     # Explicit quiesce does not exit/restart the container. Capture files BEFORE prune.
     while True:
