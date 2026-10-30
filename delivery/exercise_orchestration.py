@@ -4,6 +4,7 @@ import base64
 from datetime import datetime, timezone
 import hashlib
 import json
+import math
 from pathlib import Path
 import re
 import subprocess
@@ -14,12 +15,13 @@ import uuid
 from traffic_accounting import validate
 
 FRESHNESS_NS = 60 * 1_000_000_000
-REMOTE_BASE = "35143dd26e48801331fcc160b4d5d73cf3a2b1eb"
+REMOTE_BASE = "9c7f088263ab286e3154f2c3a879ad2c4992070a"
 MAIN = "704354cb5c4f94e580817c28487986cc09de1ffb"
 REF = "refs/heads/demo/v6-kind-progressive"
 IDENTITY = "elajeff|67196636+elajeff@users.noreply.github.com|elajeff|67196636+elajeff@users.noreply.github.com"
 SCOPE = {"helm/request-tracker/files/traffic.py", "delivery/exercise_orchestration.py",
-         "delivery/test_exercise_orchestration.py", "delivery/test_traffic_accounting.py"}
+         "delivery/test_exercise_orchestration.py", "delivery/test_traffic_accounting.py",
+         "delivery/test_promotion_deadline.py", "delivery/values-v6-kind.yaml"}
 
 
 class GateError(ValueError):
@@ -29,6 +31,91 @@ class GateError(ValueError):
 def need(condition, message):
     if not condition:
         raise GateError(message)
+
+
+def promotion_budget(rollout_spec, analysis_spec, measured_startups, measured_sync_seconds):
+    """Empirical cached-image budget, not a configured worst-case success bound.
+
+    Four serial pod births (maxSurge=1) are budgeted at the slowest measured
+    create-to-available time, rounded UP. Probe/controller/observation margins
+    are separate; preStop remains overlapped, as demonstrated by the timeline.
+    """
+    strategy = rollout_spec["strategy"]["canary"]
+    need(rollout_spec["replicas"] == 4 and strategy["maxSurge"] == 1
+         and strategy["maxUnavailable"] == 0, "Recalculate budget for changed scaling strategy")
+    need(len(measured_startups) == 4 and all(0 < x <= 180 for x in measured_startups), "Missing startup measurements")
+    steps = strategy["steps"]
+    need([x.get("setWeight") for x in steps if "setWeight" in x] == [25, 50, 100], "Changed rollout steps")
+    def seconds(value):
+        text = str(value)
+        need(re.fullmatch(r"[0-9]+s?", text) is not None, "Unsupported duration")
+        return int(text.rstrip("s"))
+    pauses = sum(seconds(x["pause"]["duration"]) for x in steps if "pause" in x)
+    inline = sum(1 for x in steps if "analysis" in x)
+    metrics = analysis_spec["metrics"]
+    need(metrics and all(type(m.get("count")) is int and m["count"] >= 1 for m in metrics), "Unbounded analysis")
+    # Metrics run concurrently, not sequentially; first measurement is immediate.
+    analysis = inline * max(seconds(m.get("initialDelay", 0))
+                            + (m["count"] - 1) * seconds(m["interval"]) for m in metrics)
+    probe = rollout_spec["template"]["spec"]["containers"][0]["readinessProbe"]["periodSeconds"]
+    serial_startup = 4 * math.ceil(max(measured_startups))
+    sync = max(probe, math.ceil(measured_sync_seconds))
+    controller = 6  # More than the observed post-ready controller+Argo propagation.
+    final_read = 5
+    work = pauses + analysis + serial_startup + sync + controller + probe
+    return {"pauseSeconds": pauses, "analysisSeconds": analysis, "serialStartupSeconds": serial_startup,
+            "syncSeconds": sync, "controllerMarginSeconds": controller, "probeMarginSeconds": probe,
+            "workSeconds": work, "finalReadSeconds": final_read, "totalSeconds": work + final_read}
+
+
+def promotion_ready(app, rollout, replicasets, revision, image):
+    """Aggregate availability (3 new + 1 old) can never satisfy the candidate gate."""
+    status = rollout.get("status", {})
+    candidate = status.get("currentPodHash")
+    sync = app.get("status", {}).get("sync", {})
+    if app.get("operation") or sync.get("revision") != revision or sync.get("status") != "Synced":
+        return False
+    if (app.get("status", {}).get("health", {}).get("status") != "Healthy"
+            or status.get("phase") != "Healthy" or not candidate or status.get("stableRS") != candidate
+            or status.get("readyReplicas") != 4 or rollout["spec"].get("replicas") != 4
+            or rollout["spec"]["template"]["spec"]["containers"][0]["image"] != image):
+        return False
+    matches = [r for r in replicasets if r["metadata"].get("labels", {}).get("rollouts-pod-template-hash") == candidate
+               and any(o.get("uid") == rollout["metadata"]["uid"] for o in r["metadata"].get("ownerReferences", []))]
+    return (len(matches) == 1 and matches[0]["spec"].get("replicas") == 4
+            and matches[0].get("status", {}).get("readyReplicas") == 4
+            and matches[0].get("status", {}).get("availableReplicas") == 4
+            and matches[0]["spec"]["template"]["spec"]["containers"][0]["image"] == image)
+
+
+def wait_promotion(read_state, revision, image, budget, record, monotonic=time.monotonic, sleep=time.sleep):
+    """Status reads only; callers must cap all read I/O to the supplied timeout.
+
+    A final bounded sample is always attempted at the progression boundary.
+    Its I/O budget is included in totalSeconds; late results cannot pass.
+    """
+    began = monotonic()
+    work_end = began + budget["workSeconds"]
+    absolute_end = began + budget["totalSeconds"]
+    record({"event": "promotion-wait-start", "startedMonotonic": began,
+            "workDeadlineMonotonic": work_end, "absoluteDeadlineMonotonic": absolute_end, "budget": budget})
+    def sample(timeout, final=False):
+        state = read_state(timeout)
+        ready = promotion_ready(state["app"], state["rollout"], state["replicasets"], revision, image)
+        record({"event": "promotion-sample", "observedMonotonic": monotonic(), "final": final,
+                "candidateHash": state["rollout"].get("status", {}).get("currentPodHash"), "ready": ready})
+        if monotonic() <= absolute_end and ready:
+            return state
+    while monotonic() < work_end:
+        result = sample(min(budget["finalReadSeconds"], work_end - monotonic()))
+        if result:
+            return result
+        sleep(min(2, max(0, work_end - monotonic())))
+    if monotonic() < absolute_end:
+        result = sample(absolute_end - monotonic(), final=True)
+        if result:
+            return result
+    raise GateError("Promotion deadline: four ready candidate replicas and reconciliation required")
 
 
 def sha(raw):
