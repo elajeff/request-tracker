@@ -14,7 +14,7 @@ export default async function waitForStack(config) {
         const queue = await api.get('/api/requests?limit=1');
         const staff = await api.get('/api/staff?limit=1');
         if (!home.ok() || !queue.ok() || !staff.ok()) return 'Frontend/API route not ready';
-        if (!(await home.text()).includes('Service requests')) return 'Dashboard not ready';
+        if (!(await home.text()).includes('id="root"')) return 'React entry point not ready';
         const queuePage = await queue.json();
         const staffPage = await staff.json();
         if (!Array.isArray(queuePage.items) || !Array.isArray(staffPage.items)) return 'Invalid API pages';
