@@ -6,6 +6,8 @@ import java.util.UUID;
 import jakarta.validation.Valid;
 
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -44,8 +46,16 @@ public class ServiceRequestController {
             @RequestParam(defaultValue = "25") int limit,
             @RequestParam(required = false) UUID staffId,
             @RequestParam(defaultValue = "false") boolean unassigned,
-            @RequestParam(required = false) ServiceRequestStatus status) {
-        return service.findPage(q, cursor, limit, staffId, unassigned, status);
+            @RequestParam(required = false) String status) {
+        ServiceRequestStatus selectedStatus = null;
+        if (status != null) {
+            try {
+                selectedStatus = ServiceRequestStatus.valueOf(status);
+            } catch (IllegalArgumentException error) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid request status");
+            }
+        }
+        return service.findPage(q, cursor, limit, staffId, unassigned, selectedStatus);
     }
 
     @GetMapping("/{id}")

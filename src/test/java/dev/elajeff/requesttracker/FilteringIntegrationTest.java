@@ -61,18 +61,23 @@ class FilteringIntegrationTest extends SupportApiTest {
         String username = "filter-" + UUID.randomUUID(); String password = UUID.randomUUID().toString();
         accounts.create(username, "REQUESTER", password);
         UUID owner = jdbc.queryForObject("SELECT id FROM login_accounts WHERE username=?", UUID.class, username);
-        String token = UUID.randomUUID().toString(); String own = insert(token, "NEW", null, owner, 1);
-        insert(token, "NEW", null, null, 2); insert(token, "IN_PROGRESS", null, owner, 3);
+        String token = UUID.randomUUID().toString(); UUID staff = person("Owner filter staff", true);
+        String own = insert(token, "NEW", staff, owner, 1);
+        insert(token, "NEW", staff, null, 2);
+        String progress = insert(token, "IN_PROGRESS", null, owner, 3);
+        insert(token, "IN_PROGRESS", null, null, 4);
         ApiSession requester = new ApiSession(port, json); assertEquals(204, requester.login(username, password).statusCode());
         assertEquals(List.of(own), ids(page(requester, "/api/requests?q=" + token + "&status=NEW")));
         assertEquals(2, ids(page(CLIENT, "/api/requests?q=" + token + "&status=NEW")).size());
+        assertEquals(List.of(own), ids(page(requester, "/api/requests?q=" + token + "&status=NEW&staffId=" + staff)));
+        assertEquals(List.of(progress), ids(page(requester, "/api/requests?q=" + token + "&status=IN_PROGRESS&unassigned=true")));
         assertEquals(403, requester.send("GET", "/api/staff?q=anything", null).statusCode());
         assertEquals(401, new ApiSession(port, json).send("GET", "/api/requests?status=NEW", null).statusCode());
     }
 
     @Test
     void invalidStatusUsesBadRequestAndOmittedStatusRemainsCompatible() throws Exception {
-        for (String invalid : List.of("invalid", "new", "IN%20PROGRESS")) {
+        for (String invalid : List.of("", "%20", "%20NEW%20", "invalid", "new", "IN%20PROGRESS")) {
             var response = CLIENT.send("GET", "/api/requests?status=" + invalid, null);
             assertEquals(400, response.statusCode());
             assertEquals(400, json.readTree(response.body()).get("status").asInt());
@@ -82,7 +87,7 @@ class FilteringIntegrationTest extends SupportApiTest {
 
     @Test
     void staffSearchTrimsMatchesLiterallyAndPaginatesActiveAndInactiveRows() throws Exception {
-        String token = "Search%_" + UUID.randomUUID(); List<String> expected = new ArrayList<>();
+        String token = "Search%_\\" + UUID.randomUUID(); List<String> expected = new ArrayList<>();
         for (int i = 0; i < 31; i++) expected.add(person(token + " " + i, i % 2 == 0).toString());
         person("unrelated", true); expected.sort(String::compareTo);
         String path = "/api/staff?q=" + URLEncoder.encode("  " + token.toUpperCase() + "  ", StandardCharsets.UTF_8) + "&limit=10";
