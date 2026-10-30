@@ -6,7 +6,7 @@ backend:
 frontend:
   image:
     repository: request-tracker-frontend
-    tag: react-b5b0ad152cbe75ced040c2ae57a2b99601d96609
+    tag: react-dashboard-fc9e818ac52b-20261030-072600
 delivery:
   enabled: true
   replicas: 4
