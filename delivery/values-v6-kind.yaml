@@ -2,7 +2,7 @@ backend:
   sessionCookieSecure: false
   image:
     repository: request-tracker
-    tag: v6-good-704354c-deadline
+    tag: v6-fault-704354c-deadline
 frontend:
   image:
     repository: request-tracker-frontend
