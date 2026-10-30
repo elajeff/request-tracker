@@ -1,23 +1,6 @@
-# Security review and capstone demonstration
+# Preview security and demonstration runbook
 
-## Review scope and results
-
-Main `e4bded1` matched the reviewed controller tip `1d845cc` before changes. The review covered preview ownership, finalizer/expiry behavior, credential handling, namespace RBAC, image references, pod permissions, and network isolation. The previously completed 24-check E2E run was not repeated.
-
-Two findings were corrected:
-
-| Finding | Correction | Verification |
-| --- | --- | --- |
-| Restricted-compatible pods, but no namespace admission guard | Enforce/audit/warn `restricted` v1.37 only in `preview-lab` | Three generated pod types admitted; privileged, UID 0, host-path, and host-network variants denied by server-side dry run |
-| Mutable PostgreSQL image tag | Pin the tested PostgreSQL 17 Alpine digest | One disposable preview reached Ready with that exact image, then finalized under explicit Delete policy |
-
-The first privileged fixture combined incompatible security flags and failed basic API validation. After correcting the fixture, the Pod Security admission denial was verified. No unsafe test pod was created. Namespace dry-run validation reported no violations in the existing controller pod.
-
-The hardened controller image is `request-tracker-preview-controller:security-20261028184215`. Its disposable preview was removed. Both retained PVC/Secret pairs preserved their identities and content hashes; the k3s application dataset was unchanged. Final lab state was one controller pod and zero active previews. Kind resources were outside the mutation scope.
-
-Ownership checks, UID delete preconditions, credential preservation, creation-time TTL calculation, sanitized API errors, and namespace-only RBAC retained their reviewed behavior. Their prior unit/live evidence was inspected rather than rerun. The wording correction from local commit `643812d` is included in the delivery runbook; the original commit remains preserved separately.
-
-Evidence is outside Git at `C:\Users\DESKTOP\request-tracker-backups\k3s-20261028-064246\security-20261028-184156`. Namespace enforcement follows the [Kubernetes Pod Security label mechanism](https://kubernetes.io/docs/tasks/configure-pod-container/enforce-standards-namespace-labels/).
+See [security verification](../verification/security.md) for the admission and image-pinning results.
 
 ## Trust boundaries and limits
 
@@ -27,9 +10,9 @@ Restricted admission guards new pod creation; it does not remove existing pods o
 
 ## Demonstration plan
 
-The plan below was prepared after the security review. The subsequent [executed capstone walkthrough](capstone-demonstration.md) records new application, recovery, preview, and Git-published promotion/abort results. Keep the default context unchanged and use explicit contexts throughout.
+The [capstone results](../verification/capstone.md) summarize application, recovery, preview and canary checks. Keep the default context unchanged and use explicit contexts throughout.
 
-1. Show the merged history, controller CRD/Role, security namespace labels, and immutable image references. Explain that runtime permissions are confined to `preview-lab`, while CRD installation is administrative.
+1. Show the controller CRD/Role, security namespace labels, and immutable image references. Explain that runtime permissions are confined to `preview-lab`, while CRD installation is administrative.
 2. Show the saved complete 24-check lifecycle evidence and the new admission/digest-pin results. Identify the earlier interrupted run separately.
 3. Show the retained PVC/Secret names and UIDs without reading Secret values. Explain default Retain, explicit Delete, recovery, and namespace-deletion limitations.
 4. Show kind/k3s Argo health and the normal dashboard through a localhost port-forward. Dashboard acceptance was manual; it is not automated browser coverage.
