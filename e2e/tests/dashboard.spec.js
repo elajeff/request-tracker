@@ -117,22 +117,47 @@ test("late queue responses cannot restore protected content after session loss",
   page,
   request,
 }) => {
-  await seed(request, "react-private-late");
+  const row = await seed(request, "react-private-late");
+  let staffReads = 0;
+  page.on("request", (request) => {
+    if (new URL(request.url()).pathname === "/api/staff") staffReads++;
+  });
+  const initialStaff = page.waitForResponse(
+    (response) =>
+      new URL(response.url()).pathname === "/api/staff" &&
+      response.status() === 200,
+  );
   await loginUi(page);
-  let release;
+  await initialStaff;
+  await expect(
+    page.getByRole("article", { name: row.title, exact: true }).first(),
+  ).toBeVisible();
+  await page.getByText("Manage support staff", { exact: true }).click();
+  const refreshStaff = page.getByRole("button", { name: "Refresh staff" });
+  await expect(refreshStaff).toBeEnabled();
+  let release, capture, finish;
   const held = new Promise((resolve) => {
     release = resolve;
   });
+  const captured = new Promise((resolve) => {
+    capture = resolve;
+  });
+  const finished = new Promise((resolve) => {
+    finish = resolve;
+  });
   await page.route("**/api/requests?*", async (route) => {
     const response = await route.fetch();
+    expect(response.status()).toBe(200);
+    expect(
+      (await response.json()).items.some((item) => item.id === row.id),
+    ).toBe(true);
+    capture();
     await held;
     await route.fulfill({ response }).catch(() => {});
+    finish();
   });
-  const dispatched = page.waitForRequest(
-    (r) => new URL(r.url()).pathname === "/api/requests",
-  );
   await page.getByRole("button", { name: "Refresh", exact: true }).click();
-  await dispatched;
+  await captured;
   expect(
     (
       await page.request.post("/api/session/logout", {
@@ -140,13 +165,25 @@ test("late queue responses cannot restore protected content after session loss",
       })
     ).status(),
   ).toBe(204);
-  await page.getByText("Manage support staff", { exact: true }).click();
-  await page.getByRole("button", { name: "Refresh staff" }).click();
+  const denied = page.waitForResponse(
+    (response) =>
+      new URL(response.url()).pathname === "/api/staff" &&
+      response.status() === 401,
+  );
+  await refreshStaff.click();
+  await denied;
   await expect(
     page.getByRole("heading", { name: "Sign in", exact: true }),
   ).toBeVisible();
-  release();
   await expect(page.getByRole("article")).toHaveCount(0);
+  await expect(page.locator("#staff-directory")).toHaveCount(0);
+  release();
+  await finished;
+  await expect(page.getByRole("article")).toHaveCount(0);
+  await expect(
+    page.getByRole("heading", { name: "Sign in", exact: true }),
+  ).toBeVisible();
+  expect(staffReads).toBe(2);
 });
 
 test("dashboard desktop and narrow layouts retain labels and keyboard focus", async ({

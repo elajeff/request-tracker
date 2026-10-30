@@ -72,6 +72,8 @@ Earlier failures include: the React initial observer result and narrow expected 
 
 Raw evidence and independent checks are retained privately outside Git.
 
+Later authentication-bootstrap measurements and session-loss browser coverage are recorded in [filtering release verification limits](filtering-release.md).
+
 ## Earlier failures and orchestration corrections
 
 - Initial accounting preparation stopped at preflight because periodic-only counters could lose shutdown-tail requests.
