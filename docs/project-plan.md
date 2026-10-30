@@ -14,13 +14,13 @@ Maintain a support-request application and study its development, testing and op
 | Distribution practice | Selected deployment/recovery checks on [k3s](runbooks/k3s.md) through k3d |
 | Controller | [PreviewEnvironment](../preview-controller/README.md) lifecycle, ownership, expiry, retention and RBAC |
 | Authentication | [Session/CSRF protection](authentication.md), REQUESTER/SUPPORT roles and ownership |
+| Dashboard | One React/TypeScript root for sessions, requests, history and staff; browser workflows cover stale responses and session clearing |
 | Milestone C | [React deployment](verification/react-deployment.md) and [authenticated canary verification](verification/canary-release.md) |
 
 Milestone C is complete. Database migration V6 defines authentication storage; the next project release is v0.2.0. Source-only release preparation is tracked in the [release checklist](release-checklist.md).
 
 ## Remaining work
 
-- Migrate the remaining request dashboard to React incrementally.
 - Replace full-directory browser-memory staff search with bounded server-side search.
 - Investigate unresolved transient latency and diagnostic-route network failures.
 - Define SLOs from representative measurements.

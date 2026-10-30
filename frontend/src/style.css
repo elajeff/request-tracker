@@ -809,3 +809,6 @@ h1 {
 
 .login-panel { max-width: 440px; margin: 3rem auto; padding: 2rem; }
 .login-panel .form-field { margin-bottom: 1rem; }
+
+:where(button, summary, a):focus-visible { outline: 3px solid var(--blue); outline-offset: 3px; }
+@media (max-width: 650px) { .page-heading { flex-wrap: wrap; } }
