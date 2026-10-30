@@ -11,7 +11,7 @@ Support request management application built with Java 21, Spring Boot, PostgreS
 - Compose/Helm deployment, Prometheus/Grafana monitoring and Argo canary delivery.
 - An isolated PreviewEnvironment controller for local Kubernetes labs.
 
-The backend is a modular monolith using JDBC and Flyway. A same-origin Vite/nginx dashboard proxies API calls to Spring Boot. React owns staff management; the request dashboard remains TypeScript. PostgreSQL stores application data and shared sessions.
+The backend is a modular monolith using JDBC and Flyway. A same-origin Vite/nginx dashboard proxies API calls to Spring Boot. React owns the complete dashboard through one application root, including authentication, the request queue, inline details/history and staff management. PostgreSQL stores application data and shared sessions.
 
 ## Development
 
@@ -55,7 +55,7 @@ Open `http://127.0.0.1:5173`. Build the frontend with `npm.cmd run build --prefi
 | `/api/staff` and `/api/staff/{id}` | List, create and rename staff; `/active` changes availability |
 | `/api/session` | Session/CSRF bootstrap; `/login` and `/logout` manage authentication |
 
-Queue/history pages contain `items` and `nextCursor`; `limit` defaults to 25 (range 1-100). Queue counts are account-scoped. New requests start at NEW and progress through IN_PROGRESS to RESOLVED. See [authentication](docs/authentication.md) for the permission matrix and [staff/history](docs/staff-management.md) for assignment rules and migration behavior.
+Queue/history pages contain `items` and `nextCursor`; `limit` defaults to 25 (range 1-100). Queue counts are account-scoped. Search and staff filters use the API; the status filter applies only to loaded requests, including appended cursor pages. New requests start at NEW and progress through IN_PROGRESS to RESOLVED. See [authentication](docs/authentication.md) for the permission matrix and [staff/history](docs/staff-management.md) for assignment rules and migration behavior.
 
 ## Testing
 
@@ -68,7 +68,7 @@ python -m unittest discover -s preview-controller -p 'test_*.py'
 node e2e/run.mjs
 ```
 
-The browser command builds an isolated backend/nginx/Chromium stack with memory-backed PostgreSQL. Ten UI journeys cover requests, staff, pagination, ownership and session loss. It uses synthetic credentials and records, has no retries and cleans up its own resources. Sanitized reports are written to `test-results/browser/`; authenticated traces are disabled. GitHub Actions runs backend, frontend, browser, container and chart checks.
+The browser command builds an isolated backend/nginx/Chromium stack with memory-backed PostgreSQL. Sixteen UI journeys cover requests, staff, pagination, ownership, session loss, delayed responses and recoverable errors. It uses synthetic credentials and records, has no retries and cleans up its own resources. Sanitized reports are written to `test-results/browser/`; authenticated traces are disabled. GitHub Actions runs backend, frontend, browser, container and chart checks.
 
 ## Deployment and documentation
 
