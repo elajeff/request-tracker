@@ -156,34 +156,39 @@ test("late queue responses cannot restore protected content after session loss",
     await route.fulfill({ response }).catch(() => {});
     finish();
   });
-  await page.getByRole("button", { name: "Refresh", exact: true }).click();
-  await captured;
-  expect(
-    (
-      await page.request.post("/api/session/logout", {
-        headers: await csrfHeaders(page.request),
-      })
-    ).status(),
-  ).toBe(204);
-  const denied = page.waitForResponse(
-    (response) =>
-      new URL(response.url()).pathname === "/api/staff" &&
-      response.status() === 401,
-  );
-  await refreshStaff.click();
-  await denied;
-  await expect(
-    page.getByRole("heading", { name: "Sign in", exact: true }),
-  ).toBeVisible();
-  await expect(page.getByRole("article")).toHaveCount(0);
-  await expect(page.locator("#staff-directory")).toHaveCount(0);
-  release();
-  await finished;
-  await expect(page.getByRole("article")).toHaveCount(0);
-  await expect(
-    page.getByRole("heading", { name: "Sign in", exact: true }),
-  ).toBeVisible();
-  expect(staffReads).toBe(2);
+  try {
+    await page.getByRole("button", { name: "Refresh", exact: true }).click();
+    await captured;
+    expect(
+      (
+        await page.request.post("/api/session/logout", {
+          headers: await csrfHeaders(page.request),
+        })
+      ).status(),
+    ).toBe(204);
+    const denied = page.waitForResponse(
+      (response) =>
+        new URL(response.url()).pathname === "/api/staff" &&
+        response.status() === 401,
+    );
+    await refreshStaff.click();
+    await denied;
+    await expect(
+      page.getByRole("heading", { name: "Sign in", exact: true }),
+    ).toBeVisible();
+    await expect(page.getByRole("article")).toHaveCount(0);
+    await expect(page.locator("#staff-directory")).toHaveCount(0);
+    release();
+    await finished;
+    await expect(page.getByRole("article")).toHaveCount(0);
+    await expect(
+      page.getByRole("heading", { name: "Sign in", exact: true }),
+    ).toBeVisible();
+    expect(staffReads).toBe(2);
+  } finally {
+    release();
+    await page.unrouteAll({ behavior: "wait" });
+  }
 });
 
 test("dashboard desktop and narrow layouts retain labels and keyboard focus", async ({
