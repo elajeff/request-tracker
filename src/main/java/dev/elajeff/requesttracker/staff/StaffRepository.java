@@ -30,11 +30,12 @@ public class StaffRepository {
                 .stream().findFirst();
     }
 
-    public List<SupportStaff> findPage(UUID cursor, int limit) {
+    public List<SupportStaff> findPage(UUID cursor, int limit, String query) {
         return jdbc.query("""
-                SELECT * FROM support_staff WHERE (?::uuid IS NULL OR id > ?)
+                SELECT * FROM support_staff WHERE strpos(lower(name), lower(?)) > 0
+                    AND (?::uuid IS NULL OR id > ?)
                 ORDER BY id LIMIT ?
-                """, ROW_MAPPER, cursor, cursor, limit);
+                """, ROW_MAPPER, query, cursor, cursor, limit);
     }
 
     public SupportStaff rename(UUID id, String name) {

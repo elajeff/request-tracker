@@ -26,8 +26,9 @@ public class StaffController {
 
     @GetMapping
     public StaffPage findPage(@RequestParam(required = false) String cursor,
-            @RequestParam(defaultValue = "25") int limit) {
-        return service.findPage(cursor, limit);
+            @RequestParam(defaultValue = "25") int limit,
+            @RequestParam(defaultValue = "") String q) {
+        return service.findPage(cursor, limit, q);
     }
 
     @PostMapping

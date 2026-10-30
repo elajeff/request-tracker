@@ -28,4 +28,4 @@ Include application/frontend/controller source, migrations, dependency locks, te
 
 ## Limits
 
-This is a local educational release, not production certification. Formal SLOs, high-availability storage, image/binary distribution and clean-machine bundle verification remain outside the release scope. The verification records retain material failures and unresolved latency/network behavior; no zero-downtime guarantee is made. React staff search still loads the directory into browser memory.
+This is a local educational release, not production certification. Formal SLOs, high-availability storage, image/binary distribution and clean-machine bundle verification remain outside the release scope. The verification records retain material failures and unresolved latency/network behavior; no zero-downtime guarantee is made. Staff-name search and request-status filtering are applied by the backend before pagination.

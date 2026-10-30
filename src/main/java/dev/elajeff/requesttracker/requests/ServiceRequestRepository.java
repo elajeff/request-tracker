@@ -72,7 +72,7 @@ public class ServiceRequestRepository {
                 """, priority.name(), id) == 1;
     }
 
-    public List<ServiceRequest> findPage(String query, UUID staffId, boolean unassigned,
+    public List<ServiceRequest> findPage(String query, UUID staffId, boolean unassigned, ServiceRequestStatus status,
             Instant beforeCreatedAt, UUID beforeId, int limit, UUID ownerId) {
         String sql = SELECT_REQUEST + """
                 WHERE strpos(lower(concat_ws(' ', r.title, r.description, r.id::text, coalesce(s.name, ''))), lower(?)) > 0
@@ -88,6 +88,10 @@ public class ServiceRequestRepository {
             parameters.add(staffId);
         } else if (unassigned) {
             sql += " AND r.assignee_id IS NULL";
+        }
+        if (status != null) {
+            sql += " AND r.status = ?";
+            parameters.add(status.name());
         }
         if (beforeCreatedAt != null) {
             sql += " AND (r.created_at, r.id) < (?, ?)";

@@ -82,6 +82,8 @@ test('staff cursor loading deduplicates records and search includes later pages'
   expect(new Set(loaded).size).toBe(loaded.length);
   for (const label of initial) expect(loaded).toContain(label);
   await page.getByRole('searchbox', { name: 'Search staff' }).fill(prefix);
+  await expect(directory(page)).toHaveCount(25);
+  await page.getByRole('button', { name: 'Load more staff' }).click();
   await expect(directory(page)).toHaveCount(31);
   await expect(page.getByRole('button', { name: 'Load more staff' })).toHaveCount(0);
   await page.getByRole('searchbox', { name: 'Search staff' }).fill(`${prefix} absent`);

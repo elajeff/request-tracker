@@ -55,7 +55,7 @@ Open `http://127.0.0.1:5173`. Build the frontend with `npm.cmd run build --prefi
 | `/api/staff` and `/api/staff/{id}` | List, create and rename staff; `/active` changes availability |
 | `/api/session` | Session/CSRF bootstrap; `/login` and `/logout` manage authentication |
 
-Queue/history pages contain `items` and `nextCursor`; `limit` defaults to 25 (range 1-100). Queue counts are account-scoped. Search and staff filters use the API; the status filter applies only to loaded requests, including appended cursor pages. New requests start at NEW and progress through IN_PROGRESS to RESOLVED. See [authentication](docs/authentication.md) for the permission matrix and [staff/history](docs/staff-management.md) for assignment rules and migration behavior.
+Queue/history pages contain `items` and `nextCursor`; `limit` defaults to 25 (range 1-100). Queue counts are account-scoped. Text, staff/unassigned and status filters apply to the complete visible queue before pagination. The optional `status` parameter accepts `NEW`, `IN_PROGRESS` or `RESOLVED`; invalid values return HTTP 400. Counts remain account-scoped and independent of the filters. New requests start at NEW and progress through IN_PROGRESS to RESOLVED. See [authentication](docs/authentication.md) for the permission matrix and [staff/history](docs/staff-management.md) for assignment rules and migration behavior.
 
 ## Testing
 
@@ -68,7 +68,7 @@ python -m unittest discover -s preview-controller -p 'test_*.py'
 node e2e/run.mjs
 ```
 
-The browser command builds an isolated backend/nginx/Chromium stack with memory-backed PostgreSQL. Sixteen UI journeys cover requests, staff, pagination, ownership, session loss, delayed responses and recoverable errors. It uses synthetic credentials and records, has no retries and cleans up its own resources. Sanitized reports are written to `test-results/browser/`; authenticated traces are disabled. GitHub Actions runs backend, frontend, browser, container and chart checks.
+The browser command builds an isolated backend/nginx/Chromium stack with memory-backed PostgreSQL. Eighteen UI journeys cover requests, staff, pagination, ownership, session loss, delayed responses, recoverable errors and server-side filtering. It uses synthetic credentials and records, has no retries and cleans up its own resources. Sanitized reports are written to `test-results/browser/`; authenticated traces are disabled. GitHub Actions runs backend, frontend, browser, container and chart checks.
 
 ## Deployment and documentation
 
@@ -81,7 +81,7 @@ Metrics at `/actuator/prometheus` require no login and belong on loopback or clu
 
 ## Limitations
 
-This is a local-lab application with single-node storage, no production SLOs and no zero-downtime guarantee. Staff search loads the directory into browser memory. The 300-second canary observation budget is empirical; transient backend latency and diagnostic-route failures remain unresolved. Database migration V6 provides authentication storage; project release versions are separate and listed in [GitHub Releases](https://github.com/elajeff/request-tracker/releases).
+This is a local-lab application with single-node storage, no production SLOs and no zero-downtime guarantee. The 300-second canary observation budget is empirical; transient backend latency and diagnostic-route failures remain unresolved. Database migration V6 provides authentication storage; project release versions are separate and listed in [GitHub Releases](https://github.com/elajeff/request-tracker/releases).
 
 ## License
 

@@ -192,7 +192,7 @@ test("dashboard desktop and narrow layouts retain labels and keyboard focus", as
   await page.screenshot({ path: "/results/login-narrow.png", fullPage: true });
 });
 
-test("request creation failures keep input and status filtering is scoped to loaded pages", async ({
+test("request creation failures keep input and status filtering queries the queue", async ({
   page,
   request,
 }) => {
@@ -239,7 +239,7 @@ test("request creation failures keep input and status filtering is scoped to loa
     page.getByRole("article", { name: "react-status created", exact: true }),
   ).toBeVisible();
   await page
-    .getByRole("combobox", { name: "Filter loaded requests by status" })
+    .getByRole("combobox", { name: "Filter by status" })
     .selectOption("IN_PROGRESS");
   await expect(
     page.getByRole("article", { name: row.title, exact: true }),

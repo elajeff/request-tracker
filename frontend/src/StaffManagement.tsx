@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 
 import type { Api, Page, SupportStaff } from "./types";
 type StaffPage = Page<SupportStaff>;
+const STAFF_SEARCH_DEBOUNCE_MS = 250;
 
 interface Props {
   api: Api;
@@ -29,58 +30,63 @@ export function StaffManagement({ api, onPage, onSaved }: Props) {
   const alive = useRef(false);
   const busy = useRef(false);
   const controller = useRef<AbortController | null>(null);
-  const retry = useRef<null | { append: boolean; all: boolean }>(null);
+  const retry = useRef<null | { append: boolean }>(null);
+  const sequence = useRef(0);
+  const activeQuery = useRef("");
 
-  async function load(append = false, all = false) {
-    if (busy.current) return;
-    busy.current = true;
-    setLoading(true);
-    setError("");
-    setNotice("");
-    retry.current = null;
+  async function load(append = false) {
+    if (
+      busy.current ||
+      (append && (loading || !cursor || activeQuery.current !== query.trim()))
+    )
+      return;
+    controller.current?.abort();
+    const id = ++sequence.current;
     const abort = new AbortController();
     controller.current = abort;
-    let next = append ? cursor : null;
-    let received: SupportStaff[] = [];
+    setLoading(true);
+    setError("");
+    retry.current = null;
     try {
-      do {
-        const params = new URLSearchParams({ limit: "25" });
-        if (next) params.set("cursor", next);
-        const page = await api<StaffPage>(`/api/staff?${params}`, {
-          signal: abort.signal,
-        });
-        if (!alive.current) return;
-        received = merge(received, page.items);
-        next = page.nextCursor;
-      } while (all && next);
-      setPeople((previous) => merge(append ? previous : [], received));
-      setCursor(next);
-      onPage(received, !append);
+      const params = new URLSearchParams({ limit: "25", q: query.trim() });
+      if (append && cursor) params.set("cursor", cursor);
+      const page = await api<StaffPage>(`/api/staff?${params}`, {
+        signal: abort.signal,
+      });
+      if (!alive.current || id !== sequence.current) return;
+      setPeople((previous) => merge(append ? previous : [], page.items));
+      setCursor(page.nextCursor);
+      activeQuery.current = query.trim();
+      onPage(page.items, !append);
     } catch (failure) {
-      if (alive.current && !abort.signal.aborted) {
+      if (alive.current && id === sequence.current && !abort.signal.aborted) {
         setError(`Could not load staff: ${message(failure)}`);
-        retry.current = { append, all };
+        retry.current = { append };
       }
     } finally {
-      busy.current = false;
-      if (alive.current) setLoading(false);
+      if (alive.current && id === sequence.current) setLoading(false);
     }
   }
 
   useEffect(() => {
     alive.current = true;
-    void load();
     return () => {
       alive.current = false;
+      sequence.current++;
       controller.current?.abort();
     };
   }, []);
-
-  // The API has no name filter. Search completes the cursor scan before claiming no matches.
   useEffect(() => {
-    if (query.trim() && cursor && !loading && !saving && !error)
-      void load(true, true);
-  }, [query, cursor, loading, saving, error]);
+    const timer = window.setTimeout(
+      () => void load(),
+      STAFF_SEARCH_DEBOUNCE_MS,
+    );
+    return () => {
+      window.clearTimeout(timer);
+      sequence.current++;
+      controller.current?.abort();
+    };
+  }, [query]);
 
   async function save(
     path: string,
@@ -90,6 +96,9 @@ export function StaffManagement({ api, onPage, onSaved }: Props) {
   ) {
     if (busy.current) return;
     busy.current = true;
+    sequence.current++;
+    controller.current?.abort();
+    setLoading(false);
     setSaving(true);
     setError("");
     setNotice("");
@@ -100,7 +109,11 @@ export function StaffManagement({ api, onPage, onSaved }: Props) {
         body: JSON.stringify(body),
       });
       if (!alive.current) return;
-      setPeople((previous) => merge(previous, [person]));
+      setPeople((previous) =>
+        merge(previous, [person]).filter((item) =>
+          item.name.toLowerCase().includes(query.trim().toLowerCase()),
+        ),
+      );
       if (created) setName("");
       onSaved(person);
       setNotice(
@@ -122,11 +135,7 @@ export function StaffManagement({ api, onPage, onSaved }: Props) {
     return true;
   }
 
-  const visible = people.filter((person) =>
-    `${person.name} ${person.id}`
-      .toLowerCase()
-      .includes(query.trim().toLowerCase()),
-  );
+  const visible = people;
   const disabled = loading || saving;
   return (
     <details id="staff-directory" className="staff-directory">
@@ -163,7 +172,17 @@ export function StaffManagement({ api, onPage, onSaved }: Props) {
         <input
           type="search"
           value={query}
-          onChange={(event) => setQuery(event.target.value)}
+          disabled={saving}
+          onChange={(event) => {
+            sequence.current++;
+            controller.current?.abort();
+            setCursor(null);
+            setPeople([]);
+            setError("");
+            retry.current = null;
+            setLoading(true);
+            setQuery(event.target.value);
+          }}
         />
       </label>
       {error && <p role="alert">{error}</p>}
@@ -179,9 +198,7 @@ export function StaffManagement({ api, onPage, onSaved }: Props) {
         !error &&
         !visible.length &&
         (!query.trim() || cursor === null) && (
-          <p>
-            {people.length ? "No matching staff." : "No staff records yet."}
-          </p>
+          <p>{query.trim() ? "No matching staff." : "No staff records yet."}</p>
         )}
       <div aria-label="Staff records" aria-busy={disabled}>
         {visible.map((person) => (
@@ -218,7 +235,7 @@ export function StaffManagement({ api, onPage, onSaved }: Props) {
           disabled={disabled}
           onClick={() => {
             const pending = retry.current;
-            if (pending) void load(pending.append, pending.all);
+            if (pending) void load(pending.append);
           }}
         >
           Retry loading staff

@@ -15,13 +15,13 @@ Maintain a support-request application and study its development, testing and op
 | Controller | [PreviewEnvironment](../preview-controller/README.md) lifecycle, ownership, expiry, retention and RBAC |
 | Authentication | [Session/CSRF protection](authentication.md), REQUESTER/SUPPORT roles and ownership |
 | Dashboard | One React/TypeScript root for sessions, requests, history and staff; browser workflows cover stale responses and session clearing |
+| Filtering | SQL-backed queue status filters and paginated staff-name search; optional API parameters preserve existing clients |
 | Milestone C | [React deployment](verification/react-deployment.md) and [authenticated canary verification](verification/canary-release.md) |
 
 Milestone C is complete. Database migration V6 defines authentication storage; project releases use a separate version sequence. See [GitHub Releases](https://github.com/elajeff/request-tracker/releases) for published versions and the [release checklist](release-checklist.md) for source-only release checks.
 
 ## Remaining work
 
-- Replace full-directory browser-memory staff search with bounded server-side search.
 - Investigate unresolved transient latency and diagnostic-route network failures.
 - Define SLOs from representative measurements.
 - Extend configuration-error and whole-cluster recovery coverage.
