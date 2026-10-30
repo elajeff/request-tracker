@@ -14,6 +14,9 @@ import uuid
 
 from traffic_accounting import validate
 
+READINESS_TIMEOUT_SECONDS = 30
+CONTROLLER_MARGIN_SECONDS = 6  # Exceeds measured post-ready controller/Argo propagation.
+FINAL_READ_SECONDS = 5
 FRESHNESS_NS = 60 * 1_000_000_000
 MAIN = "704354cb5c4f94e580817c28487986cc09de1ffb"
 REF = "refs/heads/demo/v6-kind-progressive"
@@ -60,8 +63,8 @@ def promotion_budget(rollout_spec, analysis_spec, measured_startups, measured_sy
     probe = rollout_spec["template"]["spec"]["containers"][0]["readinessProbe"]["periodSeconds"]
     serial_startup = 4 * math.ceil(max(measured_startups))
     sync = max(probe, math.ceil(measured_sync_seconds))
-    controller = 6  # More than the observed post-ready controller+Argo propagation.
-    final_read = 5
+    controller = CONTROLLER_MARGIN_SECONDS
+    final_read = FINAL_READ_SECONDS
     work = pauses + analysis + serial_startup + sync + controller + probe
     return {"pauseSeconds": pauses, "analysisSeconds": analysis, "serialStartupSeconds": serial_startup,
             "syncSeconds": sync, "controllerMarginSeconds": controller, "probeMarginSeconds": probe,
@@ -254,7 +257,7 @@ def validate_readiness(marker, raw):
         raise GateError("Invalid readiness evidence") from None
 
 
-def wait_for_generator(read_control, capture_diagnostics, timeout=30, poll=.25,
+def wait_for_generator(read_control, capture_diagnostics, timeout=READINESS_TIMEOUT_SECONDS, poll=.25,
                        monotonic=time.monotonic, sleep=time.sleep):
     """Poll control files only. The reader must never issue/retry an application request."""
     deadline = monotonic() + timeout
