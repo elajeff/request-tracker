@@ -44,14 +44,15 @@ export function Dashboard({
   const revision = useRef(0);
   const alive = useRef(true);
   const abort = useRef<AbortController | null>(null);
-  const active = useRef({ query: "", staffFilter: "" });
+  const active = useRef({ query: "", staffFilter: "", statusFilter: "" });
   async function load(append = false) {
     if (
       append &&
       (loading ||
         !cursor ||
         query !== active.current.query ||
-        staffFilter !== active.current.staffFilter)
+        staffFilter !== active.current.staffFilter ||
+        statusFilter !== active.current.statusFilter)
     )
       return;
     abort.current?.abort();
@@ -65,6 +66,7 @@ export function Dashboard({
       const params = new URLSearchParams({ limit: "25", q: query.trim() });
       if (staffFilter === "unassigned") params.set("unassigned", "true");
       else if (staffFilter) params.set("staffId", staffFilter);
+      if (statusFilter) params.set("status", statusFilter);
       if (append && cursor) params.set("cursor", cursor);
       const page = await api<RequestQueuePage>(`/api/requests?${params}`, {
         signal: controller.signal,
@@ -98,7 +100,7 @@ export function Dashboard({
       onConnection(true);
       setCounts(page.counts);
       setCursor(page.nextCursor);
-      active.current = { query, staffFilter };
+      active.current = { query, staffFilter, statusFilter };
       setNotice("");
     } catch (error) {
       if (
@@ -121,7 +123,7 @@ export function Dashboard({
       abort.current?.abort();
       sequence.current++;
     };
-  }, [query, staffFilter]);
+  }, [query, staffFilter, statusFilter]);
   useEffect(
     () => () => {
       alive.current = false;
@@ -175,18 +177,18 @@ export function Dashboard({
         name: request.assignee ?? "",
         active: request.assigneeActive === true,
       });
-  const visible = requests
-    .filter((item) => !statusFilter || item.status === statusFilter)
-    .filter(
-      (item) =>
-        `${item.title} ${item.description} ${item.id} ${item.assignee ?? ""}`
-          .toLowerCase()
-          .includes(active.current.query.trim().toLowerCase()) &&
-        (!active.current.staffFilter ||
-          (active.current.staffFilter === "unassigned"
-            ? !item.assigneeId
-            : item.assigneeId === active.current.staffFilter)),
-    );
+  const visible = requests.filter(
+    (item) =>
+      `${item.title} ${item.description} ${item.id} ${item.assignee ?? ""}`
+        .toLowerCase()
+        .includes(active.current.query.trim().toLowerCase()) &&
+      (!active.current.statusFilter ||
+        item.status === active.current.statusFilter) &&
+      (!active.current.staffFilter ||
+        (active.current.staffFilter === "unassigned"
+          ? !item.assigneeId
+          : item.assigneeId === active.current.staffFilter)),
+  );
   return (
     <main id="dashboard" className="page">
       <header className="page-heading">
@@ -272,12 +274,15 @@ export function Dashboard({
               />
             </label>
             <label className="control-field">
-              <span>Status (loaded requests)</span>
+              <span>Status</span>
               <select
                 className="control-select"
-                aria-label="Filter loaded requests by status"
+                aria-label="Filter by status"
                 value={statusFilter}
-                onChange={(event) => setStatusFilter(event.target.value)}
+                onChange={(event) => {
+                  sequence.current++;
+                  setStatusFilter(event.target.value);
+                }}
               >
                 <option value="">All statuses</option>
                 {["NEW", "IN_PROGRESS", "RESOLVED"].map((value) => (
@@ -349,7 +354,8 @@ export function Dashboard({
               disabled={
                 loading ||
                 query !== active.current.query ||
-                staffFilter !== active.current.staffFilter
+                staffFilter !== active.current.staffFilter ||
+                statusFilter !== active.current.statusFilter
               }
               onClick={() => void load(true)}
             >
