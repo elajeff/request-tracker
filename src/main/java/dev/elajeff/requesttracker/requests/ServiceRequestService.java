@@ -45,7 +45,7 @@ public class ServiceRequestService {
         return created;
     }
 
-    public RequestQueuePage findPage(String query, String cursor, int limit, UUID staffId, boolean unassigned) {
+    public RequestQueuePage findPage(String query, String cursor, int limit, UUID staffId, boolean unassigned, ServiceRequestStatus status) {
         validateLimit(limit);
         if (staffId != null && unassigned) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Choose staffId or unassigned, not both");
@@ -68,7 +68,7 @@ public class ServiceRequestService {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid queue cursor");
             }
         }
-        List<ServiceRequest> rows = repository.findPage(query.strip(), staffId, unassigned, beforeCreatedAt, beforeId, limit + 1, ownerScope());
+        List<ServiceRequest> rows = repository.findPage(query.strip(), staffId, unassigned, status, beforeCreatedAt, beforeId, limit + 1, ownerScope());
         boolean hasMore = rows.size() > limit;
         List<ServiceRequest> items = List.copyOf(rows.subList(0, Math.min(limit, rows.size())));
         String nextCursor = null;

@@ -43,8 +43,9 @@ public class ServiceRequestController {
             @RequestParam(required = false) String cursor,
             @RequestParam(defaultValue = "25") int limit,
             @RequestParam(required = false) UUID staffId,
-            @RequestParam(defaultValue = "false") boolean unassigned) {
-        return service.findPage(q, cursor, limit, staffId, unassigned);
+            @RequestParam(defaultValue = "false") boolean unassigned,
+            @RequestParam(required = false) ServiceRequestStatus status) {
+        return service.findPage(q, cursor, limit, staffId, unassigned, status);
     }
 
     @GetMapping("/{id}")

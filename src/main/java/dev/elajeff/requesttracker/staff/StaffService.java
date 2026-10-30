@@ -21,7 +21,7 @@ public class StaffService {
         return repository.create(name.strip());
     }
 
-    public StaffPage findPage(String cursor, int limit) {
+    public StaffPage findPage(String cursor, int limit, String query) {
         if (limit < 1 || limit > 100) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Limit must be between 1 and 100");
         }
@@ -34,7 +34,7 @@ public class StaffService {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid staff cursor");
             }
         }
-        List<SupportStaff> rows = repository.findPage(afterId, limit + 1);
+        List<SupportStaff> rows = repository.findPage(afterId, limit + 1, query.strip());
         List<SupportStaff> items = List.copyOf(rows.subList(0, Math.min(limit, rows.size())));
         return new StaffPage(items, rows.size() > limit ? items.getLast().id().toString() : null);
     }
