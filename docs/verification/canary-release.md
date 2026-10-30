@@ -66,7 +66,7 @@ The successful attempt, including baselines and restoration, took **757.283 seco
 
 ## Closure and limits
 
-Milestone C verification is complete. Source-only v0.2.0 preparation is tracked in the [release checklist](../release-checklist.md).
+Milestone C verification is complete. Source-only release scope and checks are described in the [release checklist](../release-checklist.md).
 
 Earlier failures include: the React initial observer result and narrow expected 401/client abort, the four unresolved transient-backend timeouts, the stale-baseline and empty-evidence failures, the earlier promotion-observer deadline failure and its restoration network error. A later clean attempt does not establish their root causes or zero downtime. Prometheus exercise thresholds are not production SLOs, HTTP metrics do not capture every transport failure, and the private harness/raw evidence remain outside source control rather than a portable full exercise runner.
 
