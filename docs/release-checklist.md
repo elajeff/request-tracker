@@ -2,9 +2,11 @@
 
 The published [v0.1.0 release](https://github.com/elajeff/request-tracker/releases/tag/v0.1.0) is source-only. Its [historical scope](v0.1.0-release-proposal.md) predates authentication and the React staff UI.
 
-## v0.2.0 preparation
+The source-only [v0.2.0 release](https://github.com/elajeff/request-tracker/releases/tag/v0.2.0) is published. See [GitHub Releases](https://github.com/elajeff/request-tracker/releases) for published versions.
 
-Milestone C is merged and runtime verification is complete. Database migration V6 is not a project release number. The next source-only release can be prepared; this checklist does not select a tag target or publish a release.
+## Checklist for subsequent source-only releases
+
+Milestone C is merged and runtime verification is complete. Database migration V6 is not a project release number. Use the checks below for each subsequent source-only release.
 
 | Verification | Reference |
 | --- | --- |

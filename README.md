@@ -81,7 +81,7 @@ Metrics at `/actuator/prometheus` require no login and belong on loopback or clu
 
 ## Limitations
 
-This is a local-lab application with single-node storage, no production SLOs and no zero-downtime guarantee. Staff search loads the directory into browser memory. The 300-second canary observation budget is empirical; transient backend latency and diagnostic-route failures remain unresolved. Database migration V6 provides authentication storage; v0.2.0 names the next project release.
+This is a local-lab application with single-node storage, no production SLOs and no zero-downtime guarantee. Staff search loads the directory into browser memory. The 300-second canary observation budget is empirical; transient backend latency and diagnostic-route failures remain unresolved. Database migration V6 provides authentication storage; project release versions are separate and listed in [GitHub Releases](https://github.com/elajeff/request-tracker/releases).
 
 ## License
 

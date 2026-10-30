@@ -17,7 +17,7 @@ Maintain a support-request application and study its development, testing and op
 | Dashboard | One React/TypeScript root for sessions, requests, history and staff; browser workflows cover stale responses and session clearing |
 | Milestone C | [React deployment](verification/react-deployment.md) and [authenticated canary verification](verification/canary-release.md) |
 
-Milestone C is complete. Database migration V6 defines authentication storage; the next project release is v0.2.0. Source-only release preparation is tracked in the [release checklist](release-checklist.md).
+Milestone C is complete. Database migration V6 defines authentication storage; project releases use a separate version sequence. See [GitHub Releases](https://github.com/elajeff/request-tracker/releases) for published versions and the [release checklist](release-checklist.md) for source-only release checks.
 
 ## Remaining work
 
@@ -26,7 +26,7 @@ Milestone C is complete. Database migration V6 defines authentication storage; t
 - Define SLOs from representative measurements.
 - Extend configuration-error and whole-cluster recovery coverage.
 - Consider RKE2 and further security labs when local capacity permits.
-- Prepare source-only v0.2.0 notes and inventory; binaries/images and clean-machine bundle verification remain deferred.
+- Maintain source-only release notes and inventory; binaries/images and clean-machine bundle verification remain deferred.
 
 ## Contribution checks
 
