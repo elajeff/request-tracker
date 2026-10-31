@@ -12,7 +12,8 @@ WORKLOAD_OPERATIONS = {"queue", "staff", "history"}
 
 def workload_counts(starts, completions):
     completed = [event for identity, event in completions.items()
-                 if starts[identity]["operation"] in WORKLOAD_OPERATIONS]
+                 if starts[identity]["operation"] in WORKLOAD_OPERATIONS
+                 and starts[identity]["phase"] not in {"setup", "acceptance"}]
     errors = sum(event["outcome"] != "http:200" for event in completed)
     return {"completed": len(completed), "errors": errors,
             "errorRatio": errors / len(completed) if completed else None}
@@ -122,6 +123,8 @@ def observer_decision(directory, route, analysis, expected_workers=4):
         events = [json.loads(line) for line in raw.splitlines()]
         starts = {e["id"]: e for e in events if e["event"] == "started"}
         ends = {e["id"]: e for e in events if e["event"] == "completed"}
+        if any(e["phase"] == "acceptance" for e in starts.values()):
+            raise ValueError("Acceptance evidence must remain separate")
         workload = workload_counts(starts, ends)
         if summary.get("workload") != workload:
             raise ValueError("Final workload counts/ratio are missing or inconsistent")

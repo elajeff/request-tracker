@@ -2,6 +2,7 @@ import contextlib
 import copy
 import importlib.util
 import io
+import hashlib
 import json
 from pathlib import Path
 import re
@@ -9,8 +10,8 @@ import tempfile
 import unittest
 from unittest.mock import Mock, patch
 
-from exercise_orchestration import evaluate_observers, observation_checkpoint
-from traffic_accounting import error_ratio_limit, observer_decision, ratio_decision, validate
+from exercise_orchestration import bound_readiness, evaluate_observers, observation_checkpoint, validate_readiness
+from traffic_accounting import error_ratio_limit, observer_decision, ratio_decision, validate, workload_counts
 
 spec = importlib.util.spec_from_file_location("policy_traffic", Path(__file__).resolve().parents[1] /
     "helm/request-tracker/files/traffic.py")
@@ -30,7 +31,7 @@ class ObservationPolicyTest(unittest.TestCase):
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
         self.analysis = analysis_template()
-        self.health = dict.fromkeys(["rolloutHealthy", "stableAvailable", "candidateMetricsPassed",
+        self.health = dict.fromkeys(["argoHealthySynced", "rolloutHealthy", "stableAvailable", "candidateMetricsPassed",
                                      "fourCandidatesReady"], True)
 
     def stream(self, name, errors=(), total=100, workers=4, auth_error=None):
@@ -47,7 +48,7 @@ class ObservationPolicyTest(unittest.TestCase):
         if auth_error:
             a.request("session-refresh", Mock(side_effect=auth_error), "healthy")
         else:
-            for _ in range(max(0, total - workers - len(errors))):
+            for _ in range(max(0, total - len(errors))):
                 a.request("queue", lambda: (200, None), "healthy")
             for error in errors:
                 if isinstance(error, Exception):
@@ -197,6 +198,35 @@ class ObservationPolicyTest(unittest.TestCase):
         self.assertTrue(a.failed)
         self.assertEqual(client.open.call_count, 5)
         self.assertTrue(all(call.kwargs["timeout"] == 3 for call in client.open.call_args_list))
+
+    def test_setup_and_acceptance_reads_do_not_enter_sustained_totals(self):
+        directory, a = self.stream("scopes", [TimeoutError()])
+        raw = [json.loads(line) for line in (directory / "requests.ndjson").read_bytes().splitlines()]
+        starts = {e["id"]: e for e in raw if e["event"] == "started"}
+        ends = {e["id"]: e for e in raw if e["event"] == "completed"}
+        self.assertEqual(sum(e["phase"] == "setup" and e["operation"] == "queue" for e in starts.values()), 4)
+        starts[999] = {"operation": "queue", "phase": "acceptance"}
+        ends[999] = {"outcome": "http:403"}
+        self.assertEqual(workload_counts(starts, ends), {"completed": 100, "errors": 1, "errorRatio": .01})
+        self.assertEqual(a.final["workload"], workload_counts(starts, ends))
+
+    def test_foreign_or_changed_readiness_prefix_fails(self):
+        service, _ = self.stream("service")
+        host, _ = self.stream("host")
+        for filename in ["ready.json", "ready.ndjson"]:
+            (service / filename).write_bytes((host / filename).read_bytes())
+        self.assertFalse(evaluate_observers(service, host, self.analysis, self.health)["passed"])
+        # A valid standalone checkpoint from the same run must still match the final raw prefix.
+        marker = json.loads((host / "ready.json").read_text())
+        events = [json.loads(line) for line in (host / "ready.ndjson").read_bytes().splitlines()]
+        events[0]["timeNs"] -= 1
+        raw = b"".join((json.dumps(event, sort_keys=True) + "\n").encode() for event in events)
+        marker["rawSha256"] = hashlib.sha256(raw).hexdigest()
+        validate_readiness(marker, raw)
+        (host / "ready.ndjson").write_bytes(raw)
+        (host / "ready.json").write_text(json.dumps(marker))
+        with self.assertRaises(ValueError):
+            bound_readiness(host, marker["runId"], (host / "requests.ndjson").read_bytes())
 
     def test_setup_failure_is_not_an_aggregate_allowance(self):
         a = traffic.Accounting(self.root / "setup")

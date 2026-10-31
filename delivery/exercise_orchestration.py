@@ -167,8 +167,7 @@ def baseline_proof(directory, route, attempt_id, service_ip, analysis):
         need(starts.keys() == ends.keys(), "Incomplete baseline")
         decision = observer_decision(directory, "host" if route == "host" else "service", analysis)
         need(decision["passed"], decision["reason"])
-        validate_readiness(json.loads((Path(directory) / "ready.json").read_text()),
-                           (Path(directory) / "ready.ndjson").read_bytes())
+        bound_readiness(directory, run_id, raw)
         baseline = summary["baseline"]
         need(baseline["attemptId"] == str(uuid.UUID(attempt_id)), "Baseline attempt mismatch")
         need(baseline["route"] == route and baseline["context"] == "kind-request-tracker",
@@ -263,6 +262,16 @@ def validate_readiness(marker, raw):
         raise GateError("Invalid readiness evidence") from None
 
 
+def bound_readiness(directory, run_id, raw):
+    directory = Path(directory)
+    marker = json.loads((directory / "ready.json").read_text())
+    checkpoint = (directory / "ready.ndjson").read_bytes()
+    validate_readiness(marker, checkpoint)
+    need(marker["runId"] == run_id and raw.startswith(checkpoint),
+         "Readiness is not a prefix of this evidence run")
+    return marker
+
+
 def observation_checkpoint(raw, route, analysis):
     """Provisional stop check only; final evidence still requires complete draining."""
     run_id, starts, ends = decode_records(raw)
@@ -284,15 +293,16 @@ def evaluate_observers(service, host, analysis, health):
     for route, directory in [("service", service), ("host", host)]:
         decision = observer_decision(directory, route, analysis)
         try:
-            validate_readiness(json.loads((Path(directory) / "ready.json").read_text()),
-                               (Path(directory) / "ready.ndjson").read_bytes())
+            raw = (Path(directory) / "requests.ndjson").read_bytes()
+            need(sha(raw) == decision.get("rawSha256"), "Final evidence changed")
+            bound_readiness(directory, decision.get("runId"), raw)
         except (OSError, ValueError, KeyError, TypeError):
             decision = {**decision, "passed": False, "reason": "missing/invalid authenticated four-worker readiness"}
         decisions[route] = decision
     reasons = [route + ": " + d["reason"] for route, d in decisions.items() if not d["passed"]]
     if decisions["service"].get("runId") == decisions["host"].get("runId"):
         reasons.append("Service and host require separate workers and evidence")
-    for gate in ["rolloutHealthy", "stableAvailable", "candidateMetricsPassed", "fourCandidatesReady"]:
+    for gate in ["argoHealthySynced", "rolloutHealthy", "stableAvailable", "candidateMetricsPassed", "fourCandidatesReady"]:
         if health.get(gate) is not True:
             reasons.append("health gate failed or unmeasured: " + gate)
     return {"passed": not reasons, "reasons": reasons or ["Service ratio, setup, evidence and health gates passed"],

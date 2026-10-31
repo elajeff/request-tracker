@@ -74,6 +74,9 @@ class Accounting:
         with self.lock:
             if self.stop.is_set():
                 raise Quiesced()
+            worker = getattr(self.context, "worker", None)
+            if worker is not None and worker not in self.ready_workers:
+                phase = "setup"
             self.started += 1
             identity = self.started
             self.emit({"event": "started", "id": identity, "operation": operation,
@@ -101,7 +104,7 @@ class Accounting:
             self.emit({"event": "completed", "id": identity, "outcome": result,
                        "timeNs": time.time_ns(), "transport": self.context.transport})
             expected = "http:204" if operation == "login" else "http:200"
-            if operation in {"queue", "staff", "history"}:
+            if operation in {"queue", "staff", "history"} and phase not in {"setup", "acceptance"}:
                 self.workload_completed += 1
                 self.workload_errors += result != "http:200"
             worker = getattr(self.context, "worker", None)
