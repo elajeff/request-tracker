@@ -1,5 +1,7 @@
 # Filtering release verification limits
 
+See [sequential backend deployment verification](filtering-backend-deployment.md) for the integrated release, retained acceptance harness failure and final preservation checks.
+
 ## Session-loss browser coverage
 
 [Main CI run 41119976915](https://github.com/elajeff/request-tracker/actions/runs/41119976915) timed out clicking **Refresh staff** after logout. Its action log recorded a detached button; the screenshot already showed the sign-in form and cleared protected content. Initial queue and debounced staff requests could overlap logout, removing controls while the test tried to click them. The held queue response was never released before the timeout. No trace, video or browser-console timeline was retained; authenticated traces remain disabled because they contain session material.
