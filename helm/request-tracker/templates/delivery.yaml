@@ -162,6 +162,7 @@ spec:
     metadata:
       labels: {app: request-tracker-delivery, component: frontend}
     spec:
+      terminationGracePeriodSeconds: 30
       automountServiceAccountToken: false
       securityContext:
         runAsNonRoot: true
