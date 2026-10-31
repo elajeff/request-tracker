@@ -37,6 +37,8 @@ class OrchestrationTest(unittest.TestCase):
         self.end_ns = 1_800_000_000_000_000_000
         self.now_ns = self.end_ns + 1_000_000_000
         self.ip = "10.96.117.105"
+        from test_observation_policy import analysis_template
+        self.analysis = analysis_template()
         for route in ["host", "cluster"]:
             self.baseline(route)
 
@@ -63,14 +65,19 @@ class OrchestrationTest(unittest.TestCase):
         (directory / "requests.ndjson").write_bytes(raw)
         summary = {"version": 1, "runId": run_id, "complete": True, "started": identity,
                    "completed": identity, "inFlight": 0, "outcomes": counts,
+                   "workload": {"completed": 8, "errors": 0, "errorRatio": 0},
                    "rawSha256": hashlib.sha256(raw).hexdigest(), "baseline": {
                        "attemptId": self.attempt, "route": route, "context": "kind-request-tracker",
                        "baseUrl": "http://127.0.0.1:54321" if route == "host" else "http://" + self.ip + ":80",
                        "requestedSeconds": 120, "startedAtNs": begin_ns, "endedAtNs": self.end_ns}}
         (directory / "summary.json").write_text(json.dumps(summary))
+        (directory / "ready.ndjson").write_bytes(raw)
+        (directory / "ready.json").write_text(json.dumps({"version": 1, "runId": run_id,
+            "workers": [0, 1, 2, 3], "started": identity, "completed": identity, "inFlight": 0,
+            "rawSha256": summary["rawSha256"], "readyAtNs": self.end_ns}))
 
     def certify(self):
-        return gates.certify_baselines(self.root, self.attempt, self.ip, now_ns=self.now_ns)
+        return gates.certify_baselines(self.root, self.attempt, self.ip, self.analysis, now_ns=self.now_ns)
 
     def test_fresh_baselines_accepted_and_completion_timestamps_recorded(self):
         certificate = self.certify()
@@ -78,6 +85,34 @@ class OrchestrationTest(unittest.TestCase):
         self.assertEqual(set(certificate["routes"]), {"host", "cluster"})
         self.assertLess(certificate["routes"]["host"]["completedAtNs"], self.end_ns)
         self.assertEqual(gates.validate_certificate(self.root, self.attempt, self.now_ns), certificate)
+
+    def test_baseline_policy_uses_service_ratio_and_retains_host_diagnostics(self):
+        for route in ["host", "cluster"]:
+            directory = self.root / route
+            summary = json.loads((directory / "summary.json").read_text())
+            raw = (directory / "requests.ndjson").read_bytes()
+            for offset in range(100):
+                identity = summary["started"] + 1
+                outcome = "timeout" if offset == 0 else "http:200"
+                events = [{"event": "started", "runId": summary["runId"], "id": identity,
+                           "worker": 0, "operation": "history", "phase": "baseline", "timeNs": self.end_ns - 10_000_000},
+                          {"event": "completed", "runId": summary["runId"], "id": identity,
+                           "outcome": outcome, "timeNs": self.end_ns - 1_000_000}]
+                raw += b"".join((json.dumps(e) + "\n").encode() for e in events)
+                summary["started"] += 1
+                summary["completed"] += 1
+                summary["outcomes"][outcome] = summary["outcomes"].get(outcome, 0) + 1
+            summary["rawSha256"] = hashlib.sha256(raw).hexdigest()
+            summary["workload"] = {"completed": 108, "errors": 1, "errorRatio": 1 / 108}
+            (directory / "requests.ndjson").write_bytes(raw)
+            (directory / "summary.json").write_text(json.dumps(summary))
+        certificate = self.certify()
+        self.assertTrue(certificate["routes"]["cluster"]["decision"]["passed"])
+        self.assertEqual(certificate["routes"]["host"]["decision"]["outcomes"]["timeout"], 1)
+        changed = json.loads(json.dumps(self.analysis))
+        changed["metrics"][0]["successCondition"] = "len(result) == 1 && result[0] >= 0 && result[0] < 0.001"
+        with self.assertRaises(gates.GateError):
+            gates.validate_certificate(self.root, self.attempt, self.now_ns, changed)
 
     def test_expiration_during_preflight_prevents_first_push(self):
         self.certify()

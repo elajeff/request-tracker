@@ -49,6 +49,8 @@ class Accounting:
         self.started = 0
         self.completed = 0
         self.counts = collections.Counter()
+        self.workload_completed = 0
+        self.workload_errors = 0
         self.final = None
         self.failed = False
         self.context = threading.local()
@@ -79,6 +81,7 @@ class Accounting:
                        "timeNs": time.time_ns()})
         self.context.identity = identity
         value = None
+        self.context.transport = {}
         try:
             status, value = send()
             result = "http:" + str(status)
@@ -87,6 +90,8 @@ class Accounting:
             error.close()
         except (OSError, TimeoutError, http.client.HTTPException) as error:
             result = outcome(error)
+            reason = error.reason if isinstance(error, urllib.error.URLError) else error
+            self.context.transport.update(exceptionType=type(reason).__name__, errno=getattr(reason, "errno", None))
         except Exception:
             # Never serialize exception messages: they can contain credentials/URLs.
             result = "client-error"
@@ -94,13 +99,19 @@ class Accounting:
             self.completed += 1
             self.counts[result] += 1
             self.emit({"event": "completed", "id": identity, "outcome": result,
-                       "timeNs": time.time_ns()})
+                       "timeNs": time.time_ns(), "transport": self.context.transport})
             expected = "http:204" if operation == "login" else "http:200"
-            allowed_fault = (phase in {"fault", "restore"} and operation in {"queue", "staff", "history"}
-                             and result == "http:500")
-            if result != expected and not allowed_fault and self.failure is None:
+            if operation in {"queue", "staff", "history"}:
+                self.workload_completed += 1
+                self.workload_errors += result != "http:200"
+            worker = getattr(self.context, "worker", None)
+            strict = (operation in {"session-bootstrap", "login", "session-refresh"}
+                      or phase == "setup" or (worker is not None and worker not in self.ready_workers)
+                      or result in {"http:401", "client-error"})
+            if result != expected and strict and self.failure is None:
                 self.failure = {"runId": self.run_id, "id": identity, "outcome": result}
                 self.atomic_json("traffic-failure.json", self.failure)
+                self.stop.set()
         return result, value
 
     def worker_ready(self, worker_id):
@@ -142,6 +153,9 @@ class Accounting:
                           "started": self.started, "completed": self.completed,
                           "inFlight": self.started - self.completed,
                           "outcomes": dict(self.counts),
+                          "workload": {"completed": self.workload_completed, "errors": self.workload_errors,
+                                       "errorRatio": self.workload_errors / self.workload_completed
+                                       if self.workload_completed else None},
                           "rawSha256": hashlib.sha256((self.directory / "requests.ndjson").read_bytes()).hexdigest()}
             if self.baseline is not None:
                 self.final["baseline"] = dict(self.baseline)
@@ -160,9 +174,51 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
         return None
 
 
+class DiagnosticConnection(http.client.HTTPConnection):
+    def __init__(self, trace, *args, **kwargs):
+        self.trace = trace
+        super().__init__(*args, **kwargs)
+
+    def connect(self):
+        self.trace["connectBeginNs"] = time.time_ns()
+        super().connect()
+        self.trace["connectedNs"] = time.time_ns()
+        self.trace["socketErrorAfterConnect"] = self.sock.getsockopt(socket.SOL_SOCKET, socket.SO_ERROR)
+
+    def send(self, data):
+        self.trace.setdefault("sendBeginNs", time.time_ns())
+        super().send(data)
+        self.trace["lastSendNs"] = time.time_ns()
+
+    def getresponse(self):
+        self.trace["responseWaitBeginNs"] = time.time_ns()
+        try:
+            response = super().getresponse()
+            self.trace["headersNs"] = time.time_ns()
+            return response
+        except Exception:
+            self.trace["socketPresentOnFailure"] = self.sock is not None
+            if self.sock is not None:
+                try:
+                    self.trace["socketErrorOnFailure"] = self.sock.getsockopt(socket.SOL_SOCKET, socket.SO_ERROR)
+                except OSError:
+                    pass  # Socket diagnostics must not replace the original failure.
+            raise
+
+
+class DiagnosticHTTPHandler(urllib.request.HTTPHandler):
+    def __init__(self, accounting):
+        super().__init__()
+        self.accounting = accounting
+
+    def http_open(self, request):
+        return self.do_open(lambda *args, **kwargs:
+            DiagnosticConnection(self.accounting.context.transport, *args, **kwargs), request)
+
+
 def worker(accounting, base, username, password, request_id, worker_id=0, baseline=False):
     accounting.context.worker = worker_id
-    client = urllib.request.build_opener(urllib.request.ProxyHandler({}), NoRedirect(),
+    client = urllib.request.build_opener(urllib.request.ProxyHandler({}), NoRedirect(), DiagnosticHTTPHandler(accounting),
         urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()))
 
     def call(operation, path, data=None, headers=None, parse=False):
@@ -176,7 +232,8 @@ def worker(accounting, base, username, password, request_id, worker_id=0, baseli
                 body = response.read()
                 return response.status, json.loads(body) if parse else None
         phase_file = accounting.directory / "phase"
-        phase = phase_file.read_text().strip() if phase_file.exists() else ("baseline" if baseline else "setup")
+        phase = phase_file.read_text().strip() if phase_file.exists() else ("baseline" if baseline else
+            "healthy" if worker_id in accounting.ready_workers else "setup")
         if phase not in {"setup", "baseline", "healthy", "fault", "restore", "main"}:
             phase = "unknown"
         return accounting.request(operation, send, phase)
@@ -194,6 +251,7 @@ def worker(accounting, base, username, password, request_id, worker_id=0, baseli
         status, session = call("session-refresh", "/api/session", parse=True)
         if status != "http:200" or not session.get("user") or not session.get("csrfToken"):
             accounting.failed = True
+            accounting.quiesce()
             return
         paths = [("queue", "/api/requests?limit=5"), ("staff", "/api/staff?limit=5"),
                  ("history", "/api/requests/" + request_id + "/history?limit=5")]
@@ -204,8 +262,9 @@ def worker(accounting, base, username, password, request_id, worker_id=0, baseli
             started = time.monotonic()
             operation, path = paths[index % len(paths)]
             status, value = call(operation, path, parse=operation == "session-refresh")
-            if operation == "session-refresh" and status == "http:200" and not value.get("user"):
+            if operation == "session-refresh" and status == "http:200" and (not value.get("user") or not value.get("csrfToken")):
                 accounting.failed = True
+                accounting.quiesce()
                 return
             if operation == "queue" and status == "http:200":
                 accounting.worker_ready(worker_id)
@@ -218,6 +277,7 @@ def worker(accounting, base, username, password, request_id, worker_id=0, baseli
         pass
     except Exception:
         accounting.failed = True
+        accounting.quiesce()
 
 
 def install_shutdown_handlers(accounting):

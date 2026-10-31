@@ -25,6 +25,28 @@ Each path completed 192 requests: 128 HTTP 200 and 64 HTTP 204, covering bootstr
 
 Host comparisons preceded Service comparisons, and clients used different operating systems. These samples do not isolate a forwarding penalty or reproduce candidate-startup conditions. The k3s host login maximum was only about 12 ms below the timeout, and queue reads reached 2.923 seconds. Successful samples do not erase the original timeout, establish a latency margin or resolve the earlier failures in [canary verification](canary-release.md).
 
+## Integration observations
+
+The earlier kind history timeout and host-path failures remain failures under the policy used for those attempts. The following independently recounted results retain setup and shutdown traffic; HTTP 204 responses were successful logins.
+
+| Observation | Requests | HTTP 200 | HTTP 204 | Other outcomes |
+| --- | ---: | ---: | ---: | --- |
+| Pre-merge promotion and restoration | 34,085 | 34,053 | 32 | None |
+| Initial integration readiness | 19,072 | 19,055 | 16 | One k3s history network error |
+| Four-path transport comparison | 9,322 | 9,306 | 16 | None |
+| Readiness window without a merge | 56,382 | 56,350 | 32 | None |
+| Integrated candidate observation | 22,175 | 22,142 | 32 | One kind Service history timeout |
+
+Pre-merge verification passed both candidate analyses in each cluster and required four ready candidates: kind promoted in 271.285 seconds and k3s in 269.323 seconds before restoration. This did not establish later integration success. The 56,382-request window ended without a merge and changed no workloads.
+
+The initial k3s network error occurred at 00:20:58.594 UTC on 31 October 2026. Its wire ID had no matching nginx access line. Both concurrent streams shared a host port-forward, so there was no independent Service control and no retained typed exception/socket evidence to establish the precise failure boundary. The later four-path comparison used separate host and Service sessions and retained every wire ID in nginx with zero failures. It did not reproduce or resolve the original error.
+
+During integration, the kind Service history read dispatched at 01:06:32.462 UTC timed out after 3.004 seconds. Its wire ID matched an nginx HTTP 499 response, establishing arrival at the frontend; the underlying delay and backend attribution remain unresolved. The strict observer gate stopped traffic before baseline upgrades. Subsequent first candidate analyses failed: kind measured 0.12 requests/second, zero error ratio and 1.450 seconds mean latency; k3s measured zero throughput and empty error/latency vectors. These post-quiesce measurements are not passing candidate verification. Neither second analysis ran and neither candidate reached four ready replicas.
+
+Both Rollouts automatically aborted and restored four ready old stable replicas. The merged recovery returned desired state to `auth-08e4a87-20261029041407`; both Applications recovered Healthy/Synced. Baseline revisions stayed kind 7 and k3s 4, frontend images stayed unchanged, and strict pre-existing-row/infrastructure comparisons passed. No application fixtures or accounts were added. Temporary observers and sessions were removed; retained resources, including the historical zero-scale k3s ReplicaSet, were preserved.
+
+The [observer policy](../runbooks/v6-kind-progressive.md#observer-decision-policy) now separates strict setup and evidence integrity from aggregate Service errors and host diagnostics. This corrects a mismatch between the former zero-error sustained observer gate and the configured candidate error-ratio limit. It neither removes these failures nor certifies the failed integration. Candidate-specific analyses and runtime health remain separate mandatory gates.
+
 ## Release constraints
 
-Backend-release re-verification requires green CI on the integrated test correction and new clean authenticated baselines at the existing limits. Start traffic in both delivery environments and validate readiness before integrating an image change into automatically synchronized main. Require candidate-specific nonmissing analyses, the empirical observation budget and four ready candidate replicas as described in the [canary runbook](../runbooks/v6-kind-progressive.md). Baseline upgrades remain conditional on both delivery gates. No release was retried during these diagnostics, and no zero-downtime guarantee follows.
+Backend-release re-verification requires green CI on the integrated test correction and fresh authenticated baselines under the observer policy and unchanged three-second request limit. Start traffic in both delivery environments and validate readiness before integrating an image change into automatically synchronized main. Require candidate-specific nonmissing analyses, the empirical observation budget and four ready candidate replicas as described in the [canary runbook](../runbooks/v6-kind-progressive.md). Baseline upgrades remain conditional on both delivery gates. The latency diagnostics do not resolve the server delay or establish a zero-downtime guarantee.
