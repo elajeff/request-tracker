@@ -215,6 +215,10 @@ class AccountingTest(unittest.TestCase):
             summary = validate(evidence, expected_workers=4)
             self.assertGreater(summary["completed"], 12)
             raw = raw_path.read_bytes()
+            completed = [json.loads(line) for line in raw.splitlines() if json.loads(line)["event"] == "completed"]
+            self.assertTrue(all(event["transport"]["connectedNs"] >= event["transport"]["connectBeginNs"]
+                                and event["transport"]["headersNs"] >= event["transport"]["responseWaitBeginNs"]
+                                for event in completed))
             time.sleep(0.25)
             self.assertIsNone(process.poll(), "Generator must remain available for capture")
             self.assertEqual(raw, raw_path.read_bytes(), "No new requests after finalization")

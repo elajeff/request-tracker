@@ -12,7 +12,7 @@ import time
 import urllib.parse
 import uuid
 
-from traffic_accounting import validate
+from traffic_accounting import observer_decision, ratio_decision, validate, workload_counts
 
 READINESS_TIMEOUT_SECONDS = 30
 CONTROLLER_MARGIN_SECONDS = 6  # Exceeds measured post-ready controller/Argo propagation.
@@ -157,7 +157,7 @@ def clean_outcomes(starts, ends):
         need(item["outcome"] == expected, "Application traffic failure retained; gate failed")
 
 
-def baseline_proof(directory, route, attempt_id, service_ip):
+def baseline_proof(directory, route, attempt_id, service_ip, analysis):
     need(__debug__, "Optimized Python cannot enforce the existing accounting validator")
     try:
         summary = validate(directory)
@@ -165,7 +165,9 @@ def baseline_proof(directory, route, attempt_id, service_ip):
         summary_bytes = (Path(directory) / "summary.json").read_bytes()
         run_id, starts, ends = decode_records(raw)
         need(starts.keys() == ends.keys(), "Incomplete baseline")
-        clean_outcomes(starts, ends)
+        decision = observer_decision(directory, "host" if route == "host" else "service", analysis)
+        need(decision["passed"], decision["reason"])
+        bound_readiness(directory, run_id, raw)
         baseline = summary["baseline"]
         need(baseline["attemptId"] == str(uuid.UUID(attempt_id)), "Baseline attempt mismatch")
         need(baseline["route"] == route and baseline["context"] == "kind-request-tracker",
@@ -194,15 +196,16 @@ def baseline_proof(directory, route, attempt_id, service_ip):
         return {"route": route, "runId": run_id, "attemptId": baseline["attemptId"],
                 "startedAtNs": began, "windowEndedAtNs": ended, "completedAtNs": completed,
                 "completedAtUtc": datetime.fromtimestamp(completed / 1e9, timezone.utc).isoformat(),
-                "rawSha256": sha(raw), "summarySha256": sha(summary_bytes), "completed": len(ends)}
+                "rawSha256": sha(raw), "summarySha256": sha(summary_bytes), "completed": len(ends),
+                "decision": decision}
     except (OSError, KeyError, TypeError, ValueError) as error:
         if isinstance(error, GateError):
             raise
         raise GateError("Missing or invalid baseline evidence") from None
 
 
-def fresh_pair(root, attempt_id, service_ip, now_ns):
-    proof = {route: baseline_proof(Path(root) / route, route, attempt_id, service_ip)
+def fresh_pair(root, attempt_id, service_ip, now_ns, analysis):
+    proof = {route: baseline_proof(Path(root) / route, route, attempt_id, service_ip, analysis)
              for route in ["host", "cluster"]}
     need(proof["host"]["runId"] != proof["cluster"]["runId"], "Shared baseline run/session evidence")
     ensure_fresh(proof, now_ns)
@@ -214,23 +217,25 @@ def ensure_fresh(proof, now_ns):
         need(0 <= now_ns - item["completedAtNs"] <= FRESHNESS_NS, "Baseline expired or in future")
 
 
-def certify_baselines(root, attempt_id, service_ip, now_ns=None):
+def certify_baselines(root, attempt_id, service_ip, analysis, now_ns=None):
     root = Path(root)
-    proof = fresh_pair(root, attempt_id, service_ip, time.time_ns() if now_ns is None else now_ns)
+    proof = fresh_pair(root, attempt_id, service_ip, time.time_ns() if now_ns is None else now_ns, analysis)
     certificate = {"version": 1, "attemptId": attempt_id, "serviceIP": service_ip,
-                   "freshnessSeconds": 60, "routes": proof}
+                   "freshnessSeconds": 60, "analysisTemplate": analysis, "routes": proof}
     # Never overwrite a prior attempt's certificate to make old evidence look new.
     with (root / "baseline-certificate.json").open("x", encoding="utf-8") as output:
         json.dump(certificate, output, sort_keys=True)
     return certificate
 
 
-def validate_certificate(root, attempt_id, now_ns):
+def validate_certificate(root, attempt_id, now_ns, analysis=None):
     try:
         certificate = json.loads((Path(root) / "baseline-certificate.json").read_text())
         need(certificate["version"] == 1 and certificate["attemptId"] == attempt_id
              and certificate["freshnessSeconds"] == 60, "Baseline certificate mismatch")
-        actual = fresh_pair(root, attempt_id, certificate["serviceIP"], now_ns)
+        if analysis is not None:
+            need(analysis == certificate["analysisTemplate"], "Analysis configuration changed after certification")
+        actual = fresh_pair(root, attempt_id, certificate["serviceIP"], now_ns, certificate["analysisTemplate"])
         need(actual == certificate["routes"], "Baseline evidence changed after certification")
         return certificate
     except (OSError, KeyError, TypeError, json.JSONDecodeError):
@@ -255,6 +260,53 @@ def validate_readiness(marker, raw):
         return marker
     except (KeyError, TypeError, ValueError):
         raise GateError("Invalid readiness evidence") from None
+
+
+def bound_readiness(directory, run_id, raw):
+    directory = Path(directory)
+    marker = json.loads((directory / "ready.json").read_text())
+    checkpoint = (directory / "ready.ndjson").read_bytes()
+    validate_readiness(marker, checkpoint)
+    need(marker["runId"] == run_id and raw.startswith(checkpoint),
+         "Readiness is not a prefix of this evidence run")
+    return marker
+
+
+def observation_checkpoint(raw, route, analysis):
+    """Provisional stop check only; final evidence still requires complete draining."""
+    run_id, starts, ends = decode_records(raw)
+    for identity, item in ends.items():
+        if (starts[identity]["operation"] in {"session-bootstrap", "login", "session-refresh"}
+                or starts[identity]["phase"] == "setup"):
+            expected = "http:204" if starts[identity]["operation"] == "login" else "http:200"
+            need(item["outcome"] == expected, "Authentication/setup failure")
+        need(item["outcome"] not in {"http:401", "client-error"}, "Authentication/client failure")
+    return {**ratio_decision(workload_counts(starts, ends), route, analysis), "runId": run_id,
+            "provisional": True, "inFlight": len(starts) - len(ends), "rawSha256": sha(raw)}
+
+
+def evaluate_observers(service, host, analysis, health):
+    """Final release gate; host diagnostics cannot override application or health gates."""
+    if not isinstance(health, dict):
+        health = {}
+    decisions = {}
+    for route, directory in [("service", service), ("host", host)]:
+        decision = observer_decision(directory, route, analysis)
+        try:
+            raw = (Path(directory) / "requests.ndjson").read_bytes()
+            need(sha(raw) == decision.get("rawSha256"), "Final evidence changed")
+            bound_readiness(directory, decision.get("runId"), raw)
+        except (OSError, ValueError, KeyError, TypeError):
+            decision = {**decision, "passed": False, "reason": "missing/invalid authenticated four-worker readiness"}
+        decisions[route] = decision
+    reasons = [route + ": " + d["reason"] for route, d in decisions.items() if not d["passed"]]
+    if decisions["service"].get("runId") == decisions["host"].get("runId"):
+        reasons.append("Service and host require separate workers and evidence")
+    for gate in ["argoHealthySynced", "rolloutHealthy", "stableAvailable", "candidateMetricsPassed", "fourCandidatesReady"]:
+        if health.get(gate) is not True:
+            reasons.append("health gate failed or unmeasured: " + gate)
+    return {"passed": not reasons, "reasons": reasons or ["Service ratio, setup, evidence and health gates passed"],
+            "observers": decisions, "health": health}
 
 
 def wait_for_generator(read_control, capture_diagnostics, timeout=READINESS_TIMEOUT_SECONDS, poll=.25,
@@ -294,15 +346,15 @@ def git_preflight(commit, expected_tip, allowed_files=None):
 
 
 def publish_first(commit, root, attempt_id, expected_tip, preflight=git_preflight, clock=time.time_ns,
-                  push=None):
+                  push=None, analysis=None):
     """The last operation before a single push is a new freshness/evidence check."""
     root = Path(root)
-    validate_certificate(root, attempt_id, clock())
+    validate_certificate(root, attempt_id, clock(), analysis)
     preflight(commit, expected_tip)
     with (root / "publication-reserved.json").open("x", encoding="utf-8") as output:
         json.dump({"attemptId": attempt_id, "commit": commit, "expectedTip": expected_tip}, output)
     # Re-read and recount after all preflight/possible delays; no prompt/yield here.
-    certificate = validate_certificate(root, attempt_id, clock())
+    certificate = validate_certificate(root, attempt_id, clock(), analysis)
     if push is None:
         def push():
             result = subprocess.run(["git", "push", "--porcelain", "origin", commit + ":" + REF],
@@ -386,16 +438,30 @@ if __name__ == "__main__":
     commands = parser.add_subparsers(dest="command", required=True)
     certify = commands.add_parser("certify-baselines")
     certify.add_argument("root"); certify.add_argument("attempt_id"); certify.add_argument("service_ip")
+    certify.add_argument("--analysis-template", required=True)
     publish = commands.add_parser("publish-first")
     publish.add_argument("commit"); publish.add_argument("root"); publish.add_argument("attempt_id"); publish.add_argument("expected_tip")
+    publish.add_argument("--analysis-template", required=True)
+    evaluate = commands.add_parser("evaluate-observers")
+    evaluate.add_argument("service"); evaluate.add_argument("host")
+    evaluate.add_argument("--analysis-template", required=True)
+    evaluate.add_argument("--health", required=True)
     ready = commands.add_parser("wait-generator")
     ready.add_argument("pod"); ready.add_argument("uid"); ready.add_argument("restarts", type=int); ready.add_argument("output")
     args = parser.parse_args()
     try:
         if args.command == "certify-baselines":
-            print(json.dumps(certify_baselines(args.root, args.attempt_id, args.service_ip), sort_keys=True))
+            print(json.dumps(certify_baselines(args.root, args.attempt_id, args.service_ip,
+                                              json.loads(Path(args.analysis_template).read_text())), sort_keys=True))
         elif args.command == "publish-first":
-            publish_first(args.commit, args.root, args.attempt_id, args.expected_tip)
+            publish_first(args.commit, args.root, args.attempt_id, args.expected_tip,
+                          analysis=json.loads(Path(args.analysis_template).read_text()))
+        elif args.command == "evaluate-observers":
+            decision = evaluate_observers(args.service, args.host,
+                json.loads(Path(args.analysis_template).read_text()), json.loads(Path(args.health).read_text()))
+            print(json.dumps(decision, sort_keys=True))
+            if not decision["passed"]:
+                raise SystemExit(1)
         else:
             print(json.dumps(wait_kind_generator(args.pod, args.uid, args.restarts, args.output), sort_keys=True))
     except (GateError, OSError, subprocess.SubprocessError, ValueError):
