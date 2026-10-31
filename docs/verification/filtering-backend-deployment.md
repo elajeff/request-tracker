@@ -31,10 +31,10 @@ Both candidate-specific analyses passed in each cluster, with three successful o
 
 | Cluster / exposure | Throughput, requests/s | Mean latency, ms |
 | --- | ---: | ---: |
-| kind 25% | 3.520?4.520 | 10.446?11.014 |
-| kind 50% | 8.441?8.521 | 10.164?11.117 |
-| k3s 25% | 3.680?4.440 | 10.498?11.379 |
-| k3s 50% | 7.480?8.000 | 10.483?12.915 |
+| kind 25% | 3.520 to 4.520 | 10.446 to 11.014 |
+| kind 50% | 8.441 to 8.521 | 10.164 to 11.117 |
+| k3s 25% | 3.680 to 4.440 | 10.498 to 11.379 |
+| k3s 50% | 7.480 to 8.000 | 10.483 to 12.915 |
 
 Kind promoted in **243.825 seconds** and k3s in **243.170 seconds**, measured from the first observed candidate image to the successful gate. Both required the owned candidate ReplicaSet to have exactly four desired, ready and available replicas, Rollout Healthy and Argo Healthy/Synced at main. Three candidates plus one old stable replica could not pass. The 300-second budget remains empirical, not a Kubernetes worst-case guarantee.
 
