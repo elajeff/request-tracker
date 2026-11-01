@@ -1,15 +1,16 @@
 backend:
   sessionCookieSecure: false
+  slowRequestMillis: 500
   image:
     repository: request-tracker
-    tag: server-filtering-retry-023024facc6b-20261030-231441
+    tag: cleanup-1f9a420-20261101-164640
 frontend:
   image:
     repository: request-tracker-frontend
-    tag: server-filtering-2d358251737f-20261030-193759
+    tag: cleanup-1f9a420-20261101-164640
 delivery:
   enabled: true
   replicas: 4
   traffic:
-    enabled: false
+    enabled: true
     accountSecret: request-tracker-auth-traffic
