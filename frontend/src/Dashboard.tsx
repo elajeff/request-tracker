@@ -49,9 +49,6 @@ export function Dashboard({
             {username} · {support ? "support" : "requester"}
           </p>
           <h1>Service requests</h1>
-          <p className="page-subtitle">
-            One place to keep track of incoming work.
-          </p>
         </div>
         <button
           className="button button-secondary"
@@ -153,7 +150,7 @@ export function Dashboard({
                     .sort((a, b) => a.name.localeCompare(b.name))
                     .map((person) => (
                       <option key={person.id} value={person.id}>
-                        {staffLabel(person)}
+                        {staffLabel(person, knownStaff)}
                       </option>
                     ))}
                 </select>
@@ -207,7 +204,7 @@ export function Dashboard({
               </h3>
               <p>
                 {filtered
-                  ? "Try another search term or staff filter."
+                  ? "Try a different search or filter."
                   : "Create your first request using the form."}
               </p>
             </div>
@@ -219,8 +216,7 @@ export function Dashboard({
           </div>
           <h2 id="create-heading">Create request</h2>
           <p className="muted create-intro">
-            Add a request to the queue. Support manages status, priority and
-            assignment.
+            Describe the problem and support will pick it up.
           </p>
           <CreateRequest
             api={api}
@@ -240,15 +236,10 @@ export function Dashboard({
               />
             </div>
           )}
-          <p className="form-note">
-            Requests are saved in PostgreSQL and remain available after the app
-            restarts.
-          </p>
         </aside>
       </div>
       <footer className="page-footer">
         <span>Request Tracker</span>
-        <span>Local development workspace</span>
       </footer>
     </main>
   );

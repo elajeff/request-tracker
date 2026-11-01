@@ -5,7 +5,7 @@
 Support users manage a staff list: people that requests can be assigned to. Staff are not login accounts.
 
 - Create, rename, deactivate and reactivate staff from the dashboard. There is no delete.
-- Names are 1-120 characters. Duplicates are allowed; the ID tells them apart.
+- Names are 1-120 characters. Duplicates are allowed; the API tells them apart by ID, and the dashboard adds the first 8 characters of the ID to the label only when two people share a name.
 - Deactivating someone keeps their existing assignments but blocks new ones. Reassigning or unassigning still works.
 - The staff search is a case-insensitive substring match on the name. `%`, `_` and `\` are matched literally.
 

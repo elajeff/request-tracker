@@ -12,8 +12,14 @@ export const statusLabel = (status: string) =>
   status === "IN_PROGRESS"
     ? "In progress"
     : status[0] + status.slice(1).toLowerCase();
-export const staffLabel = (person: SupportStaff) =>
-  `${person.name || "(blank legacy name)"} [${person.id}]${person.active ? "" : " — inactive"}`;
+// Names are not unique, so people who share one also get the start of their ID.
+export const staffLabel = (person: SupportStaff, everyone: SupportStaff[]) => {
+  const name = person.name || "(no name)";
+  const shared = everyone.some(
+    (other) => other.id !== person.id && other.name === person.name,
+  );
+  return `${name}${shared ? ` (${person.id.slice(0, 8)})` : ""}${person.active ? "" : " (inactive)"}`;
+};
 
 function History({ request, api }: { request: ServiceRequest; api: Api }) {
   const [entries, setEntries] = useState<RequestHistoryEntry[]>([]);
@@ -221,7 +227,7 @@ export function RequestCard({
             dateStyle: "medium",
           })}
         </span>
-        <span>{request.id}</span>
+        <span>#{request.id.slice(0, 8)}</span>
       </div>
       {!draft && (support || request.status === "NEW") && (
         <button
@@ -383,7 +389,7 @@ export function RequestCard({
                       value={person.id}
                       disabled={!person.active}
                     >
-                      {staffLabel(person)}
+                      {staffLabel(person, choices)}
                     </option>
                   ))}
               </select>
@@ -392,8 +398,7 @@ export function RequestCard({
               Save assignment
             </button>
             <small>
-              Choose Unassigned to clear. More staff are available under Manage
-              support staff.
+              More staff are listed under Manage support staff.
             </small>
           </form>
         </>

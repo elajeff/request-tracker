@@ -44,7 +44,7 @@ export function App() {
           aria-labelledby="login-heading"
         >
           <h1 id="login-heading">Sign in</h1>
-          <p>Use a locally provisioned Request Tracker account.</p>
+          <p>Sign in to see your requests.</p>
           <form
             id="login-form"
             onSubmit={async (event) => {

@@ -111,7 +111,7 @@ test("staff backend search stays paginated, resets when cleared and rejects slow
   await expect(directory(page)).toHaveCount(25);
   await expect(
     page.getByRole("form", {
-      name: `Staff ${target.name} ${target.id}`,
+      name: `Staff ${target.name}`,
       exact: true,
     }),
   ).toHaveCount(0);
@@ -156,7 +156,7 @@ test("staff backend search stays paginated, resets when cleared and rejects slow
   await expect(directory(page)).toHaveCount(1);
   await expect(
     page.getByRole("form", {
-      name: `Staff ${target.name} ${target.id}`,
+      name: `Staff ${target.name}`,
       exact: true,
     }),
   ).toBeVisible();

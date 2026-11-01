@@ -11,14 +11,13 @@ The goal is a small, well-built support-request app, plus the testing, deploymen
 - Prometheus and Grafana monitoring with alert rules.
 - Canary releases with Argo CD and Argo Rollouts, including automatic rollback.
 - A preview-environment controller for short-lived test deployments.
+- Backend and frontend cleanup: errors that carry their message, one layer of role checks, the request queue and staff list loaded through small hooks, ESLint in CI, plainer dashboard text.
 - Two source releases: [v0.1.0](https://github.com/elajeff/request-tracker/releases/tag/v0.1.0) and [v0.2.0](https://github.com/elajeff/request-tracker/releases/tag/v0.2.0). The database migration number (V6) is separate from the release version.
 
 ## Next
 
 - Rerun a full canary with the higher CPU limit and request-timing logs on, to confirm the startup timeouts are gone.
 - Add an admin page for accounts (create, disable, reset password, change role) so the command line is no longer needed.
-- Simplify the backend: one global error handler, one layer of role checks, less defensive code.
-- Split up the dashboard component and tidy the frontend.
 - Define service-level objectives from real measurements.
 - Cover more recovery cases: bad configuration, whole-cluster loss.
 
