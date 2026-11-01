@@ -227,7 +227,7 @@ export function RequestCard({
             dateStyle: "medium",
           })}
         </span>
-        <span>#{request.id.slice(0, 8)}</span>
+        <span>Assigned staff: {request.assignee ?? "Unassigned"}</span>
       </div>
       {!draft && (support || request.status === "NEW") && (
         <button
@@ -403,7 +403,6 @@ export function RequestCard({
           </form>
         </>
       )}
-      <p>Assigned staff: {request.assignee ?? "Unassigned"}</p>
       <History request={request} api={api} />
     </article>
   );

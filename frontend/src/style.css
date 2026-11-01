@@ -128,6 +128,11 @@ select:disabled {
   margin-bottom: 28px;
 }
 
+.page-actions {
+  display: flex;
+  gap: 8px;
+}
+
 .eyebrow {
   margin: 0 0 10px;
   color: var(--blue);
@@ -344,18 +349,6 @@ h1 {
   overflow-wrap: anywhere;
 }
 
-.notice-success {
-  color: #197653;
-  background: #f0faf5;
-  border-color: #d3f0e1;
-}
-
-.notice-error {
-  color: #a53d47;
-  background: #fff5f5;
-  border-color: #f6d8dc;
-}
-
 .loading-placeholder {
   padding: 25px 10px;
   color: var(--muted);
@@ -475,7 +468,6 @@ h1 {
 }
 
 .request-meta span:last-child {
-  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
   overflow-wrap: anywhere;
 }
 
@@ -781,7 +773,6 @@ h1 {
 .staff-record input, .account-record input { width: 100%; min-width: 0; }
 .assignment-select { max-width: 100%; }
 #staff-create-form, #account-create-form { display: grid; gap: 8px; }
-#staff-filter { max-width: 260px; }
 .history-list {
   list-style: none;
   margin: 0;

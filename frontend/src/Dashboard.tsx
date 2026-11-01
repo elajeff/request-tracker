@@ -53,19 +53,21 @@ export function Dashboard({
           </p>
           <h1>Service requests</h1>
         </div>
-        <button
-          className="button button-secondary"
-          onClick={() =>
-            void logout().catch((error) =>
-              setNotice(`Could not sign out: ${errorMessage(error)}`),
-            )
-          }
-        >
-          Sign out
-        </button>
-        <button className="button button-secondary" onClick={queue.refresh}>
-          Refresh
-        </button>
+        <div className="page-actions">
+          <button className="button button-secondary" onClick={queue.refresh}>
+            Refresh
+          </button>
+          <button
+            className="button button-secondary"
+            onClick={() =>
+              void logout().catch((error) =>
+                setNotice(`Could not sign out: ${errorMessage(error)}`),
+              )
+            }
+          >
+            Sign out
+          </button>
+        </div>
       </header>
       <section className="stats" aria-label="Request summary">
         {(

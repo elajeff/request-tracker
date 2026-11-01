@@ -20,6 +20,7 @@ export function CreateRequest({
   const input = useRef<HTMLInputElement>(null);
   return (
     <form
+      id="create-form"
       onSubmit={async (event) => {
         event.preventDefault();
         if (busy) return;
