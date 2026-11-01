@@ -50,7 +50,7 @@ Sessions are stored in PostgreSQL, so several backend replicas share them, and e
 
 ## Endpoints without login
 
-Only `/api/session`, `/api/session/login` and the health endpoints (`/actuator/health`, `/liveness`, `/readiness`) are open, plus `/actuator/prometheus` when it is exposed. Keep metrics on localhost or inside the cluster.
+Only `/api/session`, `/api/session/login` and the health endpoints (`/actuator/health`, `/liveness`, `/readiness`) are open, plus `/actuator/prometheus` when it is exposed. The nginx frontend returns 404 for `/actuator`, so these are only reachable on the backend port. Keep that port on localhost or inside the cluster.
 
 ## Upgrading from the pre-login version
 
