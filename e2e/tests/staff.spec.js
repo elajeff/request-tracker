@@ -16,7 +16,7 @@ async function mutate(page, method, path, action) {
   return response.json();
 }
 const directory = page => page.getByRole('form', { name: /^Staff / });
-const staffRow = (page, person) => page.getByRole('form', { name: `Staff ${person.name} ${person.id}`, exact: true });
+const staffRow = (page, person) => page.getByRole('form', { name: `Staff ${person.name}`, exact: true });
 async function open(page) {
   await page.getByText('Manage support staff', { exact: true }).click();
   await expect(page.getByText(/^\d+ staff shown/)).toBeVisible();
@@ -50,15 +50,15 @@ test('React staff lifecycle keeps assignments, history and reloads consistent', 
   await mutate(page, 'PATCH', `/api/staff/${person.id}/active`, () => row.getByRole('button', { name: 'Deactivate', exact: true }).click());
   await expect(row).toContainText('Inactive');
   await expect(select).toHaveValue(person.id);
-  await expect(select.locator('option', { hasText: person.id })).toHaveJSProperty('disabled', true);
+  await expect(select.locator('option', { hasText: person.name })).toHaveJSProperty('disabled', true);
   await expect(pending).toHaveValue('');
-  await expect(pending.locator('option', { hasText: person.id })).toHaveCount(0);
+  await expect(pending.locator('option', { hasText: person.name })).toHaveCount(0);
   expect(await api(request, 'GET', `/api/requests/${assigned.id}`)).toMatchObject({ assigneeId: person.id, assigneeActive: false });
   const history = await api(request, 'GET', `/api/requests/${assigned.id}/history`);
   expect(history.items.find(item => item.field === 'ASSIGNEE').newValue).toContain(prefix);
   expect(history.items.find(item => item.field === 'ASSIGNEE').newValue).not.toContain('renamed');
   await mutate(page, 'PATCH', `/api/staff/${person.id}/active`, () => row.getByRole('button', { name: 'Reactivate' }).click());
-  await expect(select.locator('option', { hasText: person.id })).toHaveJSProperty('disabled', false);
+  await expect(select.locator('option', { hasText: person.name })).toHaveJSProperty('disabled', false);
   await page.reload();
   await open(page);
   await page.getByRole('searchbox', { name: 'Search staff' }).fill(renamed);

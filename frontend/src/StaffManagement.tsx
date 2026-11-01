@@ -107,7 +107,7 @@ export function StaffManagement({ api, onPage, onSaved }: Props) {
       if (created) setName("");
       onSaved(person);
       setNotice(
-        "Staff record saved. Existing assignments and historical values are retained.",
+        "Staff saved.",
       );
     } catch (failure) {
       setError(`Could not save staff: ${errorMessage(failure)}`);
@@ -130,8 +130,7 @@ export function StaffManagement({ api, onPage, onSaved }: Props) {
     <details id="staff-directory" className="staff-directory">
       <summary>Manage support staff</summary>
       <p className="muted">
-        Directory records, not user accounts. Matching names may be different
-        people; use their IDs to distinguish them.
+        People that requests can be assigned to. They do not have logins.
       </p>
       <form
         id="staff-create-form"
@@ -254,7 +253,7 @@ function StaffRow({
   return (
     <form
       className="staff-record"
-      aria-label={`Staff ${person.name} ${person.id}`}
+      aria-label={`Staff ${person.name}`}
       noValidate
       onSubmit={(event) => {
         event.preventDefault();
@@ -262,10 +261,10 @@ function StaffRow({
       }}
     >
       <small>
-        {person.active ? "Active" : "Inactive"} · {person.id}
+        {person.active ? "Active" : "Inactive"}
       </small>
       <input
-        aria-label={`Name for staff ${person.id}`}
+        aria-label={`Name for ${person.name}`}
         value={name}
         required
         maxLength={120}

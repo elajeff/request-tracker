@@ -150,15 +150,8 @@ h1 {
   line-height: 1.15;
 }
 
-.page-subtitle,
 .muted {
   color: var(--muted);
-}
-
-.page-subtitle {
-  margin-bottom: 0;
-  font-size: 13px;
-  line-height: 1.6;
 }
 
 .button {
@@ -620,15 +613,6 @@ h1 {
   font-weight: 400;
 }
 
-.form-note {
-  margin: 17px 0 0;
-  padding-top: 15px;
-  border-top: 1px solid #eef0f5;
-  color: #8a96a8;
-  font-size: 10px;
-  line-height: 1.7;
-}
-
 .page-footer {
   display: flex;
   justify-content: space-between;
@@ -672,9 +656,6 @@ h1 {
     align-self: end;
   }
 
-  .form-note {
-    margin-top: 15px;
-  }
 }
 
 @media (max-width: 650px) {
