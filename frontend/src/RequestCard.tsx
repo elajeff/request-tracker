@@ -133,18 +133,13 @@ export function RequestCard({
   const [assignment, setAssignment] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const lock = useRef(false);
-  const titleInput = useRef<HTMLInputElement>(null);
-  useEffect(() => {
-    if (draft) titleInput.current?.focus();
-  }, [draft !== null]);
-  useEffect(() => {
-    if (
-      assignment &&
-      staff.some((person) => person.id === assignment && !person.active) &&
-      request.assigneeId !== assignment
-    )
-      setAssignment(null);
-  }, [staff, assignment, request.assigneeId]);
+  // Drop a pending choice if that person was deactivated before it was saved.
+  const pending =
+    assignment !== null &&
+    assignment !== request.assigneeId &&
+    staff.some((person) => person.id === assignment && !person.active)
+      ? null
+      : assignment;
   async function save(
     path: string,
     method: string,
@@ -175,7 +170,7 @@ export function RequestCard({
     (person) =>
       person.active ||
       person.id === request.assigneeId ||
-      person.id === assignment,
+      person.id === pending,
   );
   if (
     request.assigneeId &&
@@ -263,7 +258,7 @@ export function RequestCard({
           <label className="form-field">
             <span>Title</span>
             <input
-              ref={titleInput}
+              autoFocus
               required
               maxLength={120}
               value={draft.title}
@@ -353,7 +348,7 @@ export function RequestCard({
             className="assignment-form"
             onSubmit={(event) => {
               event.preventDefault();
-              const id = assignment ?? request.assigneeId;
+              const id = pending ?? request.assigneeId;
               void save(
                 "/assignment",
                 "PATCH",
@@ -372,7 +367,7 @@ export function RequestCard({
               <select
                 className="control-select assignment-select"
                 aria-label={`Assigned staff for ${request.title}`}
-                value={assignment ?? request.assigneeId ?? ""}
+                value={pending ?? request.assigneeId ?? ""}
                 disabled={busy}
                 onChange={(event) => setAssignment(event.target.value)}
               >

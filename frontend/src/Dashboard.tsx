@@ -131,7 +131,7 @@ export function Dashboard({
     },
     [],
   );
-  const receiveStaff = (people: SupportStaff[], _replace: boolean) =>
+  const receiveStaff = (people: SupportStaff[]) =>
     setStaff((previous) => [
       ...new Map(
         [...previous, ...people].map((person) => [person.id, person]),
@@ -139,7 +139,7 @@ export function Dashboard({
     ]);
   function staffSaved(person: SupportStaff) {
     revision.current++;
-    receiveStaff([person], false);
+    receiveStaff([person]);
     setRequests((previous) =>
       previous.map((item) =>
         item.assigneeId === person.id

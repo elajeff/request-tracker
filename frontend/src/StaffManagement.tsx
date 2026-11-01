@@ -6,7 +6,7 @@ const STAFF_SEARCH_DEBOUNCE_MS = 250;
 
 interface Props {
   api: Api;
-  onPage: (people: SupportStaff[], replace: boolean) => void;
+  onPage: (people: SupportStaff[]) => void;
   onSaved: (person: SupportStaff) => void;
 }
 const message = (error: unknown) =>
@@ -57,7 +57,7 @@ export function StaffManagement({ api, onPage, onSaved }: Props) {
       setPeople((previous) => merge(append ? previous : [], page.items));
       setCursor(page.nextCursor);
       activeQuery.current = query.trim();
-      onPage(page.items, !append);
+      onPage(page.items);
     } catch (failure) {
       if (alive.current && id === sequence.current && !abort.signal.aborted) {
         setError(`Could not load staff: ${message(failure)}`);
@@ -203,7 +203,7 @@ export function StaffManagement({ api, onPage, onSaved }: Props) {
       <div aria-label="Staff records" aria-busy={disabled}>
         {visible.map((person) => (
           <StaffRow
-            key={person.id}
+            key={`${person.id}-${person.name}`}
             person={person}
             disabled={disabled}
             rename={(value) => {
@@ -264,7 +264,6 @@ function StaffRow({
   toggle: () => void;
 }) {
   const [name, setName] = useState(person.name);
-  useEffect(() => setName(person.name), [person.name]);
   return (
     <form
       className="staff-record"
