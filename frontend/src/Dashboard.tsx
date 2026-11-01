@@ -3,6 +3,7 @@ import type { Api, SupportStaff } from "./types";
 import { errorMessage } from "./useSession";
 import { uniqueById, useRequestQueue } from "./useRequestQueue";
 import { StaffManagement } from "./StaffManagement";
+import { AccountManagement } from "./AccountManagement";
 import { RequestCard, staffLabel } from "./RequestCard";
 import { CreateRequest } from "./CreateRequest";
 
@@ -11,12 +12,14 @@ export function Dashboard({
   support,
   username,
   logout,
+  onSessionEnded,
   onConnection,
 }: {
   api: Api;
   support: boolean;
   username: string;
   logout: () => Promise<void>;
+  onSessionEnded: () => void;
   onConnection: (connected: boolean) => void;
 }) {
   const [query, setQuery] = useState("");
@@ -233,6 +236,11 @@ export function Dashboard({
                   setDirectory((previous) => uniqueById([...previous, person]))
                   queue.staffChanged(person);
                 }}
+              />
+              <AccountManagement
+                api={api}
+                username={username}
+                onOwnSessionEnded={onSessionEnded}
               />
             </div>
           )}
