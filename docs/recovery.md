@@ -93,6 +93,49 @@ kubectl --context kind-request-tracker -n request-tracker exec request-tracker-p
 
 Restore into a separate temporary database with `pg_restore --exit-on-error --no-owner --no-acl`, and run the new image against it before upgrading the real one.
 
+## Losing the whole cluster
+
+If the cluster is gone, the dump is the only copy of the data, so keep it somewhere outside the cluster. To rebuild:
+
+1. Create a new cluster, load the images, and create the namespace and a database Secret as in [Running on Kubernetes](kubernetes.md). The password does not have to match the old one, because the dump carries no owners or grants.
+2. Install the chart with the same image tags as the backup. The backend creates an empty schema on its first start.
+3. Stop the backend, restore the dump over the empty schema, and start it again:
+
+```sh
+k="kubectl -n request-tracker"
+$k scale deploy/request-tracker --replicas=0
+$k exec -i request-tracker-postgresql-0 -- pg_restore -U request_tracker -d request_tracker \
+    --clean --if-exists --no-owner --no-acl --single-transaction --exit-on-error < backup.dump
+$k scale deploy/request-tracker --replicas=1
+```
+
+On startup Flyway should log `Successfully validated 6 migrations` and `No migration necessary`.
+
+To check that nothing was lost, run this on the old database before the backup and on the new one after the restore. The two outputs should be identical:
+
+```sql
+select 'service_requests', count(*), md5(coalesce(string_agg(t::text, '|' order by t.id), '')) from service_requests t
+union all select 'support_staff', count(*), md5(coalesce(string_agg(t::text, '|' order by t.id), '')) from support_staff t
+union all select 'request_history', count(*), md5(coalesce(string_agg(t::text, '|' order by t.id), '')) from request_history t
+union all select 'login_accounts', count(*), md5(coalesce(string_agg(t::text, '|' order by t.id), '')) from login_accounts t
+union all select 'flyway_schema_history', count(*), max(version) from flyway_schema_history where success;
+```
+
+It hashes every row of every table, so a changed value shows up, not just a missing row.
+
+### What was tested
+
+On 1 November 2026 this was simulated on kind. The real cluster was not deleted. Instead, the backup was restored into a second, throwaway kind cluster, which was deleted afterwards.
+
+- The backup took about a second and was 73 KB. The check above gave the same result just before and just after it, so nothing changed while it ran.
+- Creating the cluster and loading the app images took about 1.5 minutes. `kind load` failed for `postgres:17-alpine` (a known problem with multi-platform images), so the new cluster pulled it from Docker Hub instead.
+- `helm install --wait` took 46 seconds. The backend restarted twice while PostgreSQL was still starting, then became ready.
+- Stopping the backend, restoring and starting it again took 8 seconds.
+- The check matched exactly: 21 requests, 13 staff, 92 history entries, 5 accounts and migration V6.
+- An existing support account signed in through the new frontend and saw all 21 requests.
+
+From a fresh cluster to a working, restored app took about 3 minutes. Anything written after the backup would be lost, so how often you take backups decides how much data you can lose.
+
 ## Rolling back
 
 Schema migrations only go forward. V5 replaced the free-text assignee column, so an older Helm revision will not run against it, and V6 added accounts. Prefer a fix-forward or an image that is compatible with the current schema. Restoring an old backup loses everything written since, so treat it as a planned decision, never an automatic rollback.
