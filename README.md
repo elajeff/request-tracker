@@ -79,11 +79,12 @@ The same containers run on Docker Compose and on Kubernetes (kind and k3s). The 
 - [Authentication and permissions](docs/authentication.md)
 - [Staff and request history](docs/staff-management.md)
 - [Design decisions](docs/decisions/)
+- [Service-level objectives](docs/slos.md)
 - [Roadmap](docs/project-plan.md)
 
 ## Limitations
 
-This is a learning project, not a production service. It runs on a single node with one database, has no SLOs, and makes no zero-downtime claim. The `/actuator/prometheus` metrics endpoint needs no login, so keep it on localhost or inside the cluster. Slow requests right after a backend pod starts were traced to a tight CPU limit; see [canary delivery](docs/canary-delivery.md#known-limits).
+This is a learning project, not a production service. It runs on a single node with one database, its [service-level objectives](docs/slos.md) are only examples, and it makes no zero-downtime claim. The `/actuator/prometheus` metrics endpoint needs no login, so keep it on localhost or inside the cluster. Slow requests right after a backend pod starts were traced to a tight CPU limit; see [canary delivery](docs/canary-delivery.md#known-limits).
 
 ## License
 

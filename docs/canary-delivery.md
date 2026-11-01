@@ -43,6 +43,6 @@ I did not compare database snapshots in this run. The 30 October run did, and fo
 - The five-minute observation budget is based on measurement, not a guarantee from Kubernetes.
 - Service selectors do not switch atomically, so a rollout can briefly return 502s. Frontend pods wait 5 seconds before shutting down to reduce this. Nothing here claims zero downtime.
 - Earlier runs saw a few request timeouts right after new pods started. A later load test found the backend's 0.5-core CPU limit throttled the JVM for most of its startup, and the first logins took about 1.6 s. With a 2-core limit, startup went from 12.7 s to 3 s and those logins took 0.86 s. The limit is now 2 cores. In the 1 November rollout, startup was under 4.3 s and no request was logged as slow. The exact 3-second timeouts have not been reproduced.
-- The Prometheus thresholds are exercise gates, not production service-level objectives.
+- The Prometheus thresholds are exercise gates, looser than the [service-level objectives](slos.md).
 - Prometheus keeps two hours of data. If you want to keep results, save them elsewhere.
 - Pre-login backends must never be used as a canary or rollback target; see [authentication](authentication.md#upgrading-from-the-pre-login-version).

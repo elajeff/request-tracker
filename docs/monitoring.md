@@ -33,7 +33,7 @@ Metrics are kept for seven days in a named volume. To stop monitoring without to
 | RequestTrackerHighErrorRate | More than 5% of requests return 5xx | 5 min |
 | RequestTrackerSlowResponses | Mean response time is over 1 second | 5 min |
 
-The two traffic alerts need at least 0.1 requests per second over five minutes, so a single stray request on an idle dev machine does not trigger them. No notifications are configured; the alerts only show on Prometheus's Alerts page. The thresholds are development defaults. An unavailable target could be a dead app or a failed scrape, so check the target error and the app logs.
+The two traffic alerts need at least 0.1 requests per second over five minutes, so a single stray request on an idle dev machine does not trigger them. No notifications are configured; the alerts only show on Prometheus's Alerts page. The thresholds are development defaults, looser than the [service-level objectives](slos.md). An unavailable target could be a dead app or a failed scrape, so check the target error and the app logs.
 
 CI tests the rules with promtool. To run the same check locally:
 
