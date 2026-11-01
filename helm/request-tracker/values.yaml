@@ -1,4 +1,6 @@
 backend:
+  # Log API requests slower than this many milliseconds; 0 turns it off.
+  slowRequestMillis: 0
   sessionCookieSecure: true
   image:
     repository: request-tracker

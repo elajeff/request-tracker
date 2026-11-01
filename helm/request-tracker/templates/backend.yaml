@@ -39,6 +39,8 @@ spec:
           env:
             - name: SESSION_COOKIE_SECURE
               value: {{ .Values.backend.sessionCookieSecure | quote }}
+            - name: DIAGNOSTICS_SLOW_REQUEST_MILLIS
+              value: {{ .Values.backend.slowRequestMillis | quote }}
             - name: SPRING_DATASOURCE_USERNAME
               valueFrom:
                 secretKeyRef:
