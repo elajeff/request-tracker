@@ -15,6 +15,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.web.server.ResponseStatusException;
 import dev.elajeff.requesttracker.security.AccountAdministration;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -60,7 +61,7 @@ class AuthenticationIntegrationTest {
         var second = new ApiSession(port, json);
         assertEquals(204, first.login(username, password).statusCode());
         assertEquals(204, second.login(username, password).statusCode());
-        accounts.disable(username);
+        accounts.setEnabled(username, false);
         for (var client : List.of(first, second)) {
             assertEquals(401, client.send("GET", "/api/requests", null).statusCode());
         }
@@ -197,7 +198,7 @@ class AuthenticationIntegrationTest {
         jdbc.update("INSERT INTO service_requests(id,title,description) VALUES (?, 'Legacy', 'Keep')", id);
         accounts.claimLegacy(username, id);
         assertEquals(200, requester.send("GET", "/api/requests/" + id, null).statusCode());
-        assertThrows(IllegalArgumentException.class, () -> accounts.claimLegacy(username, id));
+        assertThrows(ResponseStatusException.class, () -> accounts.claimLegacy(username, id));
         assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM request_history WHERE request_id=?", Integer.class, id));
         assertNull(jdbc.queryForObject("SELECT actor_username FROM request_history WHERE request_id=?", String.class, id));
         assertTrue(jdbc.queryForObject("SELECT new_value FROM request_history WHERE request_id=?", String.class, id).startsWith(username + " ["));
@@ -253,11 +254,11 @@ class AuthenticationIntegrationTest {
         String hash = jdbc.queryForObject("SELECT password_hash FROM login_accounts WHERE username=?", String.class, name);
         assertTrue(hash.startsWith("{bcrypt}"));
         assertFalse(hash.contains(password));
-        assertThrows(IllegalArgumentException.class, () -> accounts.create(name, "SUPPORT", password));
-        assertThrows(IllegalArgumentException.class, () -> accounts.create(username(), "ADMIN", password));
-        assertThrows(IllegalArgumentException.class, () -> accounts.create("Invalid Name", "REQUESTER", password));
-        assertThrows(IllegalArgumentException.class, () -> accounts.create(username(), "REQUESTER", "short"));
-        assertThrows(IllegalArgumentException.class, () -> accounts.create(username(), "REQUESTER", "é".repeat(37)));
+        assertThrows(ResponseStatusException.class, () -> accounts.create(name, "SUPPORT", password));
+        assertThrows(ResponseStatusException.class, () -> accounts.create(username(), "ADMIN", password));
+        assertThrows(ResponseStatusException.class, () -> accounts.create("Invalid Name", "REQUESTER", password));
+        assertThrows(ResponseStatusException.class, () -> accounts.create(username(), "REQUESTER", "short"));
+        assertThrows(ResponseStatusException.class, () -> accounts.create(username(), "REQUESTER", "é".repeat(37)));
     }
 
     private ApiSession account(String role) throws Exception {
