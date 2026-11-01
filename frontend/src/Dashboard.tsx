@@ -1,22 +1,11 @@
-import { useEffect, useRef, useState } from "react";
-import type {
-  Api,
-  RequestCounts,
-  RequestQueuePage,
-  ServiceRequest,
-  SupportStaff,
-} from "./types";
+import { useMemo, useState } from "react";
+import type { Api, SupportStaff } from "./types";
 import { errorMessage } from "./useSession";
+import { uniqueById, useRequestQueue } from "./useRequestQueue";
 import { StaffManagement } from "./StaffManagement";
 import { RequestCard, staffLabel } from "./RequestCard";
 import { CreateRequest } from "./CreateRequest";
 
-const emptyCounts: RequestCounts = {
-  total: 0,
-  newCount: 0,
-  inProgressCount: 0,
-  resolvedCount: 0,
-};
 export function Dashboard({
   api,
   support,
@@ -30,165 +19,23 @@ export function Dashboard({
   logout: () => Promise<void>;
   onConnection: (connected: boolean) => void;
 }) {
-  const [requests, setRequests] = useState<ServiceRequest[]>([]);
-  const [counts, setCounts] = useState(emptyCounts);
-  const [staff, setStaff] = useState<SupportStaff[]>([]);
   const [query, setQuery] = useState("");
   const [staffFilter, setStaffFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
-  const [cursor, setCursor] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [directory, setDirectory] = useState<SupportStaff[]>([]);
   const [notice, setNotice] = useState("");
-  const [loadError, setLoadError] = useState(false);
-  const sequence = useRef(0);
-  const revision = useRef(0);
-  const alive = useRef(true);
-  const abort = useRef<AbortController | null>(null);
-  const active = useRef({ query: "", staffFilter: "", statusFilter: "" });
-  async function load(append = false) {
-    if (
-      append &&
-      (loading ||
-        !cursor ||
-        query !== active.current.query ||
-        staffFilter !== active.current.staffFilter ||
-        statusFilter !== active.current.statusFilter)
-    )
-      return;
-    abort.current?.abort();
-    const controller = new AbortController();
-    abort.current = controller;
-    const id = ++sequence.current,
-      version = revision.current;
-    setLoading(true);
-    setLoadError(false);
-    try {
-      const params = new URLSearchParams({ limit: "25", q: query.trim() });
-      if (staffFilter === "unassigned") params.set("unassigned", "true");
-      else if (staffFilter) params.set("staffId", staffFilter);
-      if (statusFilter) params.set("status", statusFilter);
-      if (append && cursor) params.set("cursor", cursor);
-      const page = await api<RequestQueuePage>(`/api/requests?${params}`, {
-        signal: controller.signal,
-      });
-      if (!alive.current || id !== sequence.current) return;
-      // A response dispatched before a mutation must not restore old field values.
-      if (version !== revision.current) {
-        void load();
-        return;
-      }
-      setRequests((previous) => [
-        ...new Map(
-          [...(append ? previous : []), ...page.items].map((item) => [
-            item.id,
-            item,
-          ]),
-        ).values(),
-      ]);
-      // Assignment identities remain selectable after unassignment, even outside the first staff page.
-      setStaff((previous) => {
-        const known = new Map(previous.map((person) => [person.id, person]));
-        for (const item of page.items)
-          if (item.assigneeId && !known.has(item.assigneeId))
-            known.set(item.assigneeId, {
-              id: item.assigneeId,
-              name: item.assignee ?? "",
-              active: item.assigneeActive === true,
-            });
-        return [...known.values()];
-      });
-      onConnection(true);
-      setCounts(page.counts);
-      setCursor(page.nextCursor);
-      active.current = { query, staffFilter, statusFilter };
-      setNotice("");
-    } catch (error) {
-      if (
-        alive.current &&
-        id === sequence.current &&
-        !controller.signal.aborted
-      ) {
-        setNotice(`Could not load requests: ${errorMessage(error)}`);
-        onConnection(false);
-        setLoadError(true);
-      }
-    } finally {
-      if (alive.current && id === sequence.current) setLoading(false);
-    }
-  }
-  useEffect(() => {
-    const timer = window.setTimeout(() => void load(), 250);
-    return () => {
-      window.clearTimeout(timer);
-      abort.current?.abort();
-      sequence.current++;
-    };
-  }, [query, staffFilter, statusFilter]);
-  useEffect(
-    () => () => {
-      alive.current = false;
-      abort.current?.abort();
-    },
-    [],
+  const queue = useRequestQueue(
+    api,
+    { query, staff: staffFilter, status: statusFilter },
+    onConnection,
   );
-  const receiveStaff = (people: SupportStaff[]) =>
-    setStaff((previous) => [
-      ...new Map(
-        [...previous, ...people].map((person) => [person.id, person]),
-      ).values(),
-    ]);
-  function staffSaved(person: SupportStaff) {
-    revision.current++;
-    receiveStaff([person]);
-    setRequests((previous) =>
-      previous.map((item) =>
-        item.assigneeId === person.id
-          ? { ...item, assignee: person.name, assigneeActive: person.active }
-          : item,
-      ),
-    );
-  }
-  function updated(before: ServiceRequest, fields: Partial<ServiceRequest>) {
-    revision.current++;
-    setRequests((previous) =>
-      previous.map((item) =>
-        item.id === before.id ? { ...item, ...fields } : item,
-      ),
-    );
-    if (fields.status && fields.status !== before.status) {
-      const key = (status: string) =>
-        status === "NEW"
-          ? "newCount"
-          : status === "IN_PROGRESS"
-            ? "inProgressCount"
-            : "resolvedCount";
-      setCounts((previous) => ({
-        ...previous,
-        [key(before.status)]: previous[key(before.status)] - 1,
-        [key(fields.status!)]: previous[key(fields.status!)] + 1,
-      }));
-    }
-  }
-  const known = new Map(staff.map((person) => [person.id, person]));
-  for (const request of requests)
-    if (request.assigneeId && !known.has(request.assigneeId))
-      known.set(request.assigneeId, {
-        id: request.assigneeId,
-        name: request.assignee ?? "",
-        active: request.assigneeActive === true,
-      });
-  const visible = requests.filter(
-    (item) =>
-      `${item.title} ${item.description} ${item.id} ${item.assignee ?? ""}`
-        .toLowerCase()
-        .includes(active.current.query.trim().toLowerCase()) &&
-      (!active.current.statusFilter ||
-        item.status === active.current.statusFilter) &&
-      (!active.current.staffFilter ||
-        (active.current.staffFilter === "unassigned"
-          ? !item.assigneeId
-          : item.assigneeId === active.current.staffFilter)),
+  // Directory records are fresher; assignees fill in people not loaded yet.
+  const knownStaff = useMemo(
+    () => uniqueById([...queue.assignees, ...directory]),
+    [queue.assignees, directory],
   );
+  const filtered = Boolean(query || staffFilter || statusFilter);
+  const message = queue.error || notice;
   return (
     <main id="dashboard" className="page">
       <header className="page-heading">
@@ -211,7 +58,7 @@ export function Dashboard({
         >
           Sign out
         </button>
-        <button className="button button-secondary" onClick={() => void load()}>
+        <button className="button button-secondary" onClick={queue.refresh}>
           Refresh
         </button>
       </header>
@@ -220,20 +67,20 @@ export function Dashboard({
           [
             [
               "Total requests",
-              counts.total,
+              queue.counts.total,
               "total",
               "Requests visible to your account",
             ],
-            ["New", counts.newCount, "new", "Waiting to start"],
+            ["New", queue.counts.newCount, "new", "Waiting to start"],
             [
               "In progress",
-              counts.inProgressCount,
+              queue.counts.inProgressCount,
               "progress",
               "Currently being handled",
             ],
             [
               "Resolved",
-              counts.resolvedCount,
+              queue.counts.resolvedCount,
               "resolved",
               "Completed requests",
             ],
@@ -254,9 +101,9 @@ export function Dashboard({
             <div>
               <h2 id="queue-heading">Request queue</h2>
               <p className="muted">
-                {query || staffFilter || statusFilter
-                  ? `${visible.length} matching requests loaded`
-                  : `Showing ${requests.length} of ${counts.total} requests`}
+                {filtered
+                  ? `${queue.requests.length} matching requests loaded`
+                  : `Showing ${queue.requests.length} of ${queue.counts.total} requests`}
               </p>
             </div>
             <label className="search-field">
@@ -267,10 +114,7 @@ export function Dashboard({
               <input
                 type="search"
                 value={query}
-                onChange={(event) => {
-                  sequence.current++;
-                  setQuery(event.target.value);
-                }}
+                onChange={(event) => setQuery(event.target.value)}
               />
             </label>
             <label className="control-field">
@@ -279,10 +123,7 @@ export function Dashboard({
                 className="control-select"
                 aria-label="Filter by status"
                 value={statusFilter}
-                onChange={(event) => {
-                  sequence.current++;
-                  setStatusFilter(event.target.value);
-                }}
+                onChange={(event) => setStatusFilter(event.target.value)}
               >
                 <option value="">All statuses</option>
                 {["NEW", "IN_PROGRESS", "RESOLVED"].map((value) => (
@@ -299,14 +140,11 @@ export function Dashboard({
                   className="control-select"
                   aria-label="Filter by assigned staff"
                   value={staffFilter}
-                  onChange={(event) => {
-                    sequence.current++;
-                    setStaffFilter(event.target.value);
-                  }}
+                  onChange={(event) => setStaffFilter(event.target.value)}
                 >
                   <option value="">All staff</option>
                   <option value="unassigned">Unassigned</option>
-                  {[...known.values()]
+                  {[...knownStaff]
                     .sort((a, b) => a.name.localeCompare(b.name))
                     .map((person) => (
                       <option key={person.id} value={person.id}>
@@ -317,63 +155,53 @@ export function Dashboard({
               </label>
             )}
           </div>
-          {notice && (
+          {message && (
             <div id="notice" className="notice notice-info" role="status">
-              {notice}
+              {message}
             </div>
           )}
-          {loadError && (
-            <button
-              className="button button-secondary"
-              onClick={() => void load()}
-            >
+          {queue.error && (
+            <button className="button button-secondary" onClick={queue.refresh}>
               Retry loading requests
             </button>
           )}
-          {loading && (
+          {queue.loading && (
             <div className="loading-placeholder" role="status">
               Loading requests…
             </div>
           )}
           <div className="request-list">
-            {visible.map((request) => (
+            {queue.requests.map((request) => (
               <RequestCard
                 key={request.id}
                 request={request}
                 api={api}
                 support={support}
-                staff={[...known.values()]}
-                onUpdated={updated}
+                staff={knownStaff}
+                onUpdated={queue.edited}
                 notify={setNotice}
               />
             ))}
           </div>
-          {cursor && (
+          {queue.hasMore && (
             <button
               className="button button-secondary"
-              disabled={
-                loading ||
-                query !== active.current.query ||
-                staffFilter !== active.current.staffFilter ||
-                statusFilter !== active.current.statusFilter
-              }
-              onClick={() => void load(true)}
+              disabled={!queue.canLoadMore}
+              onClick={queue.loadMore}
             >
               Load more requests
             </button>
           )}
-          {!loading && !visible.length && (
+          {!queue.loading && !queue.requests.length && (
             <div className="empty-state">
               <span className="empty-symbol" aria-hidden="true">
                 ○
               </span>
               <h3>
-                {query || staffFilter || statusFilter
-                  ? "No matching requests"
-                  : "No requests yet"}
+                {filtered ? "No matching requests" : "No requests yet"}
               </h3>
               <p>
-                {query || staffFilter || statusFilter
+                {filtered
                   ? "Try another search term or staff filter."
                   : "Create your first request using the form."}
               </p>
@@ -393,22 +221,19 @@ export function Dashboard({
             api={api}
             support={support}
             notify={setNotice}
-            onCreated={(created) => {
-              revision.current++;
-              setRequests((previous) => [created, ...previous]);
-              setCounts((previous) => ({
-                ...previous,
-                total: previous.total + 1,
-                newCount: previous.newCount + 1,
-              }));
-            }}
+            onCreated={queue.created}
           />
           {support && (
             <div id="staff-management-root">
               <StaffManagement
                 api={api}
-                onPage={receiveStaff}
-                onSaved={staffSaved}
+                onPage={(people) =>
+                  setDirectory((previous) => uniqueById([...previous, ...people]))
+                }
+                onSaved={(person) => {
+                  setDirectory((previous) => uniqueById([...previous, person]))
+                  queue.staffChanged(person);
+                }}
               />
             </div>
           )}
