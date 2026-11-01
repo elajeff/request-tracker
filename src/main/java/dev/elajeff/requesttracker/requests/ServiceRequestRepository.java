@@ -3,7 +3,6 @@ package dev.elajeff.requesttracker.requests;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -48,32 +47,24 @@ public class ServiceRequestRepository {
         return findById(id, null).orElseThrow();
     }
 
-    public boolean updateDetails(UUID id, String title, String description) {
-        return jdbcTemplate.update("""
-                UPDATE service_requests
-                SET title = ?, description = ?
-                WHERE id = ?
-                """, title, description, id) == 1;
+    public void updateDetails(UUID id, String title, String description) {
+        jdbcTemplate.update("UPDATE service_requests SET title = ?, description = ? WHERE id = ?", title, description, id);
     }
 
-    public boolean updateStatus(UUID id, ServiceRequestStatus expected, ServiceRequestStatus status) {
-        return jdbcTemplate.update("""
-                UPDATE service_requests
-                SET status = ?
-                WHERE id = ? AND status = ?
-                """, status.name(), id, expected.name()) == 1;
+    public void updateStatus(UUID id, ServiceRequestStatus status) {
+        jdbcTemplate.update("UPDATE service_requests SET status = ? WHERE id = ?", status.name(), id);
     }
 
-    public boolean updatePriority(UUID id, ServiceRequestPriority priority) {
-        return jdbcTemplate.update("""
-                UPDATE service_requests
-                SET priority = ?
-                WHERE id = ?
-                """, priority.name(), id) == 1;
+    public void updatePriority(UUID id, ServiceRequestPriority priority) {
+        jdbcTemplate.update("UPDATE service_requests SET priority = ? WHERE id = ?", priority.name(), id);
+    }
+
+    public void updateAssignment(UUID id, UUID staffId) {
+        jdbcTemplate.update("UPDATE service_requests SET assignee_id = ? WHERE id = ?", staffId, id);
     }
 
     public List<ServiceRequest> findPage(String query, UUID staffId, boolean unassigned, ServiceRequestStatus status,
-            Instant beforeCreatedAt, UUID beforeId, int limit, UUID ownerId) {
+            QueueCursor after, int limit, UUID ownerId) {
         String sql = SELECT_REQUEST + """
                 WHERE strpos(lower(concat_ws(' ', r.title, r.description, r.id::text, coalesce(s.name, ''))), lower(?)) > 0
                 """;
@@ -93,10 +84,10 @@ public class ServiceRequestRepository {
             sql += " AND r.status = ?";
             parameters.add(status.name());
         }
-        if (beforeCreatedAt != null) {
+        if (after != null) {
             sql += " AND (r.created_at, r.id) < (?, ?)";
-            parameters.add(Timestamp.from(beforeCreatedAt));
-            parameters.add(beforeId);
+            parameters.add(Timestamp.from(after.createdAt()));
+            parameters.add(after.id());
         }
         sql += " ORDER BY r.created_at DESC, r.id DESC LIMIT ?";
         parameters.add(limit);
@@ -115,18 +106,13 @@ public class ServiceRequestRepository {
     }
 
     public Optional<ServiceRequest> findById(UUID id, UUID ownerId) {
-        List<ServiceRequest> matches = jdbcTemplate.query(SELECT_REQUEST + " WHERE r.id = ? AND (?::uuid IS NULL OR r.owner_id = ?)", ROW_MAPPER, id, ownerId, ownerId);
-
-        return matches.stream().findFirst();
+        return jdbcTemplate.query(SELECT_REQUEST + " WHERE r.id = ? AND (?::uuid IS NULL OR r.owner_id = ?)",
+                ROW_MAPPER, id, ownerId, ownerId).stream().findFirst();
     }
 
     public Optional<ServiceRequest> findByIdForUpdate(UUID id, UUID ownerId) {
         return jdbcTemplate.query(SELECT_REQUEST + " WHERE r.id = ? AND (?::uuid IS NULL OR r.owner_id = ?) FOR UPDATE OF r",
                 ROW_MAPPER, id, ownerId, ownerId).stream().findFirst();
-    }
-
-    public void updateAssignment(UUID id, UUID staffId) {
-        jdbcTemplate.update("UPDATE service_requests SET assignee_id = ? WHERE id = ?", staffId, id);
     }
 
     public void recordChange(UUID id, String field, String oldValue, String newValue, UUID actorId, String actorUsername) {

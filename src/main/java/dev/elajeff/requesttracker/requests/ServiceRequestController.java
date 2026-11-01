@@ -5,9 +5,8 @@ import java.util.UUID;
 
 import jakarta.validation.Valid;
 
-import org.springframework.http.ResponseEntity;
 import org.springframework.http.HttpStatus;
-import org.springframework.web.server.ResponseStatusException;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -17,6 +16,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 
 @RestController
 @RequestMapping("/api/requests")
@@ -47,6 +47,7 @@ public class ServiceRequestController {
             @RequestParam(required = false) UUID staffId,
             @RequestParam(defaultValue = "false") boolean unassigned,
             @RequestParam(required = false) String status) {
+        // Parsed by hand because Spring binds an empty enum parameter to null, and "status=" must be rejected.
         ServiceRequestStatus selectedStatus = null;
         if (status != null) {
             try {
