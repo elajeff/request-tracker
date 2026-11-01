@@ -28,18 +28,21 @@ A rollout can stay aborted while Git still names the bad image. Fix the image in
 
 ## What we measured
 
-The last full run on kind (30 October 2026):
+The last full run on kind (1 November 2026), with the 2-core backend limit, the traffic generator on, and requests slower than 500 ms logged:
 
-- A healthy release was promoted through both steps in about 4 minutes. Measured traffic to the new version was about 25% and 46%, with no errors.
-- The broken release was aborted automatically at the first analysis, when its error rate came out at 100%. The four stable replicas kept serving and the broken pods were scaled down.
-- Restoring the healthy version finished in about 4 minutes.
-- Requests, staff, history and accounts were identical before and after.
+- A healthy release was promoted through both steps in 2 minutes 47 seconds. The analyses saw 13 requests per second at 25% and about 24 at 50%, with no errors and a mean response time of about 7 ms.
+- The new backend pods started in 3.7 to 4.3 seconds. No request was slow enough to be logged.
+- The traffic generator counted 7 failed requests out of about 2,800 during that rollout. The frontend has one replica and is replaced in the same sync, which is the likely cause, but I did not confirm it.
+- The broken release was aborted automatically about 50 seconds after Argo CD synced, at the first analysis, when its error rate came out at 100%. The four stable replicas kept serving. While the broken pod ran, the generator counted about 520 failed requests out of 6,700.
+- After the healthy tag went back into Git, the rollout was Healthy straight away, because the stable version had never changed.
+
+I did not compare database snapshots in this run. The 30 October run did, and found requests, staff, history and accounts identical before and after.
 
 ## Known limits
 
 - The five-minute observation budget is based on measurement, not a guarantee from Kubernetes.
 - Service selectors do not switch atomically, so a rollout can briefly return 502s. Frontend pods wait 5 seconds before shutting down to reduce this. Nothing here claims zero downtime.
-- Earlier runs saw a few request timeouts right after new pods started. A later load test found the backend's 0.5-core CPU limit throttled the JVM for most of its startup, and the first logins took about 1.6 s. With a 2-core limit, startup went from 12.7 s to 3 s and those logins took 0.86 s. The limit is now 2 cores. The exact 3-second timeouts were not reproduced.
+- Earlier runs saw a few request timeouts right after new pods started. A later load test found the backend's 0.5-core CPU limit throttled the JVM for most of its startup, and the first logins took about 1.6 s. With a 2-core limit, startup went from 12.7 s to 3 s and those logins took 0.86 s. The limit is now 2 cores. In the 1 November rollout, startup was under 4.3 s and no request was logged as slow. The exact 3-second timeouts have not been reproduced.
 - The Prometheus thresholds are exercise gates, not production service-level objectives.
 - Prometheus keeps two hours of data. If you want to keep results, save them elsewhere.
 - Pre-login backends must never be used as a canary or rollback target; see [authentication](authentication.md#upgrading-from-the-pre-login-version).
