@@ -18,7 +18,7 @@ Delivery mode uses the same database as the normal Helm install. Argo CD manages
 ## Trying it
 
 1. Install the baseline chart and bootstrap Argo (`delivery/bootstrap.ps1`; see [Kubernetes setup](kubernetes.md)).
-2. Create a SUPPORT account and a Secret with its username and password for the traffic generator (`delivery.traffic.accountSecret`, plus `delivery.traffic.enabled` and a real `delivery.traffic.requestId`).
+2. Create a SUPPORT account and a Secret with its username and password for the traffic generator (`delivery.traffic.accountSecret`, plus `delivery.traffic.enabled`). The generator signs in and keeps reading the queue, staff list and history, so the analysis always has traffic to measure.
 3. Build the images, load them into kind, and apply `delivery/application.yaml`.
 4. Change the backend image tag in the values file and push it. Watch it with `kubectl argo rollouts get rollout request-tracker-delivery -n request-tracker --watch`.
 
@@ -43,5 +43,3 @@ The last full run on kind (30 October 2026):
 - The Prometheus thresholds are exercise gates, not production service-level objectives.
 - Prometheus keeps two hours of data. If you want to keep results, save them elsewhere.
 - Pre-login backends must never be used as a canary or rollback target; see [authentication](authentication.md#upgrading-from-the-pre-login-version).
-
-The scripts in `delivery/` check the promotion budget, count traffic and compare database snapshots. They were written for these exercises and are not a general runner.

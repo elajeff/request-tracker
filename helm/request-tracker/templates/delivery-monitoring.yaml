@@ -121,7 +121,7 @@ spec:
       containers:
         - name: traffic
           image: python:3.13-alpine@sha256:8bcfa47b04b853a17aaf909362b847b2112fd6ec4105ea553ef9a43bafbb5916
-          command: [python, -B, /exercise/traffic.py]
+          command: [python, -B, /app/traffic.py]
           env:
             - name: TRAFFIC_USERNAME
               valueFrom:
@@ -133,8 +133,6 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.delivery.traffic.accountSecret }}
                   key: password
-            - name: TRAFFIC_REQUEST_ID
-              value: {{ .Values.delivery.traffic.requestId | quote }}
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
@@ -142,11 +140,7 @@ spec:
           resources:
             requests: {cpu: 25m, memory: 32Mi}
             limits: {cpu: 100m, memory: 64Mi}
-          volumeMounts:
-            - {name: script, mountPath: /exercise, readOnly: true}
-            - {name: evidence, mountPath: /evidence}
-      volumes:
-        - {name: script, configMap: {name: request-tracker-delivery-traffic}}
-        - {name: evidence, emptyDir: {sizeLimit: 64Mi}}
+          volumeMounts: [{name: script, mountPath: /app, readOnly: true}]
+      volumes: [{name: script, configMap: {name: request-tracker-delivery-traffic}}]
 {{- end }}
 {{- end }}
