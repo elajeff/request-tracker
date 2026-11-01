@@ -1,33 +1,33 @@
-# Project plan
+# Roadmap
 
-## Goal and constraints
+The goal is a small, well-built support-request app, plus the testing, deployment and operations work around it, all running locally on free tools with synthetic data.
 
-Maintain a support-request application and study its development, testing and operation on local infrastructure. The application is a modular monolith; infrastructure serves specific learning or engineering needs. Labs use synthetic data and do not depend on paid services.
+## Done
 
-## Completed work
+- Request workflows, staff directory, history, pagination, search and server-side filtering.
+- Session login, roles and per-account request ownership.
+- React + TypeScript dashboard, with Playwright browser tests in CI.
+- Docker Compose, Helm chart, kind and k3s deployments.
+- Prometheus and Grafana monitoring with alert rules.
+- Canary releases with Argo CD and Argo Rollouts, including automatic rollback.
+- A preview-environment controller for short-lived test deployments.
+- Two source releases: [v0.1.0](https://github.com/elajeff/request-tracker/releases/tag/v0.1.0) and [v0.2.0](https://github.com/elajeff/request-tracker/releases/tag/v0.2.0). The database migration number (V6) is separate from the release version.
 
-| Area | Reference |
-| --- | --- |
-| Application and tests | Request workflows, staff, history, pagination; backend and isolated browser tests in CI |
-| Kubernetes | [kind](kind-deployment.md), Helm probes/limits, persistent storage and service accounts |
-| Operations | [Monitoring](monitoring.md), [recovery](runbooks/local-recovery.md), [delivery](runbooks/delivery.md) |
-| Distribution practice | Selected deployment/recovery checks on [k3s](runbooks/k3s.md) through k3d |
-| Controller | [PreviewEnvironment](../preview-controller/README.md) lifecycle, ownership, expiry, retention and RBAC |
-| Authentication | [Session/CSRF protection](authentication.md), REQUESTER/SUPPORT roles and ownership |
-| Dashboard | One React/TypeScript root for sessions, requests, history and staff; browser workflows cover stale responses and session clearing |
-| Filtering | SQL-backed queue status filters and paginated staff-name search; optional API parameters preserve existing clients |
-| Milestone C | [React deployment](verification/react-deployment.md) and [authenticated canary verification](verification/canary-release.md) |
+## Next
 
-Milestone C is complete. Database migration V6 defines authentication storage; project releases use a separate version sequence. See [GitHub Releases](https://github.com/elajeff/request-tracker/releases) for published versions and the [release checklist](release-checklist.md) for source-only release checks.
+- Look into the occasional request timeouts and failures seen during canary tests.
+- Add an admin page for accounts (create, disable, reset password, change role) so the command line is no longer needed.
+- Simplify the backend: one global error handler, one layer of role checks, less defensive code.
+- Split up the dashboard component and tidy the frontend.
+- Define service-level objectives from real measurements.
+- Cover more recovery cases: bad configuration, whole-cluster loss.
 
-## Remaining work
+## Later
 
-- Investigate unresolved transient latency and diagnostic-route network failures.
-- Define SLOs from representative measurements.
-- Extend configuration-error and whole-cluster recovery coverage.
-- Consider RKE2 and further security labs when local capacity permits.
-- Maintain source-only release notes and inventory; binaries/images and clean-machine bundle verification remain deferred.
+- Request comments.
+- Published images and a clean-machine install check.
+- RKE2 and further security exercises.
 
-## Contribution checks
+## How changes are made
 
-Changes require clear acceptance criteria, a focused implementation, relevant tests, updated documentation and review of security and operational effects. CI and `git diff --check` must pass. Issues track work, decision records explain design choices, and runbooks describe repeatable procedures.
+Each change has a clear goal, a focused diff, tests, and updated docs. Issues track work, [decision records](decisions/) explain design choices, and the docs in this folder describe how to run things. CI must pass before merging.

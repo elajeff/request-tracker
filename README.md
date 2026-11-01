@@ -1,88 +1,91 @@
 # Request Tracker
 
-Support request management application built with Java 21, Spring Boot, PostgreSQL, React and TypeScript.
+A small support-request tracker. Requesters file requests; support staff triage, assign and resolve them.
 
-## Features and architecture
+Built with Java 21, Spring Boot, PostgreSQL, React and TypeScript. It started as a way to learn how a real project is built and shipped, so it also includes the deployment side: Docker, Helm, Prometheus/Grafana and canary releases on a local Kubernetes cluster.
 
-- Create, search, edit, prioritize, assign and resolve support requests.
-- REQUESTER/SUPPORT sessions, CSRF protection and account-scoped access.
-- Active/inactive staff directory, assignment validation and persistent change history.
+## What it does
+
+- Create, edit, search and filter requests, with status (New, In progress, Resolved) and priority.
+- Two roles. Requesters see only their own requests. Support sees everything, manages the staff list and assigns work.
+- Every change is recorded in a per-request history.
 - Cursor pagination for requests, staff and history.
-- Compose/Helm deployment, Prometheus/Grafana monitoring and Argo canary delivery.
-- An isolated PreviewEnvironment controller for local Kubernetes labs.
+- Session login with CSRF protection.
 
-The backend is a modular monolith using JDBC and Flyway. A same-origin Vite/nginx dashboard proxies API calls to Spring Boot. React owns the complete dashboard through one application root, including authentication, the request queue, inline details/history and staff management. PostgreSQL stores application data and shared sessions.
+## Running it
 
-## Development
+You need Java 21, Node.js 24 and Docker. The Maven wrapper is included.
 
-Requirements: Java 21, Node.js 24, Docker with Compose, and internet access for initial dependency downloads. The repository includes the Maven wrapper.
+Start PostgreSQL and the backend:
 
-To run the packaged backend and PostgreSQL:
-
-```powershell
+```sh
 docker compose up --build -d --wait
 ```
 
-The API listens at `http://localhost:8080`; health is at `/actuator/health`. View logs with `docker compose logs -f app`. `docker compose down` preserves the database volume; adding `-v` deletes it.
+The API is at `http://localhost:8080`. To run the backend from source instead, start only the database and use `SESSION_COOKIE_SECURE=false` for plain HTTP:
 
-For host development, start PostgreSQL and Spring Boot:
-
-```powershell
+```sh
 docker compose up -d --wait postgres
-$env:SESSION_COOKIE_SECURE = "false" # Local HTTP only
-.\mvnw.cmd spring-boot:run
+SESSION_COOKIE_SECURE=false ./mvnw spring-boot:run
 ```
 
-Start the dashboard in another terminal:
+Then start the frontend:
 
-```powershell
-npm.cmd ci --prefix frontend
-npm.cmd run dev --prefix frontend
+```sh
+cd frontend
+npm ci
+npm run dev
 ```
 
-Open `http://127.0.0.1:5173`. Build the frontend with `npm.cmd run build --prefix frontend`.
+Open `http://127.0.0.1:5173`. There is no default login; [create an account](docs/authentication.md#creating-accounts) first.
 
-[Provision SUPPORT and REQUESTER accounts](docs/authentication.md#local-provisioning) before signing in; no default login is installed. Local database defaults are defined in `compose.yaml` and `application.properties`; override them outside development. API clients retain cookies, fetch `/api/session` before login, then fetch a new CSRF token after login for state-changing calls.
+On Windows PowerShell use `.\mvnw.cmd` and `$env:SESSION_COOKIE_SECURE = "false"`.
 
-## API and data
+## Tests
 
-| Resource | Operations |
-| --- | --- |
-| `/api/requests` | Create and list; search with `q`, filter with `staffId` or `unassigned` |
-| `/api/requests/{id}` | Retrieve and edit details |
-| `/api/requests/{id}/{status,priority,assignment}` | Update the selected field |
-| `/api/requests/{id}/history` | Read persistent changes |
-| `/api/staff` and `/api/staff/{id}` | List, create and rename staff; `/active` changes availability |
-| `/api/session` | Session/CSRF bootstrap; `/login` and `/logout` manage authentication |
-
-Queue/history pages contain `items` and `nextCursor`; `limit` defaults to 25 (range 1-100). Queue counts are account-scoped. Text, staff/unassigned and status filters apply to the complete visible queue before pagination. The optional `status` parameter accepts `NEW`, `IN_PROGRESS` or `RESOLVED`; invalid values return HTTP 400. Counts remain account-scoped and independent of the filters. New requests start at NEW and progress through IN_PROGRESS to RESOLVED. See [authentication](docs/authentication.md) for the permission matrix and [staff/history](docs/staff-management.md) for assignment rules and migration behavior.
-
-## Testing
-
-Run backend tests against a separate disposable PostgreSQL database configured through `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME` and `SPRING_DATASOURCE_PASSWORD`:
-
-```powershell
-.\mvnw.cmd --batch-mode --no-transfer-progress verify
+```sh
+./mvnw verify                 # backend; needs a disposable PostgreSQL, see below
+node e2e/run.mjs              # browser tests in a throwaway Docker stack
 python -m unittest discover -s delivery -p 'test_*.py'
 python -m unittest discover -s preview-controller -p 'test_*.py'
-node e2e/run.mjs
 ```
 
-The browser command builds an isolated backend/nginx/Chromium stack with memory-backed PostgreSQL. Eighteen UI journeys cover requests, staff, pagination, ownership, session loss, delayed responses, recoverable errors and server-side filtering. It uses synthetic credentials and records, has no retries and cleans up its own resources. Sanitized reports are written to `test-results/browser/`; authenticated traces are disabled. GitHub Actions runs backend, frontend, browser, container and chart checks.
+Backend tests read `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME` and `SPRING_DATASOURCE_PASSWORD`. Point them at a separate database, never your development one. GitHub Actions runs the backend, frontend, browser, container, Helm and Prometheus rule checks.
 
-## Deployment and documentation
+## Project layout
 
-- [kind deployment](docs/kind-deployment.md), [k3s lab](docs/runbooks/k3s.md) and [preview controller](preview-controller/README.md)
-- [Monitoring](docs/monitoring.md), [recovery](docs/runbooks/local-recovery.md) and [security](docs/runbooks/security-capstone.md)
-- [Canary delivery](docs/runbooks/delivery.md) and [authenticated canary procedure](docs/runbooks/v6-kind-progressive.md)
-- [React staff verification](docs/verification/react-deployment.md), [full dashboard deployment](docs/verification/react-dashboard-deployment.md), [canary verification](docs/verification/canary-release.md), [filtering backend deployment](docs/verification/filtering-backend-deployment.md), [project plan](docs/project-plan.md) and [release checklist](docs/release-checklist.md)
+| Path | Contents |
+| --- | --- |
+| `src/` | Spring Boot backend (modular monolith, plain JDBC, Flyway migrations) |
+| `frontend/` | React + Vite dashboard, served by nginx |
+| `e2e/` | Playwright browser tests |
+| `helm/` | Helm chart for Kubernetes |
+| `monitoring/` | Prometheus rules and Grafana dashboard |
+| `delivery/` | Argo CD / Argo Rollouts canary setup and its checks |
+| `preview-controller/` | A small Kubernetes controller for short-lived preview environments |
+| `docs/` | Guides and design decisions |
 
-Metrics at `/actuator/prometheus` require no login and belong on loopback or cluster-internal routes. External exposure requires access controls.
+## Deployment
+
+The same containers run on Docker Compose and on Kubernetes (kind and k3s). The Helm chart has a normal mode and a delivery mode where Argo Rollouts promotes a new backend in steps (25%, 50%, 100%). Prometheus checks the error rate and latency at each step, and a bad release is aborted and rolled back automatically.
+
+- [Kubernetes setup](docs/kubernetes.md)
+- [Canary delivery](docs/canary-delivery.md)
+- [Monitoring](docs/monitoring.md)
+- [Backup and recovery](docs/recovery.md)
+- [Preview controller](preview-controller/README.md)
+
+## More docs
+
+- [Authentication and permissions](docs/authentication.md)
+- [Staff and request history](docs/staff-management.md)
+- [Design decisions](docs/decisions/)
+- [Roadmap](docs/project-plan.md)
 
 ## Limitations
 
-This is a local-lab application with single-node storage, no production SLOs and no zero-downtime guarantee. The 300-second canary observation budget is empirical; transient backend latency and diagnostic-route failures remain unresolved. Database migration V6 provides authentication storage; project release versions are separate and listed in [GitHub Releases](https://github.com/elajeff/request-tracker/releases).
+This is a learning project, not a production service. It runs on a single node with one database, has no SLOs, and makes no zero-downtime claim. The `/actuator/prometheus` metrics endpoint needs no login, so keep it on localhost or inside the cluster. A few transient request timeouts seen during canary tests were never fully explained; they are listed in the [roadmap](docs/project-plan.md).
 
 ## License
 
-No license has been selected. The source is not licensed for reuse.
+No license has been chosen, so the code is not licensed for reuse.

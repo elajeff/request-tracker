@@ -1,90 +1,61 @@
-# Session authentication
+# Authentication and permissions
 
-Login accounts and support-staff directory records are separate. There is no public registration or default account. Usernames are immutable, case-sensitive, and contain 3–64 lowercase letters, digits, dots, underscores or hyphens. Passwords use Spring Security's delegating BCrypt encoder and must contain at least 12 characters and at most 72 UTF-8 bytes.
+Login accounts and staff records are separate things. A staff record is just a name that requests can be assigned to; it cannot log in. There is no sign-up page and no default account.
+
+Usernames are 3-64 lowercase letters, digits, dots, underscores or hyphens, and cannot be changed. Passwords are 12 characters or more (at most 72 bytes) and stored with BCrypt.
 
 ## Permissions
 
-| Operation | REQUESTER | SUPPORT |
+| Action | REQUESTER | SUPPORT |
 | --- | --- | --- |
-| Create request | Own account; MEDIUM priority | Own account; any priority |
-| Queue, counts, search, filters, request and history pages | Own requests only | All requests, including ownerless legacy records |
-| Edit title/description | Own requests while NEW | Any request |
-| Status, priority, staff assignment | Denied | Allowed |
-| Staff directory reads and changes | Denied | Allowed |
+| Create a request | Yes, always MEDIUM priority | Yes, any priority |
+| View requests, history and counts | Own requests only | All requests |
+| Edit title and description | Own requests, only while NEW | Any request |
+| Change status, priority or assignee | No | Yes |
+| View or change the staff list | No | Yes |
 
-Ownership comes from the authenticated account. Unknown JSON fields, including forged owner/role fields, are rejected. Queue counts cover the account's visible dataset, independently of search/filter selection. Foreign and missing request IDs both return 404. Requester filters can narrow their own requests but cannot enumerate the staff directory.
+Request owners come from the logged-in account, never from the request body. A request that belongs to someone else returns 404, the same as one that does not exist.
 
-New history events record the authenticated account ID and a username snapshot in the mutation transaction. Existing history keeps its original values and has no fabricated actor. Staff renames do not rewrite assignment history. History is not a tamper-proof audit log.
+## Creating accounts
 
-## Local provisioning
+Accounts are created from the command line, since there is no admin page yet. Build the jar and point it at your database with the usual `SPRING_DATASOURCE_*` variables:
 
-Build the application, then use its local command with the target database supplied through `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME` and `SPRING_DATASOURCE_PASSWORD`. Confirm the database before running an account operation. These commands do not start an HTTP server:
-
-```text
-java -jar target/request-tracker-0.0.1-SNAPSHOT.jar --accounts.action=create --accounts.username=local-support --accounts.role=SUPPORT
-java -jar target/request-tracker-0.0.1-SNAPSHOT.jar --accounts.action=create --accounts.username=local-requester --accounts.role=REQUESTER
-java -jar target/request-tracker-0.0.1-SNAPSHOT.jar --accounts.action=disable --accounts.username=local-requester
+```sh
+java -jar target/request-tracker-0.0.1-SNAPSHOT.jar --accounts.action=create --accounts.username=alice --accounts.role=SUPPORT
+java -jar target/request-tracker-0.0.1-SNAPSHOT.jar --accounts.action=disable --accounts.username=alice
 ```
 
-Create prompts for hidden password input in an interactive console. For automation, supply `REQUEST_TRACKER_ACCOUNT_PASSWORD` through a protected process environment and remove it afterward. Do not use password arguments, shell history, committed environment files, or log environment dumps. The command accepts no password argument. With Compose, `docker compose run --rm -it app` followed by the same `--accounts.*` options uses the configured Compose database and a hidden prompt.
+`create` asks for the password with hidden input. For scripts, set `REQUEST_TRACKER_ACCOUNT_PASSWORD` instead; never pass it as an argument. These commands do not start the web server. With Compose, run `docker compose run --rm -it app` followed by the same options.
 
-Disabling an account deletes its stored sessions. Each authenticated API call also checks the current enabled flag, including sessions created on another replica. Requests already executing when an account is disabled may finish. There is no password-reset, account-renaming, role-editing, or account-reactivation API.
+Disabling an account ends its sessions and rejects its next request. There is no password reset or role change yet.
 
-### Legacy ownership
+### Older requests
 
-V6 preserves existing requests, staff assignments and history. Existing requests have no owner and are SUPPORT-only. After independently confirming the intended owner, an operator can assign one ownerless request to an active REQUESTER:
+Requests created before accounts existed have no owner, so only SUPPORT can see them. To give one to a requester:
 
-```text
-java -jar target/request-tracker-0.0.1-SNAPSHOT.jar --accounts.action=claim-legacy --accounts.username=local-requester --accounts.request-id=REQUEST_UUID
+```sh
+java -jar target/request-tracker-0.0.1-SNAPSHOT.jar --accounts.action=claim-legacy --accounts.username=bob --accounts.request-id=<request uuid>
 ```
 
-This operation cannot replace existing ownership. It records an OWNER event containing the target username and ID, with no authenticated actor: the local operator must not be falsely identified as the target account. Staff names are never used to infer ownership.
+## Sessions and CSRF
 
-## Session and CSRF protocol
+1. `GET /api/session` returns the current user (or null) plus a CSRF token and its header name.
+2. `POST /api/session/login` takes a form-encoded `username` and `password` plus the CSRF header. Success is 204. Any wrong, unknown or disabled login gets the same 401.
+3. Fetch `/api/session` again after logging in, because login issues a new CSRF token.
+4. Send the CSRF header on every state-changing call, including `POST /api/session/logout`.
 
-- `GET /api/session` returns the current account or null, plus `csrfToken` and `csrfHeaderName`. It creates an anonymous session when necessary and has no application-data access.
-- `POST /api/session/login` accepts URL-encoded `username` and `password`, with the CSRF header. Success is 204; invalid, unknown and disabled accounts receive the same 401 message. Login rotates the session ID and CSRF token.
-- Fetch `/api/session` after login to obtain the new CSRF token. Send its header on every state-changing API call, including logout.
-- `POST /api/session/logout` invalidates the session and clears its cookie; success is 204.
-- Missing authentication returns 401; insufficient permissions or an invalid CSRF token returns 403. The dashboard clears private state on session loss and requires a fresh login. Failed writes are not automatically retried.
+401 means you are not signed in; 403 means you lack permission or the CSRF token is wrong.
 
-Sessions are stored in PostgreSQL through Spring Session JDBC, allowing backend replicas to share them. Idle timeout is 30 minutes. `RTSESSION` is HttpOnly, SameSite=Lax, path `/`, and Secure by default. Use HTTPS when Secure is enabled. Set `SESSION_COOKIE_SECURE=false` only for local HTTP; Compose and the disposable browser harness set it explicitly. Helm exposes `backend.sessionCookieSecure` (default true); local HTTP installations require an explicit false value. Vite and nginx keep browser API requests same-origin; no CORS exceptions or JWT storage are required.
+Sessions are stored in PostgreSQL, so several backend replicas share them, and expire after 30 minutes idle. The `RTSESSION` cookie is HttpOnly, SameSite=Lax and Secure. Set `SESSION_COOKIE_SECURE=false` only for local HTTP (Helm: `backend.sessionCookieSecure`).
 
-## Operational boundary
+## Endpoints without login
 
-Only these operational reads bypass login: `GET /actuator/health`, `GET /actuator/health/liveness`, `GET /actuator/health/readiness`, and `GET /actuator/prometheus` when exposed. Health omits component details; the root response may list the liveness/readiness group names. Other actuator paths and operational mutations are denied. The default Helm configuration exposes health only; delivery also exposes Prometheus.
+Only `/api/session`, `/api/session/login` and the health endpoints (`/actuator/health`, `/liveness`, `/readiness`) are open, plus `/actuator/prometheus` when it is exposed. Keep metrics on localhost or inside the cluster.
 
-Keep these endpoints on loopback port-forwards or cluster-internal Services and restrict them at any external proxy/network boundary. nginx also forwards `/actuator/`; the authentication layer does not make operational metadata safe for public exposure. Login/session routes expose no request or staff data. No application-data endpoint is anonymous.
+## Upgrading from the pre-login version
 
-The optional delivery generator requires `delivery.traffic.accountSecret`, referencing a separately provisioned SUPPORT login with Secret keys `username` and `password`, and a valid `delivery.traffic.requestId`. It authenticates using sessions, counts HTTP/network failures without retrying failed requests, and logs counts only. Analysis includes 4xx and 5xx errors and excludes session/actuator traffic. Do not enable it with an old anonymous client. The authenticated rollout results are linked below.
+Migration V6 adds the account, owner, history-actor and session tables and does not change existing data. Back up the database first. Upgrade the frontend and backend together, and remove every old backend from both routes: an old backend ignores the new permission rules, so it is not a safe canary or rollback target. Roll back only to a version that includes V6.
 
-## Migration and deployment
+## Not covered
 
-The [authentication cutover](runbooks/authentication-cutover.md) records the coordinated baseline/delivery transition for kind and k3s, including failures, final preservation checks and evidence limitations.
-
-V6 adds account, ownership, actor and session storage without changing V1–V5 or rewriting existing values. Back up the database before a deployment. Coordinate frontend/backend upgrades and remove all pre-authentication backends from both application routes before exposing the new release. An old V5 backend can still bypass the new authorization rules; it is not a safe security rollback or canary peer. Shared V6 session storage does not protect traffic handled by an old binary.
-
-Roll back only to an authentication-compatible image, preserving V6 tables. Restoring a pre-V6 backup loses subsequent changes and requires an explicit recovery decision. Local administrator access, database access and application images remain trusted. Internet-facing brute-force protection, password recovery, MFA and TLS termination are outside this local-lab milestone.
-
-## Verification
-
-Run `node e2e/run.mjs` for the disposable PostgreSQL/backend/nginx/Chromium environment. It provisions random test passwords through environment variables, verifies SUPPORT and REQUESTER journeys, and removes only its randomly named Compose project. PostgreSQL uses memory-backed storage. Backend integration tests also require a disposable PostgreSQL database configured through the datasource environment variables; never point them at a development or cluster database.
-
-Authenticated traces are disabled because they contain passwords and reusable session/CSRF material. Failures retain screenshots, JSON results, sanitized error contexts and stack logs. Test assertions remain active with zero retries. GitHub Actions uses the same browser command; local success does not establish a GitHub CI result.
-
-Deployment evidence is summarized in the [authentication cutover](runbooks/authentication-cutover.md), [React verification](verification/react-deployment.md) and [authenticated canary verification](verification/canary-release.md).
-
-### Manual deployed-authentication checklist
-
-Use uniquely named disposable accounts provisioned through the hidden-input procedure above: two REQUESTER accounts and one SUPPORT account. Keep existing records/accounts unchanged. Use separate browser profiles for each account, `127.0.0.1` for kind and `localhost` for k3s; cookies are shared across ports on the same host.
-
-1. Log in as requester A, create a uniquely labelled request, reload and confirm persistence. Invalid credentials receive a generic error. Log out; private state clears and protected API calls return 401.
-2. Log in as requester B. A's request is absent from queue/search/history; direct detail/history API lookups return 404. B cannot manage staff, assignments, status or priority.
-3. Log in as SUPPORT. Confirm access to A's request, update assignment/status/priority, and inspect meaningful history values and actor names.
-4. While a disposable account is logged in, disable only that account through the local CLI. Its next protected action must return 401, clear private dashboard state and require login without silently retrying the failed action.
-
-### Pre-React deployed smoke: 29 October 2026
-
-Twenty-four HTTP checks through the deployed k3s nginx route met their expected statuses: login/logout, requester ownership/history isolation, SUPPORT access, and disposable-account deactivation with existing-session invalidation and rejected login. One synthetic request/history event remains; its uniquely named REQUESTER account is disabled. Existing V6 records matched by stable ID and every field.
-
-The initial runner incorrectly reused the legacy-ownerless preservation helper and exited unsuccessfully. That failure is retained; a separate strict review verified original rows and explicitly accounted for the single request/history addition. No security defect was demonstrated. No migrations, restores, deployment or reconciliation changes were performed. Deployed browser login journeys were not completed (browser connection/CDP access failed); use the manual checklist above. This checkpoint predates the completed [deployed React verification](verification/react-deployment.md); its original failure remains recorded. V6 promotion/abort was outstanding at this checkpoint; see the canary verification summary.
+Brute-force protection, password recovery, MFA and TLS termination are out of scope for this project.

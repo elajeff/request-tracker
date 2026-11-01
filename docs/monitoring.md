@@ -1,12 +1,10 @@
-# Local monitoring
+# Monitoring
 
-Prometheus scrapes the backend every 15 seconds. Grafana provisions a Prometheus datasource and a Request Tracker dashboard with scrape availability, HTTP traffic, 5xx rate, mean response latency, JVM memory/threads, CPU utilization, and database connections. HTTP panels exclude Actuator traffic. Rates need at least two scrapes and application traffic; idle routes can have no latency data. Latency is a mean, not a percentile.
+An optional Docker Compose overlay adds Prometheus and Grafana. Prometheus scrapes the backend's `/actuator/prometheus` every 15 seconds. Grafana comes with a Request Tracker dashboard showing scrape availability, HTTP traffic, 5xx rate, mean response time, JVM memory and threads, CPU and database connections. Actuator traffic is left out of the HTTP panels. Latency is a mean, not a percentile, and rates need at least two scrapes and some traffic.
 
-## Start
+## Start it
 
-Create a Grafana admin password file once, from the repository root. Keep it out of Git (the `.env.*` pattern is ignored).
-
-Bash:
+Create a Grafana admin password file once. It is git-ignored (`.env.*`). Do not run this again over an existing file.
 
 ```sh
 mkdir -m 700 .env.monitoring
@@ -14,53 +12,32 @@ mkdir -m 700 .env.monitoring
 chmod 644 .env.monitoring/grafana-admin-password
 ```
 
-PowerShell:
-
-```powershell
-New-Item -ItemType Directory -Path .env.monitoring
-$bytes = New-Object byte[] 32
-$rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
-$rng.GetBytes($bytes)
-[System.IO.File]::WriteAllText((Join-Path $PWD '.env.monitoring/grafana-admin-password'), [BitConverter]::ToString($bytes).Replace('-', '').ToLowerInvariant())
-$rng.Dispose()
-```
-
-Do not rerun password generation over an existing file. On Linux the secret file must be readable by Grafana (UID 472); the private parent directory limits host access to your account. On Windows restrict the directory ACL to your account. If your checkout uses a restrictive umask, make the non-secret `monitoring/` directories traversable and their configuration files readable by the containers. Start the optional overlay:
+On Windows, create the folder and write a random hex string to `.env.monitoring/grafana-admin-password`, and restrict the folder to your user.
 
 ```sh
 docker compose -f compose.yaml -f compose.monitoring.yaml up -d --build --wait
 ```
 
-Open Grafana on `http://127.0.0.1:3000`, sign in as `admin` with the password from the local file, and select **Dashboards → Request Tracker → Request Tracker**. Prometheus is on `http://127.0.0.1:9090`. Both ports bind to localhost; Prometheus has no authentication. These services are for local development only. Grafana retains its initial admin password in its database; changing the file after first startup does not rotate it. Use Grafana's password-change interface for rotation.
+- Grafana: `http://127.0.0.1:3000`, user `admin`, password from the file. Open **Dashboards > Request Tracker**.
+- Prometheus: `http://127.0.0.1:9090` (no login). Check that `up{job="request-tracker"}` is 1.
 
-Use the dashboard to inspect requests made from the application dashboard or API. In Prometheus, query `up{job="request-tracker"}` (expected: `1`) and `http_server_requests_seconds_count{job="request-tracker"}`. The **Targets** page shows scrape errors. Check container logs if the datasource or target is unavailable:
+Both ports are bound to localhost only; this setup is for local development. Grafana keeps its first admin password in its database, so changing the file later does not change it. Use Grafana's own password page.
 
-```sh
-docker compose -f compose.yaml -f compose.monitoring.yaml logs prometheus grafana app
-```
-
-Metrics are stored in a named volume with seven-day retention. Grafana settings also persist in a named volume. To stop only monitoring:
-
-```sh
-docker compose -f compose.yaml -f compose.monitoring.yaml stop prometheus grafana
-```
-
-Do not use `down -v` to stop monitoring: it also deletes the application's database volume. The ordinary `compose.yaml` remains usable without the monitoring overlay or password file.
+Metrics are kept for seven days in a named volume. To stop monitoring without touching the app, run `docker compose -f compose.yaml -f compose.monitoring.yaml stop prometheus grafana`. Do not use `down -v`; it also deletes the app's database.
 
 ## Alerts
 
-Prometheus evaluates three alerts, visible on its **Alerts** page:
-
-| Alert | Condition | Hold time |
+| Alert | Fires when | For |
 | --- | --- | --- |
-| RequestTrackerUnavailable | Metrics target is down or missing | 1 minute |
-| RequestTrackerHighErrorRate | More than 5% of application requests return 5xx | 5 minutes |
-| RequestTrackerSlowResponses | Mean application response time exceeds 1 second | 5 minutes |
+| RequestTrackerUnavailable | The metrics target is down or missing | 1 min |
+| RequestTrackerHighErrorRate | More than 5% of requests return 5xx | 5 min |
+| RequestTrackerSlowResponses | Mean response time is over 1 second | 5 min |
 
-Traffic alerts exclude Actuator requests and require at least 0.1 requests per second over five minutes. This avoids alerts caused by isolated requests in an idle development environment. An unavailable metrics endpoint does not distinguish an application outage from a scrape failure. Check the target error and application logs before diagnosing the cause.
+The two traffic alerts need at least 0.1 requests per second over five minutes, so a single stray request on an idle dev machine does not trigger them. No notifications are configured; the alerts only show on Prometheus's Alerts page. The thresholds are development defaults. An unavailable target could be a dead app or a failed scrape, so check the target error and the app logs.
 
-These alerts are local diagnostics; no notification receiver is configured. Thresholds are development defaults, not service-level objectives. Test the rules with the same command used in CI:
+CI tests the rules with promtool. To run the same check locally:
 
 ```sh
-docker run --rm --entrypoint /bin/promtool -v "$PWD/monitoring/prometheus:/etc/prometheus:ro" -w /etc/prometheus prom/prometheus:v3.10.0 test rules alerts.test.yml
+docker run --rm --entrypoint /bin/promtool -v "$PWD/monitoring/prometheus:/etc/prometheus:ro" \
+    -w /etc/prometheus prom/prometheus:v3.10.0 test rules alerts.test.yml
 ```

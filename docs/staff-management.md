@@ -1,17 +1,36 @@
-# Staff management and history
+# Staff and request history
 
-Open **Manage support staff** beside the queue to create, rename, deactivate, or reactivate directory records. Names are 1–120 characters; duplicate names are allowed and IDs distinguish records. These are not authenticated users. Use **Load more staff** for additional directory records and selector options. **Search staff** sends an optional `q` parameter to `GET /api/staff`. The backend matches names case-insensitively using a literal substring, after trimming surrounding whitespace; omitted, empty or whitespace-only queries list all staff. Percent, underscore and backslash characters are literal; the query does not use SQL wildcard or escape syntax. Both active and inactive staff can match. Each request returns at most the selected page size; searching does not fetch the remaining pages automatically.
+## Staff
 
-Search uses a 250 ms debounce, resets the cursor when text changes and cancels or ignores stale responses. Clearing it returns to the first unfiltered page. The dashboard owns shared staff options and assignment state. Its React staff-management component reports loaded pages and saved records to update queue filters and assignment options. Previously loaded assignment identities remain available even when absent from the current search page. Session loss unmounts the directory and clears its drafts. Loading, empty, validation and error states are explicit; failed writes require a manual retry.
+Support users manage a staff list: people that requests can be assigned to. Staff are not login accounts.
 
-Choose active staff or **Unassigned** on a request. Deactivation preserves existing assignments but blocks new ones; reassignment and unassignment remain available. The staff filter includes inactive records and combines with search and pagination. Totals remain global. Expand **Change history** to load older changes or refresh.
+- Create, rename, deactivate and reactivate staff from the dashboard. There is no delete.
+- Names are 1-120 characters. Duplicates are allowed; the ID tells them apart.
+- Deactivating someone keeps their existing assignments but blocks new ones. Reassigning or unassigning still works.
+- The staff search is a case-insensitive substring match on the name. `%`, `_` and `\` are matched literally.
 
-Staff API: `POST /api/staff` and `PUT /api/staff/{id}` accept `{"name":"Alex Support"}`; `PATCH /api/staff/{id}/active` accepts `{"active":false}` (or true). `GET /api/staff` uses `limit`/`cursor` pagination, ordered by UUID. There is no delete endpoint. Assignment now accepts `{"staffId":"UUID"}` or `{"unassign":true}` instead of a free-text name. Queue filters use `staffId=UUID` or `unassigned=true`, not both.
+API:
 
-Migration V5 copies every non-null legacy assignment exactly into a separate inactive staff record, linked to its request. Even equal names are not merged; review and reactivate, rename, or reassign them. Blank legacy names must be renamed before activation. The old text column is replaced only after copying its values; history rows are untouched. New assignment history captures name and staff ID at change time, in the same transaction. Renaming staff updates the current display without rewriting historical values. No-op/rejected updates add no history. History starts at V3. V6 adds authenticated actor snapshots for new API changes; older changes remain unattributed. It is not a tamper-proof audit log.
+| Call | Body |
+| --- | --- |
+| `POST /api/staff` | `{"name": "Alex"}` |
+| `PUT /api/staff/{id}` | `{"name": "Alex"}` |
+| `PATCH /api/staff/{id}/active` | `{"active": false}` |
+| `GET /api/staff?q=&limit=&cursor=` | |
+| `PATCH /api/requests/{id}/assignment` | `{"staffId": "<uuid>"}` or `{"unassign": true}` |
 
-V5 requires the matching backend and dashboard; the previous free-text-assignment backend cannot run against the new schema.
+Filter the request queue with `staffId=<uuid>` or `unassigned=true`, not both.
 
-## Cursor behavior
+## History
 
-Request filters are applied in SQL before the existing descending `(created_at, id)` queue cursor. Staff names are filtered before the existing ascending UUID cursor. Change a filter by starting again without a cursor; subsequent pages must use the same filters. Cursors retain their existing formats and do not freeze later edits. New staff UUIDs after the boundary can appear on later pages; UUIDs before it appear on a fresh search. Queue arrivals newer than its boundary appear after refresh.
+Every change to a request (created, title, description, status, priority, assignee) adds a history entry in the same transaction as the change. The entry stores the old and new value and, since V6, who made the change. Entries from before V6 have no actor. Renaming a staff member does not rewrite old entries. This is a convenience log, not a tamper-proof audit trail.
+
+Open **Change history** on a request to read it, newest first.
+
+## Pagination
+
+Requests, staff and history use cursors. Requests are ordered newest first and staff by ID. Pass `nextCursor` from one page as `cursor` in the next call. When you change a filter or search text, start again without a cursor.
+
+## Migrations
+
+V5 replaced the free-text assignee with the staff table. Every old assignee became its own inactive staff record, linked to its request, so nothing was merged by guesswork. A blank legacy name has to be renamed before it can be reactivated.
