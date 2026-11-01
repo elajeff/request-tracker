@@ -3,10 +3,8 @@
 .env.*
 !.env.example
 
-# Java / Maven / Gradle
+# Maven
 target/
-build/
-.gradle/
 
 # Frontend dependencies and build output
 node_modules/
@@ -20,8 +18,6 @@ dist/
 .DS_Store
 Thumbs.db
 
-# Local Kubernetes state and test artifacts
-.terraform/
-coverage/
+# Test results and Python caches
 test-results/
 __pycache__/
