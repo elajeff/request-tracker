@@ -74,3 +74,8 @@ test('the public route does not expose actuator endpoints', async ({ request }) 
     expect((await request.get(path)).status(), path).toBe(404);
   }
 });
+
+test('nginx passes the request ID through to the backend', async ({ request }) => {
+  const response = await request.get('/api/session', { headers: { 'X-Request-ID': 'e2e-trace-1' } });
+  expect(response.headers()['x-request-id']).toBe('e2e-trace-1');
+});
