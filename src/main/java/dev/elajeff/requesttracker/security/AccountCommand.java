@@ -26,7 +26,8 @@ public class AccountCommand implements ApplicationRunner {
             String username = option(args, "accounts.username");
             switch (option(args, "accounts.action")) {
                 case "create" -> create(username, option(args, "accounts.role"));
-                case "disable" -> administration.disable(username);
+                case "disable" -> administration.setEnabled(username, false);
+                case "enable" -> administration.setEnabled(username, true);
                 case "claim-legacy" -> administration.claimLegacy(username, UUID.fromString(option(args, "accounts.request-id")));
                 default -> throw new IllegalArgumentException("Unknown account action");
             }

@@ -50,7 +50,7 @@ public class SecurityConfiguration {
                         "/actuator/health", "/actuator/health/liveness", "/actuator/health/readiness",
                         "/actuator/prometheus", "/api/session").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/session/login").permitAll()
-                .requestMatchers("/api/staff/**").hasRole("SUPPORT")
+                .requestMatchers("/api/staff/**", "/api/accounts/**").hasRole("SUPPORT")
                 .requestMatchers(HttpMethod.PATCH, "/api/requests/**").hasRole("SUPPORT")
                 .requestMatchers("/api/requests/**", "/api/session/logout").authenticated()
                 .anyRequest().denyAll())
