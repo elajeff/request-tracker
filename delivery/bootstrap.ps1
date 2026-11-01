@@ -27,4 +27,4 @@ kubectl @kubectlArgs -n argocd set resources deployment/argocd-repo-server --req
 if ($LASTEXITCODE -ne 0) { throw 'Repository server sizing failed' }
 kubectl @kubectlArgs -n argo-rollouts set resources deployment/argo-rollouts --requests=cpu=50m,memory=128Mi --limits=cpu=500m,memory=256Mi
 if ($LASTEXITCODE -ne 0) { throw 'Controller sizing failed' }
-# Apply application.yaml only after the reviewed desired-state branch is published.
+# Apply application.yaml once the image tag you want to deploy is pushed.

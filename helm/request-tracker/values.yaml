@@ -51,5 +51,5 @@ delivery:
   replicas: 4
   traffic:
     enabled: false
+    # Secret with the username and password of a SUPPORT account.
     accountSecret: ""
-    requestId: "54f35b91-dbfc-4b95-9570-da8c80dd5dea"

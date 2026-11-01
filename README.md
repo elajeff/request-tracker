@@ -46,7 +46,6 @@ On Windows PowerShell use `.\mvnw.cmd` and `$env:SESSION_COOKIE_SECURE = "false"
 ```sh
 ./mvnw verify                 # backend; needs a disposable PostgreSQL, see below
 node e2e/run.mjs              # browser tests in a throwaway Docker stack
-python -m unittest discover -s delivery -p 'test_*.py'
 python -m unittest discover -s preview-controller -p 'test_*.py'
 ```
 
