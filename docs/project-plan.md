@@ -14,13 +14,14 @@ The goal is a small, well-built support-request app, plus the testing, deploymen
 - A full canary rerun with the 2-core CPU limit and request-timing logs: healthy release promoted in under 3 minutes, broken release aborted in about 50 seconds, no startup timeouts.
 - Service-level objectives for availability, latency and startup, based on the measurements from the canary rerun.
 - A bad-configuration recovery test on the normal install and through the canary: the old pods kept serving, `helm rollback` took a second and the canary aborted at its 300-second deadline.
+- A whole-cluster loss test, simulated on a second kind cluster: the backup restored in 8 seconds and every row matched.
 - An accounts page for support users: create, disable and enable accounts, change roles and reset passwords, without the command line.
 - Backend and frontend cleanup: errors that carry their message, one layer of role checks, the request queue and staff list loaded through small hooks, ESLint in CI, plainer dashboard text.
 - Two source releases: [v0.1.0](https://github.com/elajeff/request-tracker/releases/tag/v0.1.0) and [v0.2.0](https://github.com/elajeff/request-tracker/releases/tag/v0.2.0). The database migration number (V6) is separate from the release version.
 
 ## Next
 
-- Cover whole-cluster loss: restore a backup into a new cluster and check the data.
+- Release v0.3.0 with the accounts page and the recovery tests.
 
 ## Later
 
