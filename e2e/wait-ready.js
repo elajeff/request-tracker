@@ -6,7 +6,8 @@ export default async function waitForStack(config) {
   try {
     await expect.poll(async () => {
       try {
-        const health = await api.get('/actuator/health/readiness', { timeout: 5000 });
+        // nginx does not proxy /actuator, so check the backend directly.
+        const health = await api.get('http://request-tracker:8080/actuator/health/readiness', { timeout: 5000 });
         if (!health.ok()) return `Readiness HTTP ${health.status()}`;
         if ((await health.json()).status !== 'UP') return 'Readiness is not UP';
         const home = await api.get('/');

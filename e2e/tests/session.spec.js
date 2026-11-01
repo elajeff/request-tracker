@@ -68,3 +68,9 @@ test('invalidated server session clears private content and permits a fresh logi
   await loginUi(page);
   await expect(page.getByText('Manage support staff', { exact: true })).toBeVisible();
 });
+
+test('the public route does not expose actuator endpoints', async ({ request }) => {
+  for (const path of ['/actuator/health', '/actuator/prometheus']) {
+    expect((await request.get(path)).status(), path).toBe(404);
+  }
+});
