@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import type { Api, SupportStaff } from "./types";
 import { errorMessage } from "./useSession";
 import { uniqueById, useRequestQueue } from "./useRequestQueue";
@@ -33,6 +33,11 @@ export function Dashboard({
   const knownStaff = useMemo(
     () => uniqueById([...queue.assignees, ...directory]),
     [queue.assignees, directory],
+  );
+  const receiveStaff = useCallback(
+    (people: SupportStaff[]) =>
+      setDirectory((previous) => uniqueById([...previous, ...people])),
+    [],
   );
   const filtered = Boolean(query || staffFilter || statusFilter);
   const message = queue.error || notice;
@@ -227,9 +232,7 @@ export function Dashboard({
             <div id="staff-management-root">
               <StaffManagement
                 api={api}
-                onPage={(people) =>
-                  setDirectory((previous) => uniqueById([...previous, ...people]))
-                }
+                onPage={receiveStaff}
                 onSaved={(person) => {
                   setDirectory((previous) => uniqueById([...previous, person]))
                   queue.staffChanged(person);
