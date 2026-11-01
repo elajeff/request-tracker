@@ -31,6 +31,7 @@ export function App() {
           onConnection={setConnected}
           support={auth.session.user.role === "SUPPORT"}
           username={auth.session.user.username}
+          onSessionEnded={() => void auth.refresh()}
           logout={async () => {
             await auth.api<void>("/api/session/logout", { method: "POST" });
             auth.clear("Signed out.");

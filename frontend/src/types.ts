@@ -44,8 +44,15 @@ export interface SupportStaff {
   active: boolean;
 }
 export type Api = <T>(path: string, options?: RequestInit) => Promise<T>;
+export type Role = "REQUESTER" | "SUPPORT";
+export interface Account {
+  id: string;
+  username: string;
+  role: Role;
+  enabled: boolean;
+}
 export interface SessionView {
-  user: { id: string; username: string; role: "REQUESTER" | "SUPPORT" } | null;
+  user: { id: string; username: string; role: Role } | null;
   csrfToken: string;
   csrfHeaderName: string;
 }
