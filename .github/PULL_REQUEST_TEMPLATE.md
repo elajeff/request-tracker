@@ -2,22 +2,18 @@
 
 <!-- What does this change do, and why? -->
 
-## Related issue
-
 Closes #
 
 ## Changes
 
-- Describe the change
+-
 
-## Verification
+## Testing
 
-- [ ] Tests/checks run (list commands and results below).
-- [ ] Relevant documentation updated.
-- [ ] No credentials, local config, or generated build artifacts included.
+<!-- What you ran or checked by hand. CI results show on the PR. -->
 
-Commands and results:
+-
 
 ## Risk and rollback
 
-<!-- What could break? How would this change be reverted or recovered? -->
+<!-- What could break, and how to undo it. -->
