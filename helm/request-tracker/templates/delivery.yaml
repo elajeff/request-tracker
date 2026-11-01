@@ -148,7 +148,7 @@ data:
       root /usr/share/nginx/html;
       location / { try_files $uri $uri/ /index.html; }
       location /api/ { proxy_pass http://request-tracker-delivery:8080; }
-      location /actuator/ { proxy_pass http://request-tracker-delivery:8080; }
+      location /actuator { return 404; }
     }
 ---
 apiVersion: apps/v1
