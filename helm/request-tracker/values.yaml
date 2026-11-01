@@ -11,7 +11,8 @@ backend:
       cpu: 100m
       memory: 256Mi
     limits:
-      cpu: 500m
+      # A JVM throttled to half a core takes ~13 s to start and serves its first requests slowly.
+      cpu: "2"
       memory: 512Mi
 
 frontend:
