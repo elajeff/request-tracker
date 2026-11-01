@@ -15,7 +15,7 @@ The goal is a small, well-built support-request app, plus the testing, deploymen
 
 ## Next
 
-- Look into the occasional request timeouts and failures seen during canary tests.
+- Rerun a full canary with the higher CPU limit and request-timing logs on, to confirm the startup timeouts are gone.
 - Add an admin page for accounts (create, disable, reset password, change role) so the command line is no longer needed.
 - Simplify the backend: one global error handler, one layer of role checks, less defensive code.
 - Split up the dashboard component and tidy the frontend.

@@ -84,7 +84,7 @@ The same containers run on Docker Compose and on Kubernetes (kind and k3s). The 
 
 ## Limitations
 
-This is a learning project, not a production service. It runs on a single node with one database, has no SLOs, and makes no zero-downtime claim. The `/actuator/prometheus` metrics endpoint needs no login, so keep it on localhost or inside the cluster. A few transient request timeouts seen during canary tests were never fully explained; they are listed in the [roadmap](docs/project-plan.md).
+This is a learning project, not a production service. It runs on a single node with one database, has no SLOs, and makes no zero-downtime claim. The `/actuator/prometheus` metrics endpoint needs no login, so keep it on localhost or inside the cluster. Slow requests right after a backend pod starts were traced to a tight CPU limit; see [canary delivery](docs/canary-delivery.md#known-limits).
 
 ## License
 
