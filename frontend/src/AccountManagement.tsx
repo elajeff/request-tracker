@@ -35,7 +35,8 @@ export function AccountManagement({ api, username, onOwnSessionEnded }: Props) {
   const [newUsername, setNewUsername] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [newRole, setNewRole] = useState<Role>("REQUESTER");
-  const [loading, setLoading] = useState(false);
+  // The first page loads on mount, so start in the loading state rather than showing "0 shown".
+  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");

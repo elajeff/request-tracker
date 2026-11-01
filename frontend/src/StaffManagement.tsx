@@ -25,7 +25,8 @@ export function StaffManagement({ api, onPage, onSaved }: Props) {
   const [query, setQuery] = useState("");
   const [loadedQuery, setLoadedQuery] = useState<string | null>(null);
   const [name, setName] = useState("");
-  const [loading, setLoading] = useState(false);
+  // The first page loads on mount, so start in the loading state rather than showing "0 shown".
+  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
