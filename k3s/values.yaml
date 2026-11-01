@@ -1,13 +1,4 @@
 backend:
   sessionCookieSecure: false
-  image:
-    repository: request-tracker
-    tag: auth-08e4a87-20261029041407
-frontend:
-  image:
-    repository: request-tracker-frontend
-    tag: auth-08e4a87-20261029041407
 postgresql:
   existingSecret: request-tracker-k3s-db
-  persistence:
-    storageClassName: local-path

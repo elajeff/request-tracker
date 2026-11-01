@@ -58,7 +58,7 @@ helm upgrade --install request-tracker helm/request-tracker \
     -n request-tracker -f k3s/values.yaml --wait
 ```
 
-Build and import the image tags listed in `k3s/values.yaml` first, and create fresh database credentials in this cluster; do not copy the kind ones. Check that you have enough memory and disk before running both clusters at once.
+Before installing, import the same `local` images you built for kind with `k3d image import request-tracker:local request-tracker-frontend:local -c request-tracker-k3s`, and create a `request-tracker-k3s-db` Secret with fresh database credentials; do not copy the kind ones. Check that you have enough memory and disk before running both clusters at once.
 
 ## Delivery mode
 
