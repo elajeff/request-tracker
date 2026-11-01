@@ -8,9 +8,11 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.factory.PasswordEncoderFactories;
@@ -21,7 +23,6 @@ import org.springframework.session.web.http.DefaultCookieSerializer;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 @Configuration
-@EnableMethodSecurity
 public class SecurityConfiguration {
     @Bean
     PasswordEncoder passwordEncoder() {
@@ -40,16 +41,17 @@ public class SecurityConfiguration {
     }
 
     @Bean
-    @org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication
+    @ConditionalOnWebApplication
     SecurityFilterChain securityFilterChain(HttpSecurity http, AccountRepository accounts) throws Exception {
+        // All role checks live here; services only apply ownership and business rules.
         http.authorizeHttpRequests(authorize -> authorize
                 .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
-                .requestMatchers(org.springframework.http.HttpMethod.GET,
+                .requestMatchers(HttpMethod.GET,
                         "/actuator/health", "/actuator/health/liveness", "/actuator/health/readiness",
                         "/actuator/prometheus", "/api/session").permitAll()
-                .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/session/login").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/session/login").permitAll()
                 .requestMatchers("/api/staff/**").hasRole("SUPPORT")
-                .requestMatchers(org.springframework.http.HttpMethod.PATCH, "/api/requests/**").hasRole("SUPPORT")
+                .requestMatchers(HttpMethod.PATCH, "/api/requests/**").hasRole("SUPPORT")
                 .requestMatchers("/api/requests/**", "/api/session/logout").authenticated()
                 .anyRequest().denyAll())
                 .formLogin(form -> form.loginPage("/").loginProcessingUrl("/api/session/login")
@@ -65,10 +67,12 @@ public class SecurityConfiguration {
         return http.build();
     }
 
-    private static void jsonError(HttpServletResponse response, int status, String message) throws IOException {
+    // Same shape as Spring's problem details, so clients read every error the same way.
+    private static void jsonError(HttpServletResponse response, int status, String detail) throws IOException {
         response.setStatus(status);
-        response.setContentType("application/json");
-        response.getWriter().write("{\"message\":\"" + message + "\"}");
+        response.setContentType("application/problem+json");
+        response.getWriter().write("{\"status\":%d,\"title\":\"%s\",\"detail\":\"%s\"}"
+                .formatted(status, HttpStatus.valueOf(status).getReasonPhrase(), detail));
     }
 
     // Check the database on each API call so disabling an account invalidates sessions across replicas.

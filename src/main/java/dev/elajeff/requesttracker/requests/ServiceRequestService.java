@@ -1,10 +1,6 @@
 package dev.elajeff.requesttracker.requests;
 
 import java.util.List;
-import java.nio.charset.StandardCharsets;
-import java.time.Instant;
-import java.time.DateTimeException;
-import java.util.Base64;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -12,9 +8,10 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
-import dev.elajeff.requesttracker.staff.StaffService;
+
+import dev.elajeff.requesttracker.security.Account;
 import dev.elajeff.requesttracker.security.CurrentAccount;
-import org.springframework.security.access.prepost.PreAuthorize;
+import dev.elajeff.requesttracker.staff.StaffService;
 import dev.elajeff.requesttracker.staff.SupportStaff;
 
 @Service
@@ -31,17 +28,14 @@ public class ServiceRequestService {
     }
 
     @Transactional
-    public ServiceRequest create(
-            String title, String description, ServiceRequestPriority priority) {
-        ServiceRequestPriority selectedPriority =
-                priority == null ? ServiceRequestPriority.MEDIUM : priority;
-
-        var account = currentAccount.required();
+    public ServiceRequest create(String title, String description, ServiceRequestPriority priority) {
+        ServiceRequestPriority selectedPriority = priority == null ? ServiceRequestPriority.MEDIUM : priority;
+        Account account = currentAccount.required();
         if (!account.support() && selectedPriority != ServiceRequestPriority.MEDIUM) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only support may set priority");
         }
         ServiceRequest created = repository.create(title.strip(), description.strip(), selectedPriority, account.id());
-        recordChange(created.id(), "CREATED", null, created.title());
+        recordChange(account, created.id(), "CREATED", null, created.title());
         return created;
     }
 
@@ -50,138 +44,88 @@ public class ServiceRequestService {
         if (staffId != null && unassigned) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Choose staffId or unassigned, not both");
         }
-        Instant beforeCreatedAt = null;
-        UUID beforeId = null;
-        if (cursor != null) {
-            try {
-                if (cursor.length() > 256) throw new IllegalArgumentException();
-                String[] parts = new String(Base64.getUrlDecoder().decode(cursor), StandardCharsets.UTF_8).split(",", -1);
-                if (parts.length != 2) throw new IllegalArgumentException();
-                beforeCreatedAt = Instant.parse(parts[0]);
-                if (beforeCreatedAt.isBefore(Instant.parse("0001-01-01T00:00:00Z"))
-                        || beforeCreatedAt.isAfter(Instant.parse("9999-12-31T23:59:59Z"))) {
-                    throw new IllegalArgumentException();
-                }
-                beforeId = UUID.fromString(parts[1]);
-                if (!beforeId.toString().equals(parts[1])) throw new IllegalArgumentException();
-            } catch (IllegalArgumentException | DateTimeException error) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid queue cursor");
-            }
-        }
-        List<ServiceRequest> rows = repository.findPage(query.strip(), staffId, unassigned, status, beforeCreatedAt, beforeId, limit + 1, ownerScope());
-        boolean hasMore = rows.size() > limit;
+        QueueCursor after = cursor == null ? null : QueueCursor.decode(cursor);
+        UUID owner = ownerScope(currentAccount.required());
+        List<ServiceRequest> rows = repository.findPage(query.strip(), staffId, unassigned, status, after, limit + 1, owner);
         List<ServiceRequest> items = List.copyOf(rows.subList(0, Math.min(limit, rows.size())));
-        String nextCursor = null;
-        if (hasMore) {
-            ServiceRequest last = items.getLast();
-            nextCursor = Base64.getUrlEncoder().withoutPadding().encodeToString(
-                    (last.createdAt() + "," + last.id()).getBytes(StandardCharsets.UTF_8));
-        }
-        return new RequestQueuePage(items, nextCursor, repository.counts(ownerScope()));
+        String nextCursor = rows.size() > limit ? QueueCursor.after(items.getLast()).encode() : null;
+        return new RequestQueuePage(items, nextCursor, repository.counts(owner));
     }
 
     public ServiceRequest findById(UUID id) {
-        return repository.findById(id, ownerScope())
-                .orElseThrow(() -> new ServiceRequestNotFoundException(id));
+        return findVisible(currentAccount.required(), id);
     }
 
     @Transactional
     public ServiceRequest updateDetails(UUID id, String title, String description) {
-        ServiceRequest current = findForUpdate(id);
-        if (!currentAccount.required().support() && current.status() != ServiceRequestStatus.NEW) {
+        Account account = currentAccount.required();
+        ServiceRequest current = findForUpdate(account, id);
+        if (!account.support() && current.status() != ServiceRequestStatus.NEW) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Requesters may edit details only while a request is NEW");
         }
-        String updatedTitle = title.strip();
-        String updatedDescription = description.strip();
-
-        if (current.title().equals(updatedTitle)
-                && current.description().equals(updatedDescription)) {
+        String newTitle = title.strip();
+        String newDescription = description.strip();
+        if (current.title().equals(newTitle) && current.description().equals(newDescription)) {
             return current;
         }
-
-        if (!repository.updateDetails(id, updatedTitle, updatedDescription)) {
-            throw new ServiceRequestNotFoundException(id);
-        }
-
-        recordChange(id, "TITLE", current.title(), updatedTitle);
-        recordChange(id, "DESCRIPTION", current.description(), updatedDescription);
-        return new ServiceRequest(
-                current.id(), updatedTitle, updatedDescription,
-                current.status(), current.priority(), current.createdAt(), current.assignee(), current.assigneeId(), current.assigneeActive());
+        repository.updateDetails(id, newTitle, newDescription);
+        recordChange(account, id, "TITLE", current.title(), newTitle);
+        recordChange(account, id, "DESCRIPTION", current.description(), newDescription);
+        return findVisible(account, id);
     }
 
     @Transactional
-    @PreAuthorize("hasRole('SUPPORT')")
     public ServiceRequest updateStatus(UUID id, ServiceRequestStatus status) {
-        ServiceRequest current = findForUpdate(id);
-
+        Account account = currentAccount.required();
+        ServiceRequest current = findForUpdate(account, id);
         if (current.status() == status) {
             return current;
         }
-
         boolean allowed = switch (current.status()) {
             case NEW -> status == ServiceRequestStatus.IN_PROGRESS;
             case IN_PROGRESS -> status == ServiceRequestStatus.RESOLVED;
             case RESOLVED -> false;
         };
-
         if (!allowed) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "Cannot change status from " + current.status() + " to " + status);
         }
-
-        if (!repository.updateStatus(id, current.status(), status)) {
-            throw new ResponseStatusException(
-                    HttpStatus.CONFLICT, "Request status changed. Refresh and try again.");
-        }
-
-        recordChange(id, "STATUS", current.status().name(), status.name());
-        return new ServiceRequest(
-                current.id(), current.title(), current.description(),
-                status, current.priority(), current.createdAt(), current.assignee(), current.assigneeId(), current.assigneeActive());
+        repository.updateStatus(id, status);
+        recordChange(account, id, "STATUS", current.status().name(), status.name());
+        return findVisible(account, id);
     }
 
     @Transactional
-    @PreAuthorize("hasRole('SUPPORT')")
     public ServiceRequest updatePriority(UUID id, ServiceRequestPriority priority) {
-        ServiceRequest current = findForUpdate(id);
-
+        Account account = currentAccount.required();
+        ServiceRequest current = findForUpdate(account, id);
         if (current.priority() == priority) {
             return current;
         }
-
-        if (!repository.updatePriority(id, priority)) {
-            throw new ServiceRequestNotFoundException(id);
-        }
-
-        recordChange(id, "PRIORITY", current.priority().name(), priority.name());
-        return new ServiceRequest(
-                current.id(), current.title(), current.description(),
-                current.status(), priority, current.createdAt(), current.assignee(), current.assigneeId(), current.assigneeActive());
+        repository.updatePriority(id, priority);
+        recordChange(account, id, "PRIORITY", current.priority().name(), priority.name());
+        return findVisible(account, id);
     }
 
     @Transactional
-    @PreAuthorize("hasRole('SUPPORT')")
     public ServiceRequest updateAssignment(UUID id, UUID staffId) {
-        ServiceRequest current = findForUpdate(id);
-        if (Objects.equals(current.assigneeId(), staffId)) return current;
+        Account account = currentAccount.required();
+        ServiceRequest current = findForUpdate(account, id);
+        if (Objects.equals(current.assigneeId(), staffId)) {
+            return current;
+        }
         SupportStaff selected = null;
         if (staffId != null) {
-            // Serialize assignment with deactivation/renaming of its target staff record.
+            // Lock the staff row so it cannot be deactivated or renamed while being assigned.
             selected = staffService.requireForUpdate(staffId);
             if (!selected.active()) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cannot assign inactive staff");
             }
         }
         repository.updateAssignment(id, staffId);
-        recordChange(id, "ASSIGNEE", assignmentLabel(current.assignee(), current.assigneeId()),
+        recordChange(account, id, "ASSIGNEE", assignmentLabel(current.assignee(), current.assigneeId()),
                 selected == null ? null : assignmentLabel(selected.name(), selected.id()));
-        return findById(id);
-    }
-
-    private static String assignmentLabel(String name, UUID id) {
-        return id == null ? null : name + " [" + id + "]";
+        return findVisible(account, id);
     }
 
     public RequestHistoryPage findHistory(UUID id, String cursor, int limit) {
@@ -197,9 +141,12 @@ public class ServiceRequestService {
         }
         findById(id);
         List<RequestHistoryEntry> rows = repository.findHistory(id, beforeId, limit + 1);
-        boolean hasMore = rows.size() > limit;
         List<RequestHistoryEntry> items = List.copyOf(rows.subList(0, Math.min(limit, rows.size())));
-        return new RequestHistoryPage(items, hasMore ? Long.toString(items.getLast().id()) : null);
+        return new RequestHistoryPage(items, rows.size() > limit ? Long.toString(items.getLast().id()) : null);
+    }
+
+    private static String assignmentLabel(String name, UUID id) {
+        return id == null ? null : name + " [" + id + "]";
     }
 
     private static void validateLimit(int limit) {
@@ -208,19 +155,23 @@ public class ServiceRequestService {
         }
     }
 
-    private UUID ownerScope() {
-        var account = currentAccount.required();
+    /** Requesters only see their own requests; support sees all of them. */
+    private static UUID ownerScope(Account account) {
         return account.support() ? null : account.id();
     }
 
-    private ServiceRequest findForUpdate(UUID id) {
-        return repository.findByIdForUpdate(id, ownerScope())
+    private ServiceRequest findVisible(Account account, UUID id) {
+        return repository.findById(id, ownerScope(account))
                 .orElseThrow(() -> new ServiceRequestNotFoundException(id));
     }
 
-    private void recordChange(UUID id, String field, String before, String after) {
+    private ServiceRequest findForUpdate(Account account, UUID id) {
+        return repository.findByIdForUpdate(id, ownerScope(account))
+                .orElseThrow(() -> new ServiceRequestNotFoundException(id));
+    }
+
+    private void recordChange(Account actor, UUID id, String field, String before, String after) {
         if (!Objects.equals(before, after)) {
-            var actor = currentAccount.required();
             repository.recordChange(id, field, before, after, actor.id(), actor.username());
         }
     }

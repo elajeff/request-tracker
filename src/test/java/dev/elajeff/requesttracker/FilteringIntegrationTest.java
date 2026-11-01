@@ -72,7 +72,9 @@ class FilteringIntegrationTest extends SupportApiTest {
         assertEquals(List.of(own), ids(page(requester, "/api/requests?q=" + token + "&status=NEW&staffId=" + staff)));
         assertEquals(List.of(progress), ids(page(requester, "/api/requests?q=" + token + "&status=IN_PROGRESS&unassigned=true")));
         assertEquals(403, requester.send("GET", "/api/staff?q=anything", null).statusCode());
-        assertEquals(401, new ApiSession(port, json).send("GET", "/api/requests?status=NEW", null).statusCode());
+        var anonymous = new ApiSession(port, json).send("GET", "/api/requests?status=NEW", null);
+        assertEquals(401, anonymous.statusCode());
+        assertEquals("Sign in required", json.readTree(anonymous.body()).get("detail").asText());
     }
 
     @Test
@@ -81,6 +83,7 @@ class FilteringIntegrationTest extends SupportApiTest {
             var response = CLIENT.send("GET", "/api/requests?status=" + invalid, null);
             assertEquals(400, response.statusCode());
             assertEquals(400, json.readTree(response.body()).get("status").asInt());
+            assertEquals("Invalid request status", json.readTree(response.body()).get("detail").asText());
         }
         assertEquals(200, CLIENT.send("GET", "/api/requests", null).statusCode());
     }
