@@ -13,21 +13,40 @@ Usernames are 3-64 lowercase letters, digits, dots, underscores or hyphens, and 
 | Edit title and description | Own requests, only while NEW | Any request |
 | Change status, priority or assignee | No | Yes |
 | View or change the staff list | No | Yes |
+| Manage login accounts | No | Yes |
 
 Request owners come from the logged-in account, never from the request body. A request that belongs to someone else returns 404, the same as one that does not exist.
 
+## Managing accounts
+
+SUPPORT users manage accounts from **Manage accounts** on the dashboard, or through the API:
+
+| Call | Body |
+| --- | --- |
+| `GET /api/accounts?q=&limit=&cursor=` | |
+| `POST /api/accounts` | `{"username": "alice", "role": "SUPPORT", "password": "..."}` |
+| `PATCH /api/accounts/{username}/enabled` | `{"enabled": false}` |
+| `PATCH /api/accounts/{username}/role` | `{"role": "REQUESTER"}` |
+| `PUT /api/accounts/{username}/password` | `{"password": "..."}` |
+
+- Disabling an account, changing its role or resetting its password ends that account's sessions. A session keeps the role it logged in with, so this is what makes a role change take effect.
+- At least one enabled SUPPORT account must always exist. A change that would remove the last one is refused with 409, from the page, the API or the command line.
+- On the dashboard you cannot disable or demote your own account. You can reset your own password, which signs you out.
+- Passwords are never returned. Search matches usernames and ignores case, and results are ordered by username.
+
 ## Creating accounts
 
-Accounts are created from the command line, since there is no admin page yet. Build the jar and point it at your database with the usual `SPRING_DATASOURCE_*` variables:
+The first SUPPORT account has to come from the command line, because everything above needs someone signed in. The command line also works if you are locked out. Build the jar and point it at your database with the usual `SPRING_DATASOURCE_*` variables:
 
 ```sh
 java -jar target/request-tracker-0.0.1-SNAPSHOT.jar --accounts.action=create --accounts.username=alice --accounts.role=SUPPORT
 java -jar target/request-tracker-0.0.1-SNAPSHOT.jar --accounts.action=disable --accounts.username=alice
+java -jar target/request-tracker-0.0.1-SNAPSHOT.jar --accounts.action=enable --accounts.username=alice
 ```
 
 `create` asks for the password with hidden input. For scripts, set `REQUEST_TRACKER_ACCOUNT_PASSWORD` instead; never pass it as an argument. These commands do not start the web server. With Compose, run `docker compose run --rm -it app` followed by the same options.
 
-Disabling an account ends its sessions and rejects its next request. There is no password reset or role change yet.
+The command line can create, disable and enable accounts. Resetting a password and changing a role are done from the dashboard.
 
 ### Older requests
 
@@ -58,4 +77,4 @@ Migration V6 adds the account, owner, history-actor and session tables and does 
 
 ## Not covered
 
-Brute-force protection, password recovery, MFA and TLS termination are out of scope for this project.
+Brute-force protection, self-service password recovery, MFA and TLS termination are out of scope for this project.

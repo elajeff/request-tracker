@@ -7,7 +7,7 @@ Built with Java 21, Spring Boot, PostgreSQL, React and TypeScript. It started as
 ## What it does
 
 - Create, edit, search and filter requests, with status (New, In progress, Resolved) and priority.
-- Two roles. Requesters see only their own requests. Support sees everything, manages the staff list and assigns work.
+- Two roles. Requesters see only their own requests. Support sees everything, manages the staff list and accounts, and assigns work.
 - Every change is recorded in a per-request history.
 - Cursor pagination for requests, staff and history.
 - Session login with CSRF protection.
@@ -37,7 +37,7 @@ npm ci
 npm run dev
 ```
 
-Open `http://127.0.0.1:5173`. There is no default login; [create an account](docs/authentication.md#creating-accounts) first.
+Open `http://127.0.0.1:5173`. There is no default login; [create the first support account](docs/authentication.md#creating-accounts) from the command line, then manage the rest from the dashboard.
 
 On Windows PowerShell use `.\mvnw.cmd` and `$env:SESSION_COOKIE_SECURE = "false"`.
 
