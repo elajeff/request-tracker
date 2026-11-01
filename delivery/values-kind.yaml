@@ -3,7 +3,7 @@ backend:
   slowRequestMillis: 500
   image:
     repository: request-tracker
-    tag: fault-cleanup-1f9a420-20261101-164640
+    tag: cleanup-1f9a420-20261101-164640
 frontend:
   image:
     repository: request-tracker-frontend
