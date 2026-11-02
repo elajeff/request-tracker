@@ -88,4 +88,4 @@ This is a learning project, not a production service. It runs on a single node w
 
 ## License
 
-No license has been chosen, so the code is not licensed for reuse.
+MIT. See [LICENSE](LICENSE).
