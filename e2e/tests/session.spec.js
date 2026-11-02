@@ -45,7 +45,7 @@ test('requester owns persisted details and history while support alone manages t
   await card.getByText('Change history', { exact: true }).click();
   const history = card.getByRole('list', { name: `Change history for ${created.title}` });
   await expect(history.getByRole('listitem').getByRole('paragraph')).toHaveText([
-    'NEW → IN_PROGRESS', 'Requester details → Edited requester details', `Created: ${created.title}`,
+    'New → In progress', 'Requester details → Edited requester details', `Created: ${created.title}`,
   ]);
   await expect(history.getByText(/status · e2e-support/)).toBeVisible();
   await expect(history.getByText(/description · e2e-requester/)).toBeVisible();

@@ -138,9 +138,9 @@ test('status and priority changes persist with before/after history', async ({ p
   await item.getByText('Change history', { exact: true }).click();
   const history = item.getByRole('list', { name: `Change history for ${created.title}` });
   await expect(history.getByRole('listitem')).toHaveText([
-    /status.*IN_PROGRESS → RESOLVED/s,
-    /status.*NEW → IN_PROGRESS/s,
-    /priority.*MEDIUM → HIGH/s,
+    /status.*In progress → Resolved/s,
+    /status.*New → In progress/s,
+    /priority.*Medium → High/s,
     /created.*Created: e2e-history changes/s,
   ]);
   expect(await api(request, 'GET', `/api/requests/${created.id}`)).toMatchObject({

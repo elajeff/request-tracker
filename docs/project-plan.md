@@ -22,7 +22,7 @@ The goal is a small, well-built support-request app, plus the testing, deploymen
 
 ## Next
 
-- Add a license and a dashboard screenshot, and simplify the preview controller.
+- Simplify the preview controller.
 
 ## Later
 
