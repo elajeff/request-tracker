@@ -66,7 +66,7 @@ Backend tests read `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME` and `SP
 
 ## Deployment
 
-The same containers run on Docker Compose and on Kubernetes (kind and k3s). The Helm chart has a normal mode and a delivery mode where Argo Rollouts promotes a new backend in steps (25%, 50%, 100%). Prometheus checks the error rate and latency at each step, and a bad release is aborted and rolled back automatically.
+Docker Compose runs PostgreSQL and the backend for local development; the dashboard runs through the Vite dev server. On Kubernetes (kind and k3s) the Helm chart deploys all three pieces, with nginx serving the dashboard. The chart has a normal mode and a delivery mode where Argo Rollouts promotes a new backend in steps (25%, 50%, 100%). Prometheus checks the error rate and latency at each step, and a bad release is aborted and rolled back automatically.
 
 - [Kubernetes setup](docs/kubernetes.md)
 - [Canary delivery](docs/canary-delivery.md)
