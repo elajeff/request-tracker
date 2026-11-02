@@ -64,7 +64,8 @@ export function useRequestQueue(
   const [loadedFilters, setLoadedFilters] = useState<QueueFilters | null>(
     null,
   );
-  const [loading, setLoading] = useState(false);
+  // The first page loads on mount, so start in the loading state rather than showing "No requests yet".
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   // Everyone seen as an assignee, kept after unassignment so they stay
   // selectable even when they are not on the loaded staff page.
