@@ -48,6 +48,6 @@ sum(rate(http_server_requests_seconds_sum{job="request-tracker",uri!~"/actuator/
 
 - The window is 28 days, but the Compose overlay keeps 7 days of metrics and the canary's Prometheus keeps 2 hours. Use `[7d]` locally.
 - Latency is a mean, because the backend does not publish a histogram. A mean hides slow outliers. Real objectives use a percentile such as the 95th, which needs `management.metrics.distribution.percentiles-histogram.http.server.requests=true`.
-- The metrics come from the backend. A 502 returned by nginx while a pod is being replaced never reaches the backend, so it is not counted. Measuring at the frontend would be more honest.
+- The metrics come from the backend. A 502 returned by nginx while a pod is being replaced never reaches the backend, so it is not counted. Measuring at the frontend would be more accurate.
 - The [alerts](monitoring.md#alerts) fire at 5% errors and one second mean latency. These are early-warning thresholds well outside the objectives above, not the objectives themselves. The canary checks use the same loose thresholds as gates.
 - There are no notifications, so nobody is paged when an objective is at risk.
