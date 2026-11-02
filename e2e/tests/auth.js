@@ -21,5 +21,5 @@ export async function loginUi(page, role = 'SUPPORT') {
   await page.getByLabel('Password', { exact: true }).fill(process.env[`E2E_${role}_PASSWORD`]);
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Sign out' })).toBeVisible();
-  await expect(page.getByText(`e2e-${role.toLowerCase()} · ${role === 'SUPPORT' ? 'support' : 'requester'}`, { exact: true })).toBeVisible();
+  await expect(page.locator('.signed-in')).toHaveText(`Signed in as e2e-${role.toLowerCase()} ${role === 'SUPPORT' ? 'Support' : 'Requester'}`);
 }

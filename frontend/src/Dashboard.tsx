@@ -47,13 +47,12 @@ export function Dashboard({
   return (
     <main id="dashboard" className="page">
       <header className="page-heading">
-        <div>
-          <p className="eyebrow">
-            {username} · {support ? "support" : "requester"}
-          </p>
-          <h1>Service requests</h1>
-        </div>
+        <h1>Service requests</h1>
         <div className="page-actions">
+          <p className="signed-in">
+            Signed in as <strong>{username}</strong>{" "}
+            <span className="role-badge">{support ? "Support" : "Requester"}</span>
+          </p>
           <button className="button button-secondary" onClick={queue.refresh}>
             Refresh
           </button>
