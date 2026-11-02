@@ -20,6 +20,7 @@ class Client:
         self.opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), cookies)
 
     def call(self, path, data=None, headers=None):
+        self.path = path  # Reported if this call fails.
         request = urllib.request.Request(BASE_URL + path, data=data, headers=headers or {})
         with self.opener.open(request, timeout=TIMEOUT_SECONDS) as response:
             body = response.read()
@@ -48,10 +49,12 @@ def worker(number):
             ok += 1
         except urllib.error.HTTPError as error:
             failed += 1
+            print(f"worker={number} failed path={client.path} status={error.code}", flush=True)
             if error.code == 401:
                 client = None  # Sign in again on the next round.
-        except (OSError, ValueError, KeyError):
+        except (OSError, ValueError, KeyError) as error:
             failed += 1
+            print(f"worker={number} failed path={client.path} error={error!r}", flush=True)
         if (ok + failed) % 100 == 0:
             print(f"worker={number} ok={ok} failed={failed}", flush=True)
         time.sleep(INTERVAL_SECONDS)
