@@ -46,6 +46,12 @@ You still need to [create an account](authentication.md#creating-accounts) befor
 
 To remove it, run `helm uninstall request-tracker -n request-tracker`. The database volume survives an uninstall, but deleting the namespace or the kind cluster deletes it.
 
+### Who can reach the database
+
+A NetworkPolicy lets only backend pods connect to PostgreSQL, including the canary backends in delivery mode; any other pod gets no response. `kubectl exec` and `kubectl port-forward` still work, so backups and the account commands are unaffected. kind's default network plugin and k3s both enforce NetworkPolicies; on a cluster that doesn't, the policy is ignored.
+
+The PostgreSQL container keeps only the five Linux capabilities its startup script needs to fix the data folder's owner and switch to the `postgres` user, and it can't gain new privileges.
+
 ## k3s
 
 `k3s/cluster.yaml` creates a one-node k3s cluster with k3d, bound to `127.0.0.1:6551`, with a 5 GiB memory limit. Use its own kubeconfig and the `k3d-request-tracker-k3s` context so it never becomes your default:
