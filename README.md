@@ -4,6 +4,10 @@ A small support-request tracker. Requesters file requests; support staff triage,
 
 Built with Java 21, Spring Boot, PostgreSQL, React and TypeScript. It started as a way to learn how a real project is built and shipped, so it also includes the deployment side: Docker, Helm, Prometheus/Grafana and canary releases on a local Kubernetes cluster.
 
+![The dashboard signed in as a support user, with request counts, the request queue and the create form](docs/images/dashboard.png)
+
+The screenshot uses made-up example data.
+
 ## What it does
 
 - Create, edit, search and filter requests, with status (New, In progress, Resolved) and priority.

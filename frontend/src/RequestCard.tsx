@@ -8,10 +8,15 @@ import type {
 } from "./types";
 import { errorMessage } from "./useSession";
 
-export const statusLabel = (status: string) =>
-  status === "IN_PROGRESS"
-    ? "In progress"
-    : status[0] + status.slice(1).toLowerCase();
+// IN_PROGRESS -> "In progress", HIGH -> "High".
+export const label = (value: string) =>
+  value[0] + value.slice(1).toLowerCase().replace("_", " ");
+const historyValue = (field: string, value: string | null) =>
+  value === null
+    ? "Unassigned"
+    : field === "STATUS" || field === "PRIORITY"
+      ? label(value)
+      : value;
 // Names are not unique, so people who share one also get the start of their ID.
 export const staffLabel = (person: SupportStaff, everyone: SupportStaff[]) => {
   const name = person.name || "(no name)";
@@ -94,7 +99,7 @@ function History({ request, api }: { request: ServiceRequest; api: Api }) {
             <p>
               {entry.field === "CREATED"
                 ? `Created: ${entry.newValue}`
-                : `${entry.oldValue ?? "Unassigned"} → ${entry.newValue ?? "Unassigned"}`}
+                : `${historyValue(entry.field, entry.oldValue)} → ${historyValue(entry.field, entry.newValue)}`}
             </p>
           </li>
         ))}
@@ -212,10 +217,10 @@ export function RequestCard({
           <span
             className={`pill status-${request.status.toLowerCase().replace("_", "-")}`}
           >
-            {statusLabel(request.status)}
+            {label(request.status)}
           </span>
           <span className={`pill priority-${request.priority.toLowerCase()}`}>
-            {request.priority}
+            {label(request.priority)}
           </span>
         </div>
       </div>
@@ -322,7 +327,7 @@ export function RequestCard({
               >
                 {statuses.map((value) => (
                   <option key={value} value={value}>
-                    {statusLabel(value)}
+                    {label(value)}
                   </option>
                 ))}
               </select>
@@ -345,7 +350,9 @@ export function RequestCard({
                 }
               >
                 {["HIGH", "MEDIUM", "LOW"].map((value) => (
-                  <option key={value}>{value}</option>
+                  <option key={value} value={value}>
+                    {label(value)}
+                  </option>
                 ))}
               </select>
             </label>

@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { label } from "./RequestCard";
 import type { Api, ServiceRequest } from "./types";
 import { errorMessage } from "./useSession";
 
@@ -86,7 +87,7 @@ export function CreateRequest({
           >
             {["HIGH", "MEDIUM", "LOW"].map((value) => (
               <option key={value} value={value}>
-                {value[0] + value.slice(1).toLowerCase()}
+                {label(value)}
               </option>
             ))}
           </select>
