@@ -4,6 +4,8 @@ WORKDIR /workspace
 COPY .mvn/ .mvn/
 COPY mvnw pom.xml ./
 RUN sed -i 's/\r$//' mvnw && chmod +x mvnw
+# Download dependencies in their own layer so a source change does not fetch them again.
+RUN ./mvnw --batch-mode --no-transfer-progress dependency:go-offline
 
 COPY src/ src/
 RUN ./mvnw --batch-mode --no-transfer-progress package -DskipTests
