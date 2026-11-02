@@ -109,6 +109,8 @@ spec:
   template:
     metadata:
       labels: {app: request-tracker-delivery, component: traffic}
+      # Restart the pod when the script changes; the ConfigMap alone would not.
+      annotations: {checksum/script: {{ .Files.Get "files/traffic.py" | sha256sum }}}
     spec:
       automountServiceAccountToken: false
       terminationGracePeriodSeconds: 30
