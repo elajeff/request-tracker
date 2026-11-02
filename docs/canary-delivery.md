@@ -32,11 +32,32 @@ The last full run on kind (1 November 2026), with the 2-core backend limit, the 
 
 - A healthy release was promoted through both steps in 2 minutes 47 seconds. The analyses saw 13 requests per second at 25% and about 24 at 50%, with no errors and a mean response time of about 7 ms.
 - The new backend pods started in 3.7 to 4.3 seconds. No request was slow enough to be logged.
-- The traffic generator counted 7 failed requests out of about 2,800 during that rollout. The frontend has one replica and is replaced in the same sync, which is the likely cause, but I did not confirm it.
+- The traffic generator counted 7 failed requests out of about 2,800 during that rollout. It only printed totals then, so the cause was not recorded. The follow-up run below could not reproduce them.
 - The broken release was aborted automatically about 50 seconds after Argo CD synced, at the first analysis, when its error rate came out at 100%. The four stable replicas kept serving. While the broken pod ran, the generator counted about 520 failed requests out of 6,700.
 - After the healthy tag went back into Git, the rollout was Healthy straight away, because the stable version had never changed.
 
 I did not compare database snapshots in this run. The 30 October run did, and found requests, staff, history and accounts identical before and after.
+
+### Follow-up run, 2 November 2026
+
+This run looked for the cause of the 7 failures. The traffic generator now prints one line per failed request, with its path and the HTTP status or error. Each rollout went through a short-lived test branch that Argo CD was pointed at, so `main` never named a test tag. The branch was deleted afterwards.
+
+Five rollouts, each changing one thing that differed from the 1 November run:
+
+| Rollout | Backend and frontend | Traffic rounds | Failed |
+| --- | --- | --- | --- |
+| Same images under a new tag | cleanup → cleanup | about 3,600 | 0 |
+| Down to the 30 October build | cleanup → 30 Oct | about 3,600 | 0 |
+| Up to the cleanup build, as on 1 November | 30 Oct → cleanup | about 3,600 | 0 |
+| Traffic generator switched on in the same sync, as on 1 November | cleanup → cleanup | about 2,800 | 0 |
+| Back to `main` | cleanup → cleanup | about 3,600 | 0 |
+
+- Every rollout was promoted in 2 minutes 51 seconds to 3 minutes 1 second.
+- The frontend's single replica was replaced in every rollout. The old nginx pod returned 200 for every request it served, then shut down cleanly. The one-replica frontend was the suspected cause, but that is ruled out for these runs.
+- The overnight steady state before the run had no failures in about 214,000 rounds.
+- The database check from the [recovery guide](recovery.md#losing-the-whole-cluster) gave identical results before and after all five rollouts.
+
+The 1 November failures are still unexplained. They were not repeated in about 17,000 rounds under the same conditions. If they come back, the generator's log now says which call failed and why.
 
 ## Known limits
 
