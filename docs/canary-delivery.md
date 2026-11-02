@@ -59,11 +59,25 @@ Five rollouts, each changing one thing that differed from the 1 November run:
 
 The 1 November failures are still unexplained. They were not repeated in about 17,000 rounds under the same conditions. If they come back, the generator's log now says which call failed and why.
 
+### Timeout bursts, 2 November 2026
+
+With steady traffic later that day, the generator logged 40 failed requests out of about 137,000. 21 of them came while the database pod restarted for a chart upgrade, which is expected. The other 19 came in four short bursts, and each burst hit all four workers at the same moment.
+
+- In each burst every backend pod logged slow requests at the same second, with almost the same duration, up to about 4 seconds. Outside the bursts the mean response time was about 6 ms.
+- CPU use in the Docker VM stayed around 1.5%, and garbage collection pauses were short, so the backend was not overloaded.
+- During a burst the database connections were waiting for the write-ahead log to be flushed to disk. Spring Session updates the session row on every API call, reads included, so every request waits for that flush.
+- The bursts matched times when Docker images were being built, or kind clusters created and loaded, on the same machine.
+
+I reproduced it by creating a throwaway kind cluster and loading an image into it while the generator ran. The database waited 1 to 2 seconds for each flush, and requests on all backend pods took 1.1 to 2.2 seconds in those same seconds. They stayed under the generator's 3-second timeout that time, so nothing failed. Writing a 4 GB file with a forced flush in a plain container did not cause it; the longest wait was 0.29 seconds.
+
+So the bursts come from heavy Docker work slowing the shared Docker Desktop disk, not from the app. The 1 November failures may have the same cause, but that cannot be shown: the image builds and loads for that run finished about three minutes before the rollout started, and nothing else heavy was recorded during it.
+
 ## Known limits
 
 - The five-minute observation budget is based on measurement, not a guarantee from Kubernetes.
 - Service selectors do not switch atomically, so a rollout can briefly return 502s. Frontend pods wait 5 seconds before shutting down to reduce this. Nothing here claims zero downtime.
 - Earlier runs saw a few request timeouts right after new pods started. A later load test found the backend's 0.5-core CPU limit throttled the JVM for most of its startup, and the first logins took about 1.6 s. With a 2-core limit, startup went from 12.7 s to 3 s and those logins took 0.86 s. The limit is now 2 cores. In the 1 November rollout, startup was under 4.3 s and no request was logged as slow. The exact 3-second timeouts have not been reproduced.
+- Building images or creating kind clusters on the same machine can stall the database's disk writes for a few seconds, which slows every request at once (see the timeout bursts above). A stall during an analysis could fail the mean response time check, so avoid heavy Docker work while a rollout is being measured.
 - The Prometheus thresholds are exercise gates, looser than the [service-level objectives](slos.md).
 - Prometheus keeps two hours of data. If you want to keep results, save them elsewhere.
 - Pre-login backends must never be used as a canary or rollback target; see [authentication](authentication.md#upgrading-from-the-pre-login-version).
