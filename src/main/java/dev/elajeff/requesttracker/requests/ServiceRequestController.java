@@ -21,7 +21,6 @@ import org.springframework.web.server.ResponseStatusException;
 @RestController
 @RequestMapping("/api/requests")
 public class ServiceRequestController {
-
     private final ServiceRequestService service;
 
     public ServiceRequestController(ServiceRequestService service) {
@@ -29,19 +28,13 @@ public class ServiceRequestController {
     }
 
     @PostMapping
-    public ResponseEntity<ServiceRequest> create(
-            @Valid @RequestBody CreateServiceRequestRequest request) {
-        ServiceRequest created = service.create(
-                request.title(), request.description(), request.priority());
-
-        return ResponseEntity.created(
-                URI.create("/api/requests/" + created.id()))
-                .body(created);
+    public ResponseEntity<ServiceRequest> create(@Valid @RequestBody CreateServiceRequestRequest request) {
+        ServiceRequest created = service.create(request.title(), request.description(), request.priority());
+        return ResponseEntity.created(URI.create("/api/requests/" + created.id())).body(created);
     }
 
     @GetMapping
-    public RequestQueuePage findAll(
-            @RequestParam(defaultValue = "") String q,
+    public RequestQueuePage findAll(@RequestParam(defaultValue = "") String q,
             @RequestParam(required = false) String cursor,
             @RequestParam(defaultValue = "25") int limit,
             @RequestParam(required = false) UUID staffId,
@@ -65,29 +58,25 @@ public class ServiceRequestController {
     }
 
     @PutMapping("/{id}")
-    public ServiceRequest updateDetails(
-            @PathVariable UUID id,
+    public ServiceRequest updateDetails(@PathVariable UUID id,
             @Valid @RequestBody UpdateServiceRequestDetailsRequest request) {
         return service.updateDetails(id, request.title(), request.description());
     }
 
     @PatchMapping("/{id}/status")
-    public ServiceRequest updateStatus(
-            @PathVariable UUID id,
+    public ServiceRequest updateStatus(@PathVariable UUID id,
             @Valid @RequestBody UpdateServiceRequestStatusRequest request) {
         return service.updateStatus(id, request.status());
     }
 
     @PatchMapping("/{id}/priority")
-    public ServiceRequest updatePriority(
-            @PathVariable UUID id,
+    public ServiceRequest updatePriority(@PathVariable UUID id,
             @Valid @RequestBody UpdateServiceRequestPriorityRequest request) {
         return service.updatePriority(id, request.priority());
     }
 
     @PatchMapping("/{id}/assignment")
-    public ServiceRequest updateAssignment(
-            @PathVariable UUID id,
+    public ServiceRequest updateAssignment(@PathVariable UUID id,
             @Valid @RequestBody UpdateServiceRequestAssignmentRequest request) {
         return service.updateAssignment(id, request.staffId());
     }
