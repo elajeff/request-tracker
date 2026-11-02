@@ -92,13 +92,17 @@ public class SecurityConfiguration {
         protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
                 throws ServletException, IOException {
             var authentication = SecurityContextHolder.getContext().getAuthentication();
-            if (authentication != null && authentication.isAuthenticated()
-                    && accounts.find(authentication.getName()).filter(Account::enabled).isEmpty()) {
-                var session = request.getSession(false);
-                if (session != null) session.invalidate();
-                SecurityContextHolder.clearContext();
-                jsonError(response, 401, "Sign in required");
-                return;
+            if (authentication != null && authentication.isAuthenticated()) {
+                var account = accounts.find(authentication.getName()).filter(Account::enabled);
+                if (account.isEmpty()) {
+                    var session = request.getSession(false);
+                    if (session != null) session.invalidate();
+                    SecurityContextHolder.clearContext();
+                    jsonError(response, 401, "Sign in required");
+                    return;
+                }
+                // Reused by CurrentAccount so the request does not look the account up a second time.
+                request.setAttribute(CurrentAccount.REQUEST_ATTRIBUTE, account.get());
             }
             chain.doFilter(request, response);
         }

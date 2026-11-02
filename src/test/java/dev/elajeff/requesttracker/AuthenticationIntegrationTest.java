@@ -16,11 +16,16 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.micrometer.metrics.test.autoconfigure.AutoConfigureMetrics;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.web.server.ResponseStatusException;
 import dev.elajeff.requesttracker.security.AccountAdministration;
+import dev.elajeff.requesttracker.security.AccountRepository;
 import tools.jackson.databind.json.JsonMapper;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.clearInvocations;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 
 @AutoConfigureMetrics
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
@@ -31,6 +36,7 @@ class AuthenticationIntegrationTest {
     @Autowired private JdbcTemplate jdbc;
     @Autowired private JsonMapper json;
     @Autowired private DataSource dataSource;
+    @MockitoSpyBean private AccountRepository accountRepository;
 
     @Test
     void loginRotatesSessionAndLogoutRequiresCsrfAndInvalidatesIt() throws Exception {
@@ -245,6 +251,19 @@ class AuthenticationIntegrationTest {
         for (String path : List.of("/actuator/env", "/actuator/health/db", "/actuator", "/error", "/login", "/api/session/login")) {
             assertEquals(401, anonymous.send("GET", path, null).statusCode());
         }
+    }
+
+    @Test
+    void apiCallsLookUpTheSignedInAccountOnce() throws Exception {
+        var client = account("REQUESTER");
+        String name = client.session().get("user").get("username").asText();
+        create(client, "One lookup");
+        clearInvocations(accountRepository);
+        assertEquals(200, client.send("GET", "/api/requests", null).statusCode());
+        verify(accountRepository, times(1)).find(name);
+        clearInvocations(accountRepository);
+        create(client, "Still one lookup");
+        verify(accountRepository, times(1)).find(name);
     }
 
     @Test
