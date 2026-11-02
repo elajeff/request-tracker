@@ -46,6 +46,8 @@ python preview-controller/e2e.py --kubeconfig target/k3s-practice/kubeconfig.yam
     --context k3d-request-tracker-k3s --output target/preview-e2e.json
 ```
 
+It also runs on a throwaway kind cluster. kind's storage class is called `standard`, so first create a StorageClass named `local-path` with the provisioner `rancher.io/local-path`. The script only accepts the context name above, so rename the context in a kubeconfig file that contains only the throwaway cluster.
+
 The end-to-end script covers creation, readiness, image updates, drift repair, failures, recovery, deletion and expiry. It uses disposable previews only. It also briefly changes the controller's replica count to test ownership conflicts and restores it afterwards. Retained data from repeated runs uses up the quota.
 
 Unit tests:
