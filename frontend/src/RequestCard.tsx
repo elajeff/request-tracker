@@ -142,8 +142,23 @@ export function RequestCard({
     description: string;
   } | null>(null);
   const [assignment, setAssignment] = useState<string | null>(null);
+  const [statusChoice, setStatusChoice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const lock = useRef(false);
+  const statusSave = useRef(false);
+  const statusSelect = useRef<HTMLSelectElement>(null);
+  const statusButton = useRef<HTMLButtonElement>(null);
+  const editButton = useRef<HTMLButtonElement>(null);
+  // The Save status button can unmount and the select can stay disabled during
+  // a save, which drops focus to the page. Put it back only if that happened.
+  useEffect(() => {
+    if (busy || !statusSave.current) return;
+    statusSave.current = false;
+    const active = document.activeElement;
+    if (active && active !== document.body) return;
+    const target = statusButton.current ?? statusSelect.current;
+    (target && !target.disabled ? target : editButton.current)?.focus();
+  }, [busy]);
   // Drop a pending choice if that person was deactivated before it was saved.
   const pending =
     assignment !== null &&
@@ -160,6 +175,7 @@ export function RequestCard({
   ) {
     if (lock.current) return;
     lock.current = true;
+    if (path === "/status") statusSave.current = true;
     setBusy(true);
     try {
       const updated = await api<ServiceRequest>(
@@ -169,6 +185,7 @@ export function RequestCard({
       onUpdated(request, fields(updated));
       if (!path) setDraft(null);
       if (path === "/assignment") setAssignment(null);
+      if (path === "/status") setStatusChoice(null);
       notify(message);
     } catch (error) {
       notify(`Could not update request: ${errorMessage(error)}`);
@@ -198,6 +215,15 @@ export function RequestCard({
       : request.status === "IN_PROGRESS"
         ? ["IN_PROGRESS", "RESOLVED"]
         : ["RESOLVED"];
+  // Arrow keys on a closed select fire change on Windows, and status only
+  // moves forward, so the choice is saved with a button. A choice left over
+  // from an older status is no longer offered and is ignored.
+  const pendingStatus =
+    statusChoice !== null &&
+    statusChoice !== request.status &&
+    statuses.includes(statusChoice)
+      ? statusChoice
+      : null;
   return (
     <article
       className="request-card"
@@ -236,6 +262,7 @@ export function RequestCard({
       </div>
       {!draft && (support || request.status === "NEW") && (
         <button
+          ref={editButton}
           className="button button-secondary request-edit-button"
           aria-label={`Edit details for ${request.title}`}
           onClick={() =>
@@ -308,30 +335,44 @@ export function RequestCard({
       {support && (
         <>
           <div className="request-controls">
-            <label className="control-field">
-              <span>Status</span>
-              <select
-                className="control-select"
-                aria-label={`Status for ${request.title}`}
-                value={request.status}
-                disabled={busy || request.status === "RESOLVED"}
-                onChange={(event) =>
-                  void save(
-                    "/status",
-                    "PATCH",
-                    { status: event.target.value },
-                    (item) => ({ status: item.status }),
-                    `Status updated.`,
-                  )
-                }
-              >
-                {statuses.map((value) => (
-                  <option key={value} value={value}>
-                    {label(value)}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <div className="status-field">
+              <label className="control-field">
+                <span>Status</span>
+                <select
+                  ref={statusSelect}
+                  className="control-select"
+                  aria-label={`Status for ${request.title}`}
+                  value={pendingStatus ?? request.status}
+                  disabled={busy || request.status === "RESOLVED"}
+                  onChange={(event) => setStatusChoice(event.target.value)}
+                >
+                  {statuses.map((value) => (
+                    <option key={value} value={value}>
+                      {label(value)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              {pendingStatus && (
+                <button
+                  ref={statusButton}
+                  className="button button-secondary status-save"
+                  aria-label={`Save status for ${request.title}`}
+                  disabled={busy}
+                  onClick={() =>
+                    void save(
+                      "/status",
+                      "PATCH",
+                      { status: pendingStatus },
+                      (item) => ({ status: item.status }),
+                      "Status updated.",
+                    )
+                  }
+                >
+                  Save status
+                </button>
+              )}
+            </div>
             <label className="control-field">
               <span>Priority</span>
               <select
