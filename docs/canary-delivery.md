@@ -11,7 +11,7 @@ A new backend version is rolled out gradually and checked against live metrics. 
   - less than 5% of those requests return 4xx or 5xx,
   - mean response time is under one second.
 - Missing data counts as a failure, so a version that receives no traffic can never pass.
-- Login and actuator requests are excluded from the numbers.
+- Actuator requests and everything under `/api/session` (sign-in, sign-out and session reads) are excluded from the numbers.
 
 Delivery mode uses the same database as the normal Helm install. Argo CD manages only the delivery resources; the database, its volume and its Secret stay with the baseline Helm release. Do not run `helm upgrade` while delivery mode is enabled.
 
@@ -79,5 +79,7 @@ So the bursts come from heavy Docker work slowing the shared Docker Desktop disk
 - Earlier runs saw a few request timeouts right after new pods started. A later load test found the backend's 0.5-core CPU limit throttled the JVM for most of its startup, and the first logins took about 1.6 s. With a 2-core limit, startup went from 12.7 s to 3 s and those logins took 0.86 s. The limit is now 2 cores. In the 1 November rollout, startup was under 4.3 s and no request was logged as slow. The exact 3-second timeouts have not been reproduced.
 - Building images or creating kind clusters on the same machine can stall the database's disk writes for a few seconds, which slows every request at once (see the timeout bursts above). A stall during an analysis could fail the mean response time check, so avoid heavy Docker work while a rollout is being measured.
 - The Prometheus thresholds are exercise gates, looser than the [service-level objectives](slos.md).
+- The canary backend runs Flyway migrations against the shared database when it starts, before any analysis. A failed or aborted canary does not undo a migration.
+- Sign-in requests are excluded from the analysis, and the traffic workers sign in only once, so a canary that breaks sign-in would not be caught.
 - Prometheus keeps two hours of data. If you want to keep results, save them elsewhere.
 - Pre-login backends must never be used as a canary or rollback target; see [authentication](authentication.md#upgrading-from-the-pre-login-version).

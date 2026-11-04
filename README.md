@@ -50,10 +50,11 @@ On Windows PowerShell use `.\mvnw.cmd` and `$env:SESSION_COOKIE_SECURE = "false"
 ```sh
 ./mvnw verify                 # backend; needs a disposable PostgreSQL, see below
 node e2e/run.mjs              # browser tests in a throwaway Docker stack
+pip install -r preview-controller/requirements.txt -c preview-controller/constraints.txt
 python -m unittest discover -s preview-controller -p 'test_*.py'
 ```
 
-Backend tests read `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME` and `SPRING_DATASOURCE_PASSWORD`. Point them at a separate database, never your development one. GitHub Actions runs the backend, frontend, browser, container, Helm and Prometheus rule checks.
+Backend tests read `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME` and `SPRING_DATASOURCE_PASSWORD`. Point them at a separate database, never your development one. GitHub Actions runs the backend, frontend, browser, container, Helm, Prometheus rule and preview controller checks.
 
 ## Project layout
 
@@ -70,7 +71,7 @@ Backend tests read `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME` and `SP
 
 ## Deployment
 
-Docker Compose runs PostgreSQL and the backend for local development; the dashboard runs through the Vite dev server. On Kubernetes (kind and k3s) the Helm chart deploys all three pieces, with nginx serving the dashboard. The chart has a normal mode and a delivery mode where Argo Rollouts promotes a new backend in steps (25%, 50%, 100%). Prometheus checks the error rate and latency at each step, and a bad release is aborted and rolled back automatically.
+Docker Compose runs PostgreSQL and the backend for local development; the dashboard runs through the Vite dev server. On Kubernetes (kind and k3s) the Helm chart deploys all three pieces, with nginx serving the dashboard. The chart has a normal mode and a delivery mode where Argo Rollouts promotes a new backend in steps (25%, 50%, 100%). Prometheus checks the error rate and latency at the 25% and 50% steps, and a bad release is aborted and rolled back automatically.
 
 - [Kubernetes setup](docs/kubernetes.md)
 - [Canary delivery](docs/canary-delivery.md)

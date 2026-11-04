@@ -58,6 +58,7 @@ The PostgreSQL container keeps only the five Linux capabilities its startup scri
 
 ```sh
 k3d cluster create --config k3s/cluster.yaml
+mkdir -p target/k3s-practice
 k3d kubeconfig get request-tracker-k3s > target/k3s-practice/kubeconfig.yaml
 helm upgrade --install request-tracker helm/request-tracker \
     --kubeconfig target/k3s-practice/kubeconfig.yaml --kube-context k3d-request-tracker-k3s \
@@ -68,4 +69,4 @@ Before installing, import the same `local` images you built for kind with `k3d i
 
 ## Delivery mode
 
-For canary releases, install the same chart with `-f delivery/values-kind.yaml`. See [canary delivery](canary-delivery.md).
+Canary releases run as a separate Helm release, `request-tracker-delivery`, managed by Argo CD next to the baseline release. Do not install the chart over the baseline with `-f delivery/values-kind.yaml`: delivery mode turns off the baseline templates, so Helm would delete PostgreSQL and the backend Deployment. See [canary delivery](canary-delivery.md).
