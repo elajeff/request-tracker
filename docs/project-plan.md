@@ -1,6 +1,6 @@
 # Roadmap
 
-The goal is a small, well-built support-request app, plus the testing, deployment and operations work around it, all running locally on free tools with synthetic data.
+The goal is a small support-request app, plus the testing, deployment and operations work around it, all running locally on free tools with synthetic data.
 
 ## Done
 
@@ -16,7 +16,7 @@ The goal is a small, well-built support-request app, plus the testing, deploymen
 - A bad-configuration recovery test on the normal install and through the canary: the old pods kept serving, `helm rollback` took a second and the canary aborted at its 300-second deadline.
 - A whole-cluster loss test, simulated on a second kind cluster: the backup restored in 8 seconds and every row matched.
 - A follow-up canary run looking for the cause of 7 failed requests: five rollouts and about 17,000 rounds with no failures, and the database identical before and after.
-- A readable rewrite of the preview controller, checked call by call against the old version and with the full lifecycle test on kind.
+- A rewrite of the preview controller, tested through the full lifecycle on kind.
 - An accounts page for support users: create, disable and enable accounts, change roles and reset passwords, without the command line.
 - Backend and frontend cleanup: errors that carry their message, one layer of role checks, the request queue and staff list loaded through small hooks, ESLint in CI, shorter dashboard text.
 - Four source releases: [v0.1.0](https://github.com/elajeff/request-tracker/releases/tag/v0.1.0), [v0.2.0](https://github.com/elajeff/request-tracker/releases/tag/v0.2.0), [v0.3.0](https://github.com/elajeff/request-tracker/releases/tag/v0.3.0) and [v0.4.0](https://github.com/elajeff/request-tracker/releases/tag/v0.4.0). The database migration number (V6) is separate from the release version.

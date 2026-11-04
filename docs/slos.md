@@ -4,7 +4,7 @@ Targets for how the app should behave, based on what we measured on the local cl
 
 ## What we measured
 
-From the canary rerun on 1 November 2026 (see [canary delivery](canary-delivery.md#what-we-measured)), with a synthetic client sending 13 to 26 requests per second:
+From the canary rerun on 1 November 2026 (see [canary delivery](canary-delivery.md#what-we-measured)), with a synthetic client sending between 13 and about 24 requests per second:
 
 - no 5xx responses from the healthy backend,
 - a mean response time of 6 to 7 ms,
