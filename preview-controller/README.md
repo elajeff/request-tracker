@@ -53,6 +53,7 @@ The end-to-end script covers creation, readiness, image updates, drift repair, f
 Unit tests:
 
 ```sh
+pip install -r preview-controller/requirements.txt -c preview-controller/constraints.txt
 python -m unittest discover -s preview-controller -p 'test_*.py'
 ```
 

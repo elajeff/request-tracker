@@ -23,7 +23,7 @@ Filter the request queue with `staffId=<uuid>` or `unassigned=true`, not both.
 
 ## History
 
-Every change to a request (created, title, description, status, priority, assignee) adds a history entry in the same transaction as the change. The entry stores the old and new value and, since V6, who made the change. Entries from before V6 have no actor. Renaming a staff member does not rewrite old entries. This is a convenience log, not a tamper-proof audit trail.
+Every change to a request (created, title, description, status, priority, assignee, and owner when a legacy request is claimed) adds a history entry in the same transaction as the change. The entry stores the old and new value and, since V6, who made the change. Entries from before V6 have no actor. Renaming a staff member does not rewrite old entries. This is a convenience log, not a tamper-proof audit trail.
 
 Open **Change history** on a request to read it, newest first.
 

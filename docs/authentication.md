@@ -2,13 +2,13 @@
 
 Login accounts and staff records are separate things. A staff record is just a name that requests can be assigned to; it cannot log in. There is no sign-up page and no default account.
 
-Usernames are 3-64 lowercase letters, digits, dots, underscores or hyphens, and cannot be changed. Passwords are 12 characters or more (at most 72 bytes) and stored with BCrypt.
+Usernames are 3-64 lowercase letters, digits, dots, underscores or hyphens, start with a letter or digit, and cannot be changed. Passwords are 12 characters or more (at most 72 bytes) and stored with BCrypt.
 
 ## Permissions
 
 | Action | REQUESTER | SUPPORT |
 | --- | --- | --- |
-| Create a request | Yes, always MEDIUM priority | Yes, any priority |
+| Create a request | Yes, MEDIUM priority only (anything else gets 403) | Yes, any priority |
 | View requests, history and counts | Own requests only | All requests |
 | Edit title and description | Own requests, only while NEW | Any request |
 | Change status, priority or assignee | No | Yes |
