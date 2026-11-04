@@ -134,15 +134,19 @@ test("staff backend search stays paginated, resets when cleared and rejects slow
   await expect(directory(page)).toHaveCount(35);
   await page.getByRole("searchbox", { name: "Search staff" }).fill("");
   await expect(directory(page)).toHaveCount(25);
-  let release;
+  let release, finish;
   const held = new Promise((resolve) => {
     release = resolve;
+  });
+  const finished = new Promise((resolve) => {
+    finish = resolve;
   });
   await page.route("**/api/staff?*", async (route) => {
     if (new URL(route.request().url()).searchParams.get("q") === token) {
       const response = await route.fetch();
       await held;
       await route.fulfill({ response }).catch(() => {});
+      finish();
     } else await route.continue();
   });
   const pending = page.waitForRequest(
@@ -161,6 +165,7 @@ test("staff backend search stays paginated, resets when cleared and rejects slow
     }),
   ).toBeVisible();
   release();
+  await finished;
   await expect(directory(page)).toHaveCount(1);
   expect(searches.some((u) => u.searchParams.get("q") === target.name)).toBe(
     true,
