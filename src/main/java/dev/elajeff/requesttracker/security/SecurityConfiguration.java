@@ -93,7 +93,10 @@ public class SecurityConfiguration {
                 throws ServletException, IOException {
             var authentication = SecurityContextHolder.getContext().getAuthentication();
             if (authentication != null && authentication.isAuthenticated()) {
-                var account = accounts.find(authentication.getName()).filter(Account::enabled);
+                // The session keeps the authorities from login, so a changed role has to end it too.
+                var account = accounts.find(authentication.getName()).filter(Account::enabled)
+                        .filter(found -> authentication.getAuthorities().stream()
+                                .anyMatch(authority -> authority.getAuthority().equals("ROLE_" + found.role())));
                 if (account.isEmpty()) {
                     var session = request.getSession(false);
                     if (session != null) session.invalidate();

@@ -58,6 +58,9 @@ public class AccountAdministration {
     public Account changeRole(String username, String role) {
         validateUsername(username);
         validateRole(role);
+        Account current = accounts.find(username).orElseThrow(() ->
+                new ResponseStatusException(HttpStatus.NOT_FOUND, "Account not found"));
+        if (current.role().equals(role)) return current;
         if (role.equals("REQUESTER")) keepOneSupport(username);
         Account account = update(username, "role", role);
         // A session keeps the role it logged in with, so it has to end.
