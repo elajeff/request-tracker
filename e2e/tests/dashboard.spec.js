@@ -45,15 +45,19 @@ test("queue loading, failed refresh and delayed search preserve newer state and 
   await expect(
     card.getByRole("textbox", { name: "Title", exact: true }),
   ).toHaveValue("Unsaved title");
-  let release;
+  let release, finish;
   const held = new Promise((resolve) => {
     release = resolve;
+  });
+  const finished = new Promise((resolve) => {
+    finish = resolve;
   });
   await page.route("**/api/requests?*", async (route) => {
     if (new URL(route.request().url()).searchParams.get("q") === "react-race") {
       const response = await route.fetch();
       await held;
       await route.fulfill({ response }).catch(() => {});
+      finish();
     } else await route.continue();
   });
   const dispatched = page.waitForRequest(
@@ -73,6 +77,7 @@ test("queue loading, failed refresh and delayed search preserve newer state and 
     page.getByText("No matching requests", { exact: true }),
   ).toBeVisible();
   release();
+  await finished;
   await expect(card).toHaveCount(0);
 });
 
