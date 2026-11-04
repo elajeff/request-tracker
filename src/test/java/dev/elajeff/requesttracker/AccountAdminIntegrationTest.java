@@ -75,6 +75,29 @@ class AccountAdminIntegrationTest extends SupportApiTest {
     }
 
     @Test
+    void sessionEndsWhenTheRoleChangedWithoutEndingSessions() throws Exception {
+        String name = username();
+        String password = password();
+        accounts.create(name, "SUPPORT", password);
+        var user = login(name, password);
+        assertEquals(200, user.send("GET", "/api/staff", null).statusCode());
+
+        jdbc.update("UPDATE login_accounts SET role = 'REQUESTER' WHERE username = ?", name);
+        assertEquals(401, user.send("GET", "/api/requests", null).statusCode());
+    }
+
+    @Test
+    void settingTheSameRoleKeepsExistingSessions() throws Exception {
+        String name = username();
+        String password = password();
+        accounts.create(name, "REQUESTER", password);
+        var user = login(name, password);
+
+        assertEquals("REQUESTER", read(send("PATCH", "/api/accounts/" + name + "/role", Map.of("role", "REQUESTER"))).get("role").asText());
+        assertEquals(200, user.send("GET", "/api/requests", null).statusCode());
+    }
+
+    @Test
     void invalidInputUnknownAccountsAndDuplicatesAreRejected() throws Exception {
         String name = username();
         accounts.create(name, "REQUESTER", password());
