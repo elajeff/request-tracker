@@ -126,10 +126,21 @@ test('status and priority changes persist with before/after history', async ({ p
   await mutate(page, 'PATCH', `/api/requests/${created.id}/priority`,
     () => item.getByRole('combobox', { name: `Priority for ${created.title}` }).selectOption('HIGH'));
   await expect(item.getByRole('combobox', { name: `Priority for ${created.title}` })).toHaveValue('HIGH');
+  await item.getByRole('combobox', { name: `Status for ${created.title}` }).selectOption('IN_PROGRESS');
+  await expect(item.getByRole('button', { name: `Save status for ${created.title}` })).toBeVisible();
+  await page.reload();
+  await search(page, 'e2e-history');
+  await expect(item.getByRole('combobox', { name: `Status for ${created.title}` })).toHaveValue('NEW');
+  await expect(item.getByRole('button', { name: `Save status for ${created.title}` })).toHaveCount(0);
+  expect(await api(request, 'GET', `/api/requests/${created.id}`)).toMatchObject({ status: 'NEW' });
   for (const status of ['IN_PROGRESS', 'RESOLVED']) {
+    await item.getByRole('combobox', { name: `Status for ${created.title}` }).selectOption(status);
     await mutate(page, 'PATCH', `/api/requests/${created.id}/status`,
-      () => item.getByRole('combobox', { name: `Status for ${created.title}` }).selectOption(status));
+      () => item.getByRole('button', { name: `Save status for ${created.title}` }).click());
     await expect(item.getByRole('combobox', { name: `Status for ${created.title}` })).toHaveValue(status);
+    await expect(status === 'IN_PROGRESS'
+      ? item.getByRole('combobox', { name: `Status for ${created.title}` })
+      : item.getByRole('button', { name: `Edit details for ${created.title}` })).toBeFocused();
   }
   await page.reload();
   await search(page, 'e2e-history');
