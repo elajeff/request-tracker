@@ -145,18 +145,7 @@ metadata:
   name: request-tracker-delivery-frontend
 data:
   default.conf: |
-    # The log format and $correlation_id come from access-log.conf in the frontend image.
-    server {
-      listen 8080;
-      root /usr/share/nginx/html;
-      access_log /dev/stdout timing;
-      location / { try_files $uri $uri/ /index.html; }
-      location /api/ {
-        proxy_pass http://request-tracker-delivery:8080;
-        proxy_set_header X-Request-ID $correlation_id;
-      }
-      location /actuator { return 404; }
-    }
+{{ .Files.Get "files/delivery-nginx.conf" | indent 4 }}
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -168,6 +157,8 @@ spec:
   template:
     metadata:
       labels: {app: request-tracker-delivery, component: frontend}
+      # Restart the pod when the nginx config changes; the subPath mount would not pick it up.
+      annotations: {checksum/nginx: {{ .Files.Get "files/delivery-nginx.conf" | sha256sum }}}
     spec:
       terminationGracePeriodSeconds: 30
       automountServiceAccountToken: false
