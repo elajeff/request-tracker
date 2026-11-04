@@ -64,9 +64,14 @@ test('invalidated server session clears private content and permits a fresh logi
   await page.getByRole('button', { name: 'Refresh', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Sign in', exact: true })).toBeVisible();
   await expect(page.getByText('Your session ended. Sign in again.', { exact: true })).toBeVisible();
+  await expect(page.getByText('API unavailable', { exact: true })).toHaveCount(0);
   await expect(page.getByRole('article')).toHaveCount(0);
-  await loginUi(page);
+  await page.getByRole('textbox', { name: 'Username', exact: true }).fill('e2e-support');
+  await page.getByLabel('Password', { exact: true }).fill(process.env.E2E_SUPPORT_PASSWORD);
+  await page.route('**/api/requests?*', () => {});
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click();
   await expect(page.getByText('Manage support staff', { exact: true })).toBeVisible();
+  await expect(page.getByText('API unavailable', { exact: true })).toHaveCount(0);
 });
 
 test('the public route does not expose actuator endpoints', async ({ request }) => {

@@ -130,6 +130,9 @@ export function useRequestQueue(
     [api, onConnection],
   );
 
+  // Only the dashboard reports failures, so clear the status when it goes away.
+  useEffect(() => () => onConnection(true), [onConnection]);
+
   useEffect(() => {
     const timer = window.setTimeout(
       () => void fetchPage({ query, staff, status }, null),
