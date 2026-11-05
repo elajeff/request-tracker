@@ -50,7 +50,7 @@ class StaffIntegrationTest extends SupportApiTest {
         assertEquals(404, send("PATCH", "/api/staff/" + UUID.randomUUID() + "/active", Map.of("active", false)).statusCode());
         UUID blank = UUID.randomUUID();
         jdbc.update("INSERT INTO support_staff (id,name,active) VALUES (?, ' ', false)", blank);
-        assertEquals(400, send("PATCH", "/api/staff/" + blank + "/active", Map.of("active", true)).statusCode());
+        assertEquals(409, send("PATCH", "/api/staff/" + blank + "/active", Map.of("active", true)).statusCode());
         JsonNode firstPage = ok("GET", "/api/staff?limit=1", null, 200);
         JsonNode second = ok("GET", "/api/staff?limit=1&cursor=" + firstPage.get("nextCursor").asText(), null, 200);
         assertTrue(firstPage.get("items").get(0).get("id").asText()
@@ -73,7 +73,7 @@ class StaffIntegrationTest extends SupportApiTest {
         assertFalse(retained.get("assigneeActive").asBoolean());
         assign(assigned, person, 200);
         assertEquals(historyBefore, historyCount(assigned));
-        assign(other, person, 400);
+        assign(other, person, 409);
         assertTrue(ok("GET", "/api/requests/" + other, null, 200).get("assigneeId").isNull());
         assertEquals(1, historyCount(other));
         String replacement = staff("Replacement").get("id").asText();
