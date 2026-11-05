@@ -160,20 +160,28 @@ export function RequestCard({
   const [statusChoice, setStatusChoice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const lock = useRef(false);
-  const statusSave = useRef(false);
+  const focusBack = useRef<"status" | "details" | null>(null);
   const statusSelect = useRef<HTMLSelectElement>(null);
   const statusButton = useRef<HTMLButtonElement>(null);
   const editButton = useRef<HTMLButtonElement>(null);
+  const saveDetailsButton = useRef<HTMLButtonElement>(null);
   // The Save status button can unmount and the select can stay disabled during
-  // a save, which drops focus to the page. Put it back only if that happened.
+  // a save, and the details form unmounts on Save and Cancel. Each drops focus
+  // to the page. Put it back only if that happened. After a failed details
+  // save the form is still open, so focus goes to its Save changes button.
   useEffect(() => {
-    if (busy || !statusSave.current) return;
-    statusSave.current = false;
+    if (busy || !focusBack.current) return;
+    const restore = focusBack.current;
+    focusBack.current = null;
     const active = document.activeElement;
     if (active && active !== document.body) return;
+    if (restore === "details") {
+      (editButton.current ?? saveDetailsButton.current)?.focus();
+      return;
+    }
     const target = statusButton.current ?? statusSelect.current;
     (target && !target.disabled ? target : editButton.current)?.focus();
-  }, [busy]);
+  }, [busy, draft]);
   // Drop a pending choice if that person was deactivated before it was saved.
   const pending =
     assignment !== null &&
@@ -190,7 +198,8 @@ export function RequestCard({
   ) {
     if (lock.current) return;
     lock.current = true;
-    if (path === "/status") statusSave.current = true;
+    if (path === "/status") focusBack.current = "status";
+    if (!path) focusBack.current = "details";
     setBusy(true);
     try {
       const updated = await api<ServiceRequest>(
@@ -333,14 +342,21 @@ export function RequestCard({
             />
           </label>
           <div className="edit-actions">
-            <button className="button button-primary" disabled={busy}>
+            <button
+              ref={saveDetailsButton}
+              className="button button-primary"
+              disabled={busy}
+            >
               Save changes
             </button>
             <button
               type="button"
               className="button button-secondary"
               disabled={busy}
-              onClick={() => setDraft(null)}
+              onClick={() => {
+                focusBack.current = "details";
+                setDraft(null);
+              }}
             >
               Cancel
             </button>
