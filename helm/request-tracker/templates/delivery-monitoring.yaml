@@ -15,7 +15,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata: {name: request-tracker-delivery-prometheus}
 subjects:
-  - {kind: ServiceAccount, name: request-tracker-delivery-prometheus, namespace: request-tracker}
+  - {kind: ServiceAccount, name: request-tracker-delivery-prometheus, namespace: {{ .Release.Namespace }}}
 roleRef: {apiGroup: rbac.authorization.k8s.io, kind: Role, name: request-tracker-delivery-prometheus}
 ---
 apiVersion: v1
@@ -31,7 +31,7 @@ data:
         metrics_path: /actuator/prometheus
         kubernetes_sd_configs:
           - role: pod
-            namespaces: {names: [request-tracker]}
+            namespaces: {names: [{{ .Release.Namespace }}]}
         relabel_configs:
           - source_labels: [__meta_kubernetes_pod_label_app]
             regex: request-tracker-delivery
