@@ -110,12 +110,18 @@ test("request validation, forbidden and not-found errors retain drafts for manua
       status === 403 ? "Access denied" : "Request not found",
     );
     await expect(title).toHaveValue("react-errors saved");
+    await expect(
+      card.getByRole("button", { name: "Save changes" }),
+    ).toBeFocused();
     await page.unroute(`**/api/requests/${row.id}`);
   }
   await card.getByRole("button", { name: "Save changes" }).click();
   await expect(
     page.getByRole("article", { name: "react-errors saved", exact: true }),
   ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Edit details for react-errors saved" }),
+  ).toBeFocused();
 });
 
 test("late queue responses cannot restore protected content after session loss", async ({
@@ -214,6 +220,9 @@ test("dashboard desktop and narrow layouts retain labels and keyboard focus", as
     card.getByRole("textbox", { name: "Title", exact: true }),
   ).toBeFocused();
   await card.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(
+    card.getByRole("button", { name: `Edit details for ${row.title}` }),
+  ).toBeFocused();
   for (const [width, height, name] of [
     [1440, 1000, "desktop"],
     [390, 844, "narrow"],
