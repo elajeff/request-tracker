@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useRef, useState } from "react";
 import type {
   Api,
   Page,
@@ -34,12 +34,26 @@ function History({ request, api }: { request: ServiceRequest; api: Api }) {
   const [error, setError] = useState("");
   const lock = useRef(false);
   const alive = useRef(true);
+  const details = useRef<HTMLDetailsElement>(null);
   useEffect(
     () => () => {
       alive.current = false;
     },
     [],
   );
+  const reload = useEffectEvent(() => {
+    if (loaded && details.current?.open) void load();
+  });
+  // These are the fields that write history entries.
+  useEffect(() => {
+    reload();
+  }, [
+    request.title,
+    request.description,
+    request.status,
+    request.priority,
+    request.assigneeId,
+  ]);
   async function load(append = false) {
     if (lock.current) return;
     lock.current = true;
@@ -73,6 +87,7 @@ function History({ request, api }: { request: ServiceRequest; api: Api }) {
   return (
     <details
       className="request-history"
+      ref={details}
       onToggle={(event) => {
         if (event.currentTarget.open && !loaded) void load();
       }}
