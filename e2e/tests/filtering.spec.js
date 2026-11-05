@@ -121,6 +121,53 @@ test("a request created under a status filter it can't match stays out of the li
   await expect(page.getByRole("article", { name: token })).toHaveCount(0);
 });
 
+test("a save while more requests load keeps the pages already loaded", async ({
+  page,
+  request,
+}) => {
+  await loginApi(request);
+  const token = `load-more-save-${randomUUID().slice(0, 8)}`;
+  for (let i = 0; i < 28; i++)
+    await api(request, "POST", "/api/requests", {
+      title: `${token} ${i}`,
+      description: "Paging",
+    });
+  await loginUi(page);
+  await page.getByRole("searchbox", { name: "Search requests" }).fill(token);
+  await expect(titles(page)).toHaveCount(25);
+  let release;
+  const held = new Promise((resolve) => {
+    release = resolve;
+  });
+  await page.route("**/api/requests?*", async (route) => {
+    if (new URL(route.request().url()).searchParams.has("cursor")) await held;
+    await route.continue();
+  });
+  try {
+    const dispatched = page.waitForRequest((r) =>
+      new URL(r.url()).searchParams.has("cursor"),
+    );
+    await page.getByRole("button", { name: "Load more requests" }).click();
+    await dispatched;
+    const title = `${token} 27`;
+    await page
+      .getByRole("combobox", { name: `Status for ${title}` })
+      .selectOption("IN_PROGRESS");
+    await page
+      .getByRole("button", { name: `Save status for ${title}` })
+      .click();
+    await expect(page.locator("#notice")).toContainText("Status updated");
+    release();
+    await expect(titles(page)).toHaveCount(28);
+    await expect(
+      page.getByRole("combobox", { name: `Status for ${title}` }),
+    ).toHaveValue("IN_PROGRESS");
+  } finally {
+    release();
+    await page.unrouteAll({ behavior: "wait" });
+  }
+});
+
 test("staff backend search stays paginated, resets when cleared and rejects slower old responses", async ({
   page,
   request,
