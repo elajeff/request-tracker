@@ -87,7 +87,7 @@ public class ServiceRequestService {
             case RESOLVED -> false;
         };
         if (!allowed) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
                     "Cannot change status from " + current.status() + " to " + status);
         }
         repository.updateStatus(id, status);
