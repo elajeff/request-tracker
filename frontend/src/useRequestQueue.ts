@@ -90,11 +90,10 @@ export function useRequestQueue(
           });
         let startedAt = revision.current;
         let page = await load(after);
-        // Start again from the first page if the user edited something meanwhile.
+        // Fetch the same page again if the user edited something meanwhile.
         while (!controller.signal.aborted && startedAt !== revision.current) {
-          after = null;
           startedAt = revision.current;
-          page = await load(null);
+          page = await load(after);
         }
         if (controller.signal.aborted) return;
         setRequests((previous) =>
