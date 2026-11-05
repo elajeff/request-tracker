@@ -1,9 +1,9 @@
 package dev.elajeff.requesttracker.staff;
 
-import java.net.URI;
 import java.util.UUID;
 
 import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -34,7 +34,7 @@ public class StaffController {
     @PostMapping
     public ResponseEntity<SupportStaff> create(@Valid @RequestBody StaffNameRequest request) {
         SupportStaff created = service.create(request.name());
-        return ResponseEntity.created(URI.create("/api/staff/" + created.id())).body(created);
+        return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
 
     @PutMapping("/{id}")
