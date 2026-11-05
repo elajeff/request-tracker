@@ -133,6 +133,25 @@ class ControllerTests(unittest.TestCase):
                 c.sync(self.body())
         self.assertNotIn("credential-canary", str(error.exception))
 
+    def test_any_container_waiting_error_is_reported(self):
+        items = [{"metadata": {"name": "demo-backend"}}]
+        live = {"metadata": {"generation": 1}, "status": {}}
+
+        def pod(reason):
+            return {"metadata": {"name": "demo-backend-1"},
+                    "status": {"containerStatuses": [{"state": {"waiting": {"reason": reason}}}]}}
+
+        endpoint = Mock()
+        with patch.object(c, "read", return_value=live), patch.object(c, "resource", return_value=endpoint):
+            endpoint.get.return_value.to_dict.return_value = {"items": [pod("CreateContainerConfigError")]}
+            with self.assertRaises(c.Blocked) as error:
+                c.require_rolled_out(self.body(), items)
+            self.assertEqual("CreateContainerConfigError", error.exception.reason)
+            endpoint.get.return_value.to_dict.return_value = {"items": [pod("ContainerCreating")]}
+            with self.assertRaises(c.Blocked) as error:
+                c.require_rolled_out(self.body(), items)
+            self.assertEqual("Progressing", error.exception.reason)
+
 
 if __name__ == "__main__":
     unittest.main()

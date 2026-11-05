@@ -224,8 +224,8 @@ def require_rolled_out(body, items):
         for pod in pods:
             for container in pod.get("status", {}).get("containerStatuses", []):
                 waiting = container.get("state", {}).get("waiting", {})
-                if waiting.get("reason") in ["ImagePullBackOff", "ErrImagePull", "CrashLoopBackOff"]:
-                    raise Blocked(waiting["reason"], f"{pod['metadata']['name']}: check the configured image, pod events, and container logs.")
+                if waiting.get("reason") not in [None, "ContainerCreating", "PodInitializing"]:
+                    raise Blocked(waiting["reason"], f"{pod['metadata']['name']}: check pod events, the configured image and Secrets, and container logs.")
         raise Blocked("Progressing", f"Waiting for {item['metadata']['name']} to have one available replica; inspect its pods and PVC events.")
 
 
