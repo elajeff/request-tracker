@@ -160,15 +160,22 @@ export function RequestCard({
   const [statusChoice, setStatusChoice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const lock = useRef(false);
-  const focusBack = useRef<"status" | "details" | null>(null);
+  const focusBack = useRef<
+    "status" | "details" | "priority" | "assignment" | null
+  >(null);
   const statusSelect = useRef<HTMLSelectElement>(null);
   const statusButton = useRef<HTMLButtonElement>(null);
   const editButton = useRef<HTMLButtonElement>(null);
   const saveDetailsButton = useRef<HTMLButtonElement>(null);
+  const prioritySelect = useRef<HTMLSelectElement>(null);
+  const assignmentButton = useRef<HTMLButtonElement>(null);
   // The Save status button can unmount and the select can stay disabled during
-  // a save, and the details form unmounts on Save and Cancel. Each drops focus
-  // to the page. Put it back only if that happened. After a failed details
-  // save the form is still open, so focus goes to its Save changes button.
+  // a save, and the details form unmounts on Save and Cancel. The priority
+  // select and the Save assignment button are disabled during their saves.
+  // Each drops focus to the page. Put it back only if that happened. After a
+  // failed details save the form is still open, so focus goes to its Save
+  // changes button. Priority and assignment saves go back to their own
+  // control, whether or not the save worked.
   useEffect(() => {
     if (busy || !focusBack.current) return;
     const restore = focusBack.current;
@@ -177,6 +184,14 @@ export function RequestCard({
     if (active && active !== document.body) return;
     if (restore === "details") {
       (editButton.current ?? saveDetailsButton.current)?.focus();
+      return;
+    }
+    if (restore === "priority") {
+      prioritySelect.current?.focus();
+      return;
+    }
+    if (restore === "assignment") {
+      assignmentButton.current?.focus();
       return;
     }
     const target = statusButton.current ?? statusSelect.current;
@@ -200,6 +215,8 @@ export function RequestCard({
     lock.current = true;
     if (path === "/status") focusBack.current = "status";
     if (!path) focusBack.current = "details";
+    if (path === "/priority") focusBack.current = "priority";
+    if (path === "/assignment") focusBack.current = "assignment";
     setBusy(true);
     try {
       const updated = await api<ServiceRequest>(
@@ -407,6 +424,7 @@ export function RequestCard({
             <label className="control-field">
               <span>Priority</span>
               <select
+                ref={prioritySelect}
                 className="control-select"
                 aria-label={`Priority for ${request.title}`}
                 value={request.priority}
@@ -473,7 +491,11 @@ export function RequestCard({
                   ))}
               </select>
             </label>
-            <button className="button button-secondary" disabled={busy}>
+            <button
+              ref={assignmentButton}
+              className="button button-secondary"
+              disabled={busy}
+            >
               Save assignment
             </button>
             <small>

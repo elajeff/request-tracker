@@ -207,6 +207,12 @@ test("dashboard desktop and narrow layouts retain labels and keyboard focus", as
   request,
 }) => {
   const row = await seed(request, "react-layout");
+  const person = await (
+    await request.post("/api/staff", {
+      headers: await csrfHeaders(request),
+      data: { name: "react-layout staff" },
+    })
+  ).json();
   await loginUi(page);
   await page
     .getByRole("searchbox", { name: "Search requests" })
@@ -223,6 +229,38 @@ test("dashboard desktop and narrow layouts retain labels and keyboard focus", as
   await expect(
     card.getByRole("button", { name: `Edit details for ${row.title}` }),
   ).toBeFocused();
+  const priority = card.getByRole("combobox", {
+    name: `Priority for ${row.title}`,
+  });
+  await priority.focus();
+  await priority.selectOption("LOW");
+  await expect(card.locator(".pill.priority-low")).toBeVisible();
+  await expect(priority).toBeFocused();
+  await page.route(`**/api/requests/${row.id}/priority`, (route) =>
+    route.fulfill({ status: 500, json: { detail: "Priority save failed" } }),
+  );
+  await priority.selectOption("HIGH");
+  await expect(page.locator("#notice")).toContainText("Priority save failed");
+  await expect(priority).toBeFocused();
+  const assignee = card.getByRole("combobox", {
+    name: `Assigned staff for ${row.title}`,
+  });
+  const saveAssignment = card.getByRole("button", { name: "Save assignment" });
+  await assignee.selectOption(person.id);
+  await saveAssignment.focus();
+  await page.keyboard.press("Enter");
+  await expect(card).toContainText(`Assigned staff: ${person.name}`);
+  await expect(saveAssignment).toBeFocused();
+  await page.route(`**/api/requests/${row.id}/assignment`, (route) =>
+    route.fulfill({ status: 500, json: { detail: "Assignment save failed" } }),
+  );
+  await assignee.selectOption("");
+  await saveAssignment.focus();
+  await page.keyboard.press("Enter");
+  await expect(page.locator("#notice")).toContainText(
+    "Assignment save failed",
+  );
+  await expect(saveAssignment).toBeFocused();
   for (const [width, height, name] of [
     [1440, 1000, "desktop"],
     [390, 844, "narrow"],
