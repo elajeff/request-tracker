@@ -123,8 +123,12 @@ test('status and priority changes persist with before/after history', async ({ p
   await search(page, 'e2e-history');
   const created = await create(page, 'e2e-history changes');
   const item = card(page, created.title);
+  await item.getByText('Change history', { exact: true }).click();
+  const openHistory = item.getByRole('list', { name: `Change history for ${created.title}` });
+  await expect(openHistory.getByRole('listitem')).toHaveCount(1);
   await mutate(page, 'PATCH', `/api/requests/${created.id}/priority`,
     () => item.getByRole('combobox', { name: `Priority for ${created.title}` }).selectOption('HIGH'));
+  await expect(openHistory.getByRole('listitem').first()).toHaveText(/priority.*Medium → High/s);
   await expect(item.getByRole('combobox', { name: `Priority for ${created.title}` })).toHaveValue('HIGH');
   await item.getByRole('combobox', { name: `Status for ${created.title}` }).selectOption('IN_PROGRESS');
   await expect(item.getByRole('button', { name: `Save status for ${created.title}` })).toBeVisible();
