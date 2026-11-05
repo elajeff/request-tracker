@@ -128,7 +128,7 @@ class ServiceRequestIntegrationTest extends SupportApiTest {
     void statusMovesForwardAndIsPersisted() throws Exception {
         String id = createRequestAndGetId();
 
-        assertEquals(400, patch("/api/requests/" + id + "/status",
+        assertEquals(409, patch("/api/requests/" + id + "/status",
                 "{\"status\":\"RESOLVED\"}").statusCode());
 
         HttpResponse<String> inProgress = patch("/api/requests/" + id + "/status",
@@ -235,7 +235,7 @@ class ServiceRequestIntegrationTest extends SupportApiTest {
         assertEquals(200, patch(path + "/priority", "{\"priority\":\"HIGH\"}").statusCode());
         assertEquals(200, patch(path + "/status", "{\"status\":\"IN_PROGRESS\"}").statusCode());
         assertEquals(200, put(path, "{\"title\":\"Edited title\",\"description\":\"Edited details\"}").statusCode());
-        assertEquals(400, patch(path + "/status", "{\"status\":\"NEW\"}").statusCode());
+        assertEquals(409, patch(path + "/status", "{\"status\":\"NEW\"}").statusCode());
         assertEquals(6, historyCount(requestId));
         var entries = service.findHistory(requestId, null, 25).items();
         assertEquals("DESCRIPTION", entries.getFirst().field());
