@@ -74,6 +74,7 @@ export function useRequestQueue(
   // Bumped on every local edit. A page requested before an edit is discarded
   // and fetched again, so it cannot put old field values back.
   const revision = useRef(0);
+  const latestFilters = useRef<QueueFilters>({ query, staff, status });
 
   const fetchPage = useCallback(
     async (filters: QueueFilters, after: string | null) => {
@@ -145,6 +146,9 @@ export function useRequestQueue(
   }, [fetchPage, query, staff, status]);
 
   const current = { query, staff, status };
+  useEffect(() => {
+    latestFilters.current = current;
+  });
   const upToDate = sameFilters(loadedFilters, current);
 
   return {
@@ -162,6 +166,7 @@ export function useRequestQueue(
     },
     edited(before: ServiceRequest, fields: Partial<ServiceRequest>) {
       revision.current++;
+      // The card stays put until the list reloads, so it doesn't vanish while being worked on.
       setRequests((previous) =>
         previous.map((item) =>
           item.id === before.id ? { ...item, ...fields } : item,
@@ -178,6 +183,12 @@ export function useRequestQueue(
     },
     created(item: ServiceRequest) {
       revision.current++;
+      const filters = latestFilters.current;
+      if (filters.query || filters.staff || filters.status) {
+        // A new request may not match the filters, and the server decides that.
+        void fetchPage(filters, null);
+        return;
+      }
       setRequests((previous) => [item, ...previous]);
       setCounts((previous) => ({
         ...previous,

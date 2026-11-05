@@ -91,6 +91,36 @@ test("status finds older matches before pagination and combines with search and 
   await expect(titles(page)).toHaveCount(25);
 });
 
+test("a request created under a status filter it can't match stays out of the list", async ({
+  page,
+}) => {
+  const token = `filter-create-${randomUUID().slice(0, 8)}`;
+  await loginUi(page);
+  await page.getByRole("searchbox", { name: "Search requests" }).fill(token);
+  const filtered = page.waitForResponse((r) => {
+    const u = new URL(r.url());
+    return (
+      u.pathname === "/api/requests" &&
+      u.searchParams.get("status") === "RESOLVED" &&
+      u.searchParams.get("q") === token
+    );
+  });
+  await page
+    .getByRole("combobox", { name: "Filter by status", exact: true })
+    .selectOption("RESOLVED");
+  await filtered;
+  await expect(page.getByText("0 matching requests loaded")).toBeVisible();
+  const form = page.getByRole("complementary", { name: "Create request" });
+  await form.getByRole("textbox", { name: /^Title/ }).fill(token);
+  await form.getByRole("textbox", { name: /^Description/ }).fill("Stays new");
+  await form
+    .getByRole("button", { name: "Create request", exact: true })
+    .click();
+  await expect(page.locator("#notice")).toContainText("Request created");
+  await expect(page.getByText("0 matching requests loaded")).toBeVisible();
+  await expect(page.getByRole("article", { name: token })).toHaveCount(0);
+});
+
 test("staff backend search stays paginated, resets when cleared and rejects slower old responses", async ({
   page,
   request,
