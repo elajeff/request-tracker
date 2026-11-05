@@ -119,7 +119,7 @@ public class ServiceRequestService {
             // Lock the staff row so it cannot be deactivated or renamed while being assigned.
             selected = staffService.requireForUpdate(staffId);
             if (!selected.active()) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cannot assign inactive staff");
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "Cannot assign inactive staff");
             }
         }
         repository.updateAssignment(id, staffId);

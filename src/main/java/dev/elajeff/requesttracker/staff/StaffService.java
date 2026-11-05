@@ -48,7 +48,7 @@ public class StaffService {
     public SupportStaff setActive(UUID id, boolean active) {
         SupportStaff current = requireForUpdate(id);
         if (active && current.name().isBlank()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Rename blank legacy staff before activation");
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Rename blank legacy staff before activation");
         }
         return repository.setActive(id, active);
     }
