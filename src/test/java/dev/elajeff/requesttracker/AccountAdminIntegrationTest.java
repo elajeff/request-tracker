@@ -33,7 +33,7 @@ class AccountAdminIntegrationTest extends SupportApiTest {
         String password = password();
         var created = send("POST", "/api/accounts", Map.of("username", name, "role", "REQUESTER", "password", password));
         assertEquals(201, created.statusCode(), created.body());
-        assertEquals("/api/accounts/" + name, created.headers().firstValue("Location").orElseThrow());
+        assertTrue(created.headers().firstValue("Location").isEmpty());
         assertFalse(created.body().contains("password"));
         JsonNode account = json.readTree(created.body());
         assertEquals("REQUESTER", account.get("role").asText());
