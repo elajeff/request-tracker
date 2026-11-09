@@ -232,16 +232,22 @@ test("dashboard desktop and narrow layouts retain labels and keyboard focus", as
   const priority = card.getByRole("combobox", {
     name: `Priority for ${row.title}`,
   });
-  await priority.focus();
+  const savePriority = card.getByRole("button", {
+    name: `Save priority for ${row.title}`,
+  });
   await priority.selectOption("LOW");
+  await savePriority.focus();
+  await page.keyboard.press("Enter");
   await expect(card.locator(".pill.priority-low")).toBeVisible();
   await expect(priority).toBeFocused();
   await page.route(`**/api/requests/${row.id}/priority`, (route) =>
     route.fulfill({ status: 500, json: { detail: "Priority save failed" } }),
   );
   await priority.selectOption("HIGH");
+  await savePriority.focus();
+  await page.keyboard.press("Enter");
   await expect(page.locator("#notice")).toContainText("Priority save failed");
-  await expect(priority).toBeFocused();
+  await expect(savePriority).toBeFocused();
   const assignee = card.getByRole("combobox", {
     name: `Assigned staff for ${row.title}`,
   });
@@ -250,7 +256,8 @@ test("dashboard desktop and narrow layouts retain labels and keyboard focus", as
   await saveAssignment.focus();
   await page.keyboard.press("Enter");
   await expect(card).toContainText(`Assigned staff: ${person.name}`);
-  await expect(saveAssignment).toBeFocused();
+  await expect(saveAssignment).toBeDisabled();
+  await expect(assignee).toBeFocused();
   await page.route(`**/api/requests/${row.id}/assignment`, (route) =>
     route.fulfill({ status: 500, json: { detail: "Assignment save failed" } }),
   );

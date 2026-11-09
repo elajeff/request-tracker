@@ -158,6 +158,7 @@ export function RequestCard({
   } | null>(null);
   const [assignment, setAssignment] = useState<string | null>(null);
   const [statusChoice, setStatusChoice] = useState<string | null>(null);
+  const [priorityChoice, setPriorityChoice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const lock = useRef(false);
   const focusBack = useRef<
@@ -168,14 +169,17 @@ export function RequestCard({
   const editButton = useRef<HTMLButtonElement>(null);
   const saveDetailsButton = useRef<HTMLButtonElement>(null);
   const prioritySelect = useRef<HTMLSelectElement>(null);
+  const priorityButton = useRef<HTMLButtonElement>(null);
+  const assignmentSelect = useRef<HTMLSelectElement>(null);
   const assignmentButton = useRef<HTMLButtonElement>(null);
   // The Save status button can unmount and the select can stay disabled during
-  // a save, and the details form unmounts on Save and Cancel. The priority
-  // select and the Save assignment button are disabled during their saves.
+  // a save, and the details form unmounts on Save and Cancel. The Save
+  // priority and Save assignment buttons are disabled during their saves.
   // Each drops focus to the page. Put it back only if that happened. After a
   // failed details save the form is still open, so focus goes to its Save
-  // changes button. Priority and assignment saves go back to their own
-  // control, whether or not the save worked.
+  // changes button. After a failed priority or assignment save focus goes
+  // back to the button. After one that worked, Save priority is gone and
+  // Save assignment is disabled, so focus goes to the select.
   useEffect(() => {
     if (busy || !focusBack.current) return;
     const restore = focusBack.current;
@@ -187,11 +191,14 @@ export function RequestCard({
       return;
     }
     if (restore === "priority") {
-      prioritySelect.current?.focus();
+      (priorityButton.current ?? prioritySelect.current)?.focus();
       return;
     }
     if (restore === "assignment") {
-      assignmentButton.current?.focus();
+      (assignmentButton.current?.disabled
+        ? assignmentSelect
+        : assignmentButton
+      ).current?.focus();
       return;
     }
     const target = statusButton.current ?? statusSelect.current;
@@ -227,6 +234,7 @@ export function RequestCard({
       if (!path) setDraft(null);
       if (path === "/assignment") setAssignment(null);
       if (path === "/status") setStatusChoice(null);
+      if (path === "/priority") setPriorityChoice(null);
       notify(message);
     } catch (error) {
       notify(`Could not update request: ${errorMessage(error)}`);
@@ -265,6 +273,8 @@ export function RequestCard({
     statuses.includes(statusChoice)
       ? statusChoice
       : null;
+  const pendingPriority =
+    priorityChoice !== request.priority ? priorityChoice : null;
   return (
     <article
       className="request-card"
@@ -383,7 +393,7 @@ export function RequestCard({
       {support && (
         <>
           <div className="request-controls">
-            <div className="status-field">
+            <div className="control-group">
               <label className="control-field">
                 <span>Status</span>
                 <select
@@ -404,7 +414,7 @@ export function RequestCard({
               {pendingStatus && (
                 <button
                   ref={statusButton}
-                  className="button button-secondary status-save"
+                  className="button button-secondary control-save"
                   aria-label={`Save status for ${request.title}`}
                   disabled={busy}
                   onClick={() =>
@@ -421,41 +431,53 @@ export function RequestCard({
                 </button>
               )}
             </div>
-            <label className="control-field">
-              <span>Priority</span>
-              <select
-                ref={prioritySelect}
-                className="control-select"
-                aria-label={`Priority for ${request.title}`}
-                value={request.priority}
-                disabled={busy}
-                onChange={(event) =>
-                  void save(
-                    "/priority",
-                    "PATCH",
-                    { priority: event.target.value },
-                    (item) => ({ priority: item.priority }),
-                    "Priority updated.",
-                  )
-                }
-              >
-                {["HIGH", "MEDIUM", "LOW"].map((value) => (
-                  <option key={value} value={value}>
-                    {label(value)}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <div className="control-group">
+              <label className="control-field">
+                <span>Priority</span>
+                <select
+                  ref={prioritySelect}
+                  className="control-select"
+                  aria-label={`Priority for ${request.title}`}
+                  value={pendingPriority ?? request.priority}
+                  disabled={busy}
+                  onChange={(event) => setPriorityChoice(event.target.value)}
+                >
+                  {["HIGH", "MEDIUM", "LOW"].map((value) => (
+                    <option key={value} value={value}>
+                      {label(value)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              {pendingPriority && (
+                <button
+                  ref={priorityButton}
+                  className="button button-secondary control-save"
+                  aria-label={`Save priority for ${request.title}`}
+                  disabled={busy}
+                  onClick={() =>
+                    void save(
+                      "/priority",
+                      "PATCH",
+                      { priority: pendingPriority },
+                      (item) => ({ priority: item.priority }),
+                      "Priority updated.",
+                    )
+                  }
+                >
+                  Save priority
+                </button>
+              )}
+            </div>
           </div>
           <form
             className="assignment-form"
             onSubmit={(event) => {
               event.preventDefault();
-              const id = pending ?? request.assigneeId;
               void save(
                 "/assignment",
                 "PATCH",
-                id ? { staffId: id } : { unassign: true },
+                pending ? { staffId: pending } : { unassign: true },
                 (item) => ({
                   assignee: item.assignee,
                   assigneeId: item.assigneeId,
@@ -468,6 +490,7 @@ export function RequestCard({
             <label className="form-field">
               <span>Assigned support staff</span>
               <select
+                ref={assignmentSelect}
                 className="control-select assignment-select"
                 aria-label={`Assigned staff for ${request.title}`}
                 value={pending ?? request.assigneeId ?? ""}
@@ -494,7 +517,11 @@ export function RequestCard({
             <button
               ref={assignmentButton}
               className="button button-secondary"
-              disabled={busy}
+              disabled={
+                busy ||
+                pending === null ||
+                pending === (request.assigneeId ?? "")
+              }
             >
               Save assignment
             </button>
