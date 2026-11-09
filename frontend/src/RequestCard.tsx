@@ -33,14 +33,7 @@ function History({ request, api }: { request: ServiceRequest; api: Api }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const lock = useRef(false);
-  const alive = useRef(true);
   const details = useRef<HTMLDetailsElement>(null);
-  useEffect(
-    () => () => {
-      alive.current = false;
-    },
-    [],
-  );
   const reload = useEffectEvent(() => {
     if (loaded && details.current?.open) void load();
   });
@@ -65,7 +58,6 @@ function History({ request, api }: { request: ServiceRequest; api: Api }) {
       const page = await api<Page<RequestHistoryEntry>>(
         `/api/requests/${request.id}/history?${params}`,
       );
-      if (!alive.current) return;
       setEntries((previous) => [
         ...new Map(
           [...(append ? previous : []), ...page.items].map((item) => [
@@ -77,11 +69,10 @@ function History({ request, api }: { request: ServiceRequest; api: Api }) {
       setCursor(page.nextCursor);
       setLoaded(true);
     } catch (failure) {
-      if (alive.current)
-        setError(`Could not load history: ${errorMessage(failure)}`);
+      setError(`Could not load history: ${errorMessage(failure)}`);
     } finally {
       lock.current = false;
-      if (alive.current) setBusy(false);
+      setBusy(false);
     }
   }
   return (

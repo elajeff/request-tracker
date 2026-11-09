@@ -39,15 +39,10 @@ export function App() {
           }}
         />
       ) : (
-        <section
-          id="login-panel"
-          className="panel login-panel"
-          aria-labelledby="login-heading"
-        >
+        <section className="panel login-panel" aria-labelledby="login-heading">
           <h1 id="login-heading">Sign in</h1>
           <p>Sign in to see your requests.</p>
           <form
-            id="login-form"
             onSubmit={async (event) => {
               event.preventDefault();
               if (busy) return;
@@ -96,16 +91,13 @@ export function App() {
               />
             </label>
             <button
-              id="login-button"
               className="button button-primary"
               disabled={busy || !auth.session}
             >
               Sign in
             </button>
           </form>
-          <p id="login-notice" role="status">
-            {auth.notice}
-          </p>
+          <p role="status">{auth.notice}</p>
           <button
             className="button button-secondary"
             onClick={() => void auth.refresh()}

@@ -751,10 +751,6 @@ h1 {
   background: #f8fafc;
 }
 
-.request-edit-form[hidden] {
-  display: none;
-}
-
 .edit-actions {
   display: flex;
   flex-wrap: wrap;

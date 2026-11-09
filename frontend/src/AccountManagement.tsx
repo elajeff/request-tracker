@@ -168,7 +168,7 @@ export function AccountManagement({ api, username, onOwnSessionEnded }: Props) {
 
   const disabled = loading || saving;
   return (
-    <details id="account-directory" className="account-directory">
+    <details className="account-directory">
       <summary>Manage accounts</summary>
       <p className="muted">
         Login accounts. Disabling an account, changing its role or resetting its
