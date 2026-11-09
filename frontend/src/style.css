@@ -794,13 +794,13 @@ h1 {
 :where(button, summary, a):focus-visible { outline: 3px solid var(--blue); outline-offset: 3px; }
 @media (max-width: 650px) { .page-heading { flex-wrap: wrap; } .signed-in { width: 100%; } }
 
-.status-field {
+.control-group {
   display: flex;
   min-width: 0;
   flex-direction: column;
   gap: 7px;
 }
 
-.status-save {
+.control-save {
   align-self: flex-start;
 }
