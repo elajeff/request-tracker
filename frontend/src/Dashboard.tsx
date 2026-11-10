@@ -45,7 +45,7 @@ export function Dashboard({
   const filtered = Boolean(query || staffFilter || statusFilter);
   const message = queue.error || notice;
   return (
-    <main id="dashboard" className="page">
+    <main className="page">
       <header className="page-heading">
         <h1>Service requests</h1>
         <div className="page-actions">
@@ -94,9 +94,7 @@ export function Dashboard({
         ).map(([label, count, style, caption]) => (
           <article className={`stat-card stat-${style}`} key={style}>
             <span className="stat-label">{label}</span>
-            <strong id={`${style}-count`} className="stat-number">
-              {count}
-            </strong>
+            <strong className="stat-number">{count}</strong>
             <span className="stat-caption">{caption}</span>
           </article>
         ))}
@@ -162,7 +160,7 @@ export function Dashboard({
             )}
           </div>
           {message && (
-            <div id="notice" className="notice notice-info" role="status">
+            <div id="notice" className="notice" role="status">
               {message}
             </div>
           )}

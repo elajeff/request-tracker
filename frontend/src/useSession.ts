@@ -82,7 +82,7 @@ export function useSession() {
         let message = text || `${response.status} ${response.statusText}`;
         try {
           const body = JSON.parse(text);
-          message = body.detail ?? body.message ?? body.title ?? message;
+          message = body.detail ?? body.title ?? message;
         } catch {
           /* Non-JSON proxy errors remain readable. */
         }
