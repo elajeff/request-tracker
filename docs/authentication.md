@@ -39,9 +39,9 @@ SUPPORT users manage accounts from **Manage accounts** on the dashboard, or thro
 The first SUPPORT account has to come from the command line, because everything above needs someone signed in. The command line also works if you are locked out. Build the jar and point it at your database with the usual `SPRING_DATASOURCE_*` variables:
 
 ```sh
-java -jar target/request-tracker-0.0.1-SNAPSHOT.jar --accounts.action=create --accounts.username=alice --accounts.role=SUPPORT
-java -jar target/request-tracker-0.0.1-SNAPSHOT.jar --accounts.action=disable --accounts.username=alice
-java -jar target/request-tracker-0.0.1-SNAPSHOT.jar --accounts.action=enable --accounts.username=alice
+java -jar target/request-tracker.jar --accounts.action=create --accounts.username=alice --accounts.role=SUPPORT
+java -jar target/request-tracker.jar --accounts.action=disable --accounts.username=alice
+java -jar target/request-tracker.jar --accounts.action=enable --accounts.username=alice
 ```
 
 `create` asks for the password with hidden input. For scripts, set `REQUEST_TRACKER_ACCOUNT_PASSWORD` instead; never pass it as an argument. These commands do not start the web server. With Compose, run `docker compose run --rm -it app` followed by the same options.
@@ -53,7 +53,7 @@ The command line can create, disable and enable accounts. Resetting a password a
 Requests created before accounts existed have no owner, so only SUPPORT can see them. To give one to a requester:
 
 ```sh
-java -jar target/request-tracker-0.0.1-SNAPSHOT.jar --accounts.action=claim-legacy --accounts.username=bob --accounts.request-id=<request uuid>
+java -jar target/request-tracker.jar --accounts.action=claim-legacy --accounts.username=bob --accounts.request-id=<request uuid>
 ```
 
 ## Sessions and CSRF

@@ -78,6 +78,7 @@
     </dependencies>
 
     <build>
+        <finalName>request-tracker</finalName>
         <plugins>
             <plugin>
                 <groupId>org.springframework.boot</groupId>
