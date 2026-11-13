@@ -1,122 +1,12 @@
-import { useEffect, useEffectEvent, useRef, useState } from "react";
-import type {
-  Api,
-  Page,
-  RequestHistoryEntry,
-  ServiceRequest,
-  SupportStaff,
-} from "./types";
+import { useEffect, useRef, useState } from "react";
+import type { Api, ServiceRequest, SupportStaff } from "./types";
 import {
   errorMessage,
   label,
   requestPriorities,
   staffLabel,
-  uniqueById,
 } from "./helpers";
-
-const historyValue = (field: string, value: string | null) =>
-  value === null
-    ? "Unassigned"
-    : field === "STATUS" || field === "PRIORITY"
-      ? label(value)
-      : value;
-
-function History({ request, api }: { request: ServiceRequest; api: Api }) {
-  const [entries, setEntries] = useState<RequestHistoryEntry[]>([]);
-  const [cursor, setCursor] = useState<string | null>(null);
-  const [loaded, setLoaded] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  const lock = useRef(false);
-  const details = useRef<HTMLDetailsElement>(null);
-  const reload = useEffectEvent(() => {
-    if (loaded && details.current?.open) void load();
-  });
-  // These are the fields that write history entries.
-  useEffect(() => {
-    reload();
-  }, [
-    request.title,
-    request.description,
-    request.status,
-    request.priority,
-    request.assigneeId,
-  ]);
-  async function load(append = false) {
-    if (lock.current) return;
-    lock.current = true;
-    setBusy(true);
-    setError("");
-    try {
-      const params = new URLSearchParams({ limit: "25" });
-      if (append && cursor) params.set("cursor", cursor);
-      const page = await api<Page<RequestHistoryEntry>>(
-        `/api/requests/${request.id}/history?${params}`,
-      );
-      setEntries((previous) =>
-        uniqueById([...(append ? previous : []), ...page.items]),
-      );
-      setCursor(page.nextCursor);
-      setLoaded(true);
-    } catch (failure) {
-      setError(`Could not load history: ${errorMessage(failure)}`);
-    } finally {
-      lock.current = false;
-      setBusy(false);
-    }
-  }
-  return (
-    <details
-      className="request-history"
-      ref={details}
-      onToggle={(event) => {
-        if (event.currentTarget.open && !loaded) void load();
-      }}
-    >
-      <summary>Change history</summary>
-      <button
-        className="button button-secondary"
-        disabled={busy}
-        onClick={() => void load()}
-      >
-        Refresh history
-      </button>
-      <ol
-        className="history-list"
-        aria-label={`Change history for ${request.title}`}
-      >
-        {entries.map((entry) => (
-          <li className="history-entry" key={entry.id}>
-            <strong>
-              {new Date(entry.changedAt).toLocaleString()} ·{" "}
-              {entry.field.toLowerCase()} ·{" "}
-              {entry.actorUsername ?? "Actor not recorded"}
-            </strong>
-            <p>
-              {entry.field === "CREATED"
-                ? `Created: ${entry.newValue}`
-                : `${historyValue(entry.field, entry.oldValue)} → ${historyValue(entry.field, entry.newValue)}`}
-            </p>
-          </li>
-        ))}
-      </ol>
-      <p role="status">
-        {busy
-          ? "Loading history…"
-          : error || (loaded && !entries.length ? "No recorded changes." : "")}
-      </p>
-      {cursor && (
-        <button
-          className="button button-secondary"
-          disabled={busy}
-          onClick={() => void load(true)}
-        >
-          Load older changes
-        </button>
-      )}
-    </details>
-  );
-}
+import { History } from "./History";
 
 export function RequestCard({
   request,
@@ -193,18 +83,17 @@ export function RequestCard({
       ? null
       : assignment;
   async function save(
+    focus: "status" | "details" | "priority" | "assignment",
     path: string,
     method: string,
     body: object,
     fields: (updated: ServiceRequest) => Partial<ServiceRequest>,
     message: string,
+    reset: () => void,
   ) {
     if (lock.current) return;
     lock.current = true;
-    if (path === "/status") focusBack.current = "status";
-    if (!path) focusBack.current = "details";
-    if (path === "/priority") focusBack.current = "priority";
-    if (path === "/assignment") focusBack.current = "assignment";
+    focusBack.current = focus;
     setBusy(true);
     try {
       const updated = await api<ServiceRequest>(
@@ -212,10 +101,7 @@ export function RequestCard({
         { method, body: JSON.stringify(body) },
       );
       onUpdated(request, fields(updated));
-      if (!path) setDraft(null);
-      if (path === "/assignment") setAssignment(null);
-      if (path === "/status") setStatusChoice(null);
-      if (path === "/priority") setPriorityChoice(null);
+      reset();
       notify(message);
     } catch (error) {
       notify(`Could not update request: ${errorMessage(error)}`);
@@ -314,6 +200,7 @@ export function RequestCard({
               return;
             }
             void save(
+              "details",
               "",
               "PUT",
               {
@@ -322,6 +209,7 @@ export function RequestCard({
               },
               (item) => ({ title: item.title, description: item.description }),
               "Request details updated.",
+              () => setDraft(null),
             );
           }}
         >
@@ -400,11 +288,13 @@ export function RequestCard({
                   disabled={busy}
                   onClick={() =>
                     void save(
+                      "status",
                       "/status",
                       "PATCH",
                       { status: pendingStatus },
                       (item) => ({ status: item.status }),
                       "Status updated.",
+                      () => setStatusChoice(null),
                     )
                   }
                 >
@@ -438,11 +328,13 @@ export function RequestCard({
                   disabled={busy}
                   onClick={() =>
                     void save(
+                      "priority",
                       "/priority",
                       "PATCH",
                       { priority: pendingPriority },
                       (item) => ({ priority: item.priority }),
                       "Priority updated.",
+                      () => setPriorityChoice(null),
                     )
                   }
                 >
@@ -456,6 +348,7 @@ export function RequestCard({
             onSubmit={(event) => {
               event.preventDefault();
               void save(
+                "assignment",
                 "/assignment",
                 "PATCH",
                 pending ? { staffId: pending } : { unassign: true },
@@ -465,6 +358,7 @@ export function RequestCard({
                   assigneeActive: item.assigneeActive,
                 }),
                 "Assignment updated.",
+                () => setAssignment(null),
               );
             }}
           >
