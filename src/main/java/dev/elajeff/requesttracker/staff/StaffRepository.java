@@ -21,30 +21,30 @@ public class StaffRepository {
 
     public SupportStaff create(String name) {
         UUID id = UUID.randomUUID();
-        return jdbc.queryForObject("INSERT INTO support_staff (id, name) VALUES (?, ?) RETURNING *",
+        return jdbc.queryForObject("INSERT INTO support_staff (id, name) VALUES (?, ?) RETURNING id, name, active",
                 ROW_MAPPER, id, name);
     }
 
     public Optional<SupportStaff> findByIdForUpdate(UUID id) {
-        return jdbc.query("SELECT * FROM support_staff WHERE id = ? FOR UPDATE", ROW_MAPPER, id)
+        return jdbc.query("SELECT id, name, active FROM support_staff WHERE id = ? FOR UPDATE", ROW_MAPPER, id)
                 .stream().findFirst();
     }
 
     public List<SupportStaff> findPage(UUID cursor, int limit, String query) {
         return jdbc.query("""
-                SELECT * FROM support_staff WHERE strpos(lower(name), lower(?)) > 0
+                SELECT id, name, active FROM support_staff WHERE strpos(lower(name), lower(?)) > 0
                     AND (?::uuid IS NULL OR id > ?)
                 ORDER BY id LIMIT ?
                 """, ROW_MAPPER, query, cursor, cursor, limit);
     }
 
     public SupportStaff rename(UUID id, String name) {
-        return jdbc.queryForObject("UPDATE support_staff SET name = ? WHERE id = ? RETURNING *",
+        return jdbc.queryForObject("UPDATE support_staff SET name = ? WHERE id = ? RETURNING id, name, active",
                 ROW_MAPPER, name, id);
     }
 
     public SupportStaff setActive(UUID id, boolean active) {
-        return jdbc.queryForObject("UPDATE support_staff SET active = ? WHERE id = ? RETURNING *",
+        return jdbc.queryForObject("UPDATE support_staff SET active = ? WHERE id = ? RETURNING id, name, active",
                 ROW_MAPPER, active, id);
     }
 }

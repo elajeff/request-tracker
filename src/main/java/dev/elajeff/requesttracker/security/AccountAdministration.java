@@ -4,6 +4,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Stream;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -11,6 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import dev.elajeff.requesttracker.PageLimit;
 import dev.elajeff.requesttracker.requests.ServiceRequestRepository;
 
 // Shared by the admin API and the command line, so both apply the same rules.
@@ -27,9 +29,7 @@ public class AccountAdministration {
     }
 
     public AccountPage findPage(String cursor, int limit, String query) {
-        if (limit < 1 || limit > 100) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Limit must be between 1 and 100");
-        }
+        PageLimit.validate(limit);
         if (cursor != null && !validUsername(cursor)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid account cursor");
         }
@@ -41,9 +41,9 @@ public class AccountAdministration {
     @Transactional
     public Account create(String username, String role, String password) {
         validateUsername(username);
-        validateRole(role);
+        AccountRole accountRole = parseRole(role);
         validatePassword(password);
-        return accounts.insert(UUID.randomUUID(), username, passwords.encode(password), role).orElseThrow(() ->
+        return accounts.insert(UUID.randomUUID(), username, passwords.encode(password), accountRole).orElseThrow(() ->
                 new ResponseStatusException(HttpStatus.CONFLICT, "Account already exists"));
     }
 
@@ -59,11 +59,11 @@ public class AccountAdministration {
     @Transactional
     public Account changeRole(String username, String role) {
         validateUsername(username);
-        validateRole(role);
+        AccountRole newRole = parseRole(role);
         Account current = found(accounts.find(username));
-        if (current.role().equals(role)) return current;
-        if (role.equals("REQUESTER")) keepOneSupport(username);
-        Account account = found(accounts.setRole(username, role));
+        if (current.role() == newRole) return current;
+        if (newRole == AccountRole.REQUESTER) keepOneSupport(username);
+        Account account = found(accounts.setRole(username, newRole));
         // A session keeps the role it logged in with, so it has to end.
         accounts.deleteSessions(username);
         return account;
@@ -112,10 +112,9 @@ public class AccountAdministration {
         return username != null && username.matches("[a-z0-9][a-z0-9._-]{2,63}");
     }
 
-    private static void validateRole(String role) {
-        if (!"REQUESTER".equals(role) && !"SUPPORT".equals(role)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Role must be REQUESTER or SUPPORT");
-        }
+    private static AccountRole parseRole(String role) {
+        return Stream.of(AccountRole.values()).filter(candidate -> candidate.name().equals(role)).findFirst()
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Role must be REQUESTER or SUPPORT"));
     }
 
     private static void validatePassword(String password) {
