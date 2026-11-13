@@ -155,10 +155,7 @@ export function useRequestQueue(
     hasMore: cursor !== null,
     canLoadMore: cursor !== null && !loading && upToDate,
     refresh: () => void fetchPage(current, null),
-    loadMore: () => {
-      if (cursor !== null && !loading && upToDate)
-        void fetchPage(current, cursor);
-    },
+    loadMore: () => void fetchPage(current, cursor),
     edited(before: ServiceRequest, fields: Partial<ServiceRequest>) {
       revision.current++;
       // The card stays put until the list reloads, so it doesn't vanish while being worked on.

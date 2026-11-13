@@ -18,7 +18,7 @@ The goal is a small support-request app, plus the testing, deployment and operat
 - A follow-up canary run looking for the cause of 7 failed requests: five rollouts and about 17,000 rounds with no failures, and the database identical before and after.
 - A rewrite of the preview controller, tested through the full lifecycle on kind.
 - An accounts page for support users: create, disable and enable accounts, change roles and reset passwords, without the command line.
-- Backend and frontend cleanup: errors that carry their message, one layer of role checks, the request queue and staff list loaded through small hooks, ESLint in CI, shorter dashboard text.
+- Backend and frontend cleanup: errors that carry their message, one layer of role checks, the request queue, staff list and account list loaded through hooks, ESLint in CI, shorter dashboard text.
 - Four source releases: [v0.1.0](https://github.com/elajeff/request-tracker/releases/tag/v0.1.0), [v0.2.0](https://github.com/elajeff/request-tracker/releases/tag/v0.2.0), [v0.3.0](https://github.com/elajeff/request-tracker/releases/tag/v0.3.0) and [v0.4.0](https://github.com/elajeff/request-tracker/releases/tag/v0.4.0). The database migration number (V6) is separate from the release version.
 
 ## Next

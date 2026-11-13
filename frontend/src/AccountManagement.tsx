@@ -1,9 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useState } from "react";
 
-import type { Account, Api, Page, Role } from "./types";
-import { errorMessage } from "./helpers";
+import type { Account, Api, Role } from "./types";
+import { usePagedList } from "./usePagedList";
 
-const ACCOUNT_SEARCH_DEBOUNCE_MS = 250;
 const USERNAME_PATTERN = /^[a-z0-9][a-z0-9._-]{2,63}$/;
 
 interface Props {
@@ -13,13 +12,10 @@ interface Props {
   onOwnSessionEnded: () => void;
 }
 
-// Pages are ordered by username, so keep that order when merging.
-const merge = (previous: Account[], incoming: Account[]) =>
-  [
-    ...new Map(
-      [...previous, ...incoming].map((account) => [account.username, account]),
-    ).values(),
-  ].sort((a, b) => a.username.localeCompare(b.username));
+const accountUsername = (account: Account) => account.username;
+const normalize = (query: string) => query.trim().toLowerCase();
+const matches = (account: Account, search: string) =>
+  account.username.includes(search);
 
 function passwordProblem(password: string) {
   return password.length < 12 || new TextEncoder().encode(password).length > 72
@@ -28,96 +24,33 @@ function passwordProblem(password: string) {
 }
 
 export function AccountManagement({ api, username, onOwnSessionEnded }: Props) {
-  const [accounts, setAccounts] = useState<Account[]>([]);
-  const [cursor, setCursor] = useState<string | null>(null);
-  const [query, setQuery] = useState("");
-  const [loadedQuery, setLoadedQuery] = useState<string | null>(null);
+  const {
+    items: accounts,
+    cursor,
+    query,
+    search,
+    loading,
+    saving,
+    disabled,
+    error,
+    notice,
+    retryFrom,
+    setError,
+    load,
+    run,
+    show,
+    changeQuery,
+  } = usePagedList<Account>(api, {
+    path: "/api/accounts",
+    key: accountUsername,
+    normalize,
+    matches,
+    loadFailed: "Could not load accounts",
+    saveFailed: "Could not save account",
+  });
   const [newUsername, setNewUsername] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [newRole, setNewRole] = useState<Role>("REQUESTER");
-  // The first page loads on mount, so start in the loading state rather than showing "0 shown".
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
-  const [retryFrom, setRetryFrom] = useState<string | null | undefined>();
-  const inFlight = useRef<AbortController | null>(null);
-  const busy = useRef(false);
-  const search = query.trim().toLowerCase();
-
-  const load = useCallback(
-    async (text: string, after: string | null) => {
-      if (busy.current) return;
-      inFlight.current?.abort();
-      const controller = new AbortController();
-      inFlight.current = controller;
-      setLoading(true);
-      setError("");
-      setRetryFrom(undefined);
-      try {
-        const params = new URLSearchParams({ limit: "25", q: text });
-        if (after) params.set("cursor", after);
-        const page = await api<Page<Account>>(`/api/accounts?${params}`, {
-          signal: controller.signal,
-        });
-        if (controller.signal.aborted) return;
-        setAccounts((previous) => merge(after ? previous : [], page.items));
-        setCursor(page.nextCursor);
-        setLoadedQuery(text);
-      } catch (failure) {
-        if (controller.signal.aborted) return;
-        setError(`Could not load accounts: ${errorMessage(failure)}`);
-        setRetryFrom(after);
-      } finally {
-        if (inFlight.current === controller) setLoading(false);
-      }
-    },
-    [api],
-  );
-
-  useEffect(() => {
-    const timer = window.setTimeout(
-      () => void load(search, null),
-      ACCOUNT_SEARCH_DEBOUNCE_MS,
-    );
-    return () => {
-      window.clearTimeout(timer);
-      inFlight.current?.abort();
-    };
-  }, [load, search]);
-
-  const canLoadMore = cursor !== null && !loading && loadedQuery === search;
-
-  // Runs one change at a time and reports whether it worked.
-  async function run(action: () => Promise<void>, success: string) {
-    if (busy.current) return false;
-    busy.current = true;
-    inFlight.current?.abort();
-    setLoading(false);
-    setSaving(true);
-    setError("");
-    setNotice("");
-    setRetryFrom(undefined);
-    try {
-      await action();
-      setNotice(success);
-      return true;
-    } catch (failure) {
-      setError(`Could not save account: ${errorMessage(failure)}`);
-      return false;
-    } finally {
-      busy.current = false;
-      setSaving(false);
-    }
-  }
-
-  function show(account: Account) {
-    setAccounts((previous) =>
-      merge(previous, [account]).filter((item) =>
-        item.username.includes(search),
-      ),
-    );
-  }
 
   function create() {
     if (!USERNAME_PATTERN.test(newUsername)) {
@@ -166,7 +99,6 @@ export function AccountManagement({ api, username, onOwnSessionEnded }: Props) {
     return saved;
   }
 
-  const disabled = loading || saving;
   return (
     <details className="account-directory">
       <summary>Manage accounts</summary>
@@ -225,14 +157,7 @@ export function AccountManagement({ api, username, onOwnSessionEnded }: Props) {
           type="search"
           value={query}
           disabled={saving}
-          onChange={(event) => {
-            setCursor(null);
-            setAccounts([]);
-            setError("");
-            setRetryFrom(undefined);
-            setLoading(true);
-            setQuery(event.target.value);
-          }}
+          onChange={(event) => changeQuery(event.target.value)}
         />
       </label>
       {error && <p role="alert">{error}</p>}
@@ -288,9 +213,7 @@ export function AccountManagement({ api, username, onOwnSessionEnded }: Props) {
         <button
           className="button button-secondary"
           disabled={disabled}
-          onClick={() => {
-            if (canLoadMore) void load(search, cursor);
-          }}
+          onClick={() => void load(cursor)}
         >
           Load more accounts
         </button>
@@ -299,7 +222,7 @@ export function AccountManagement({ api, username, onOwnSessionEnded }: Props) {
         <button
           className="button button-secondary"
           disabled={disabled}
-          onClick={() => void load(search, retryFrom)}
+          onClick={() => void load(retryFrom)}
         >
           Retry loading accounts
         </button>
@@ -307,7 +230,7 @@ export function AccountManagement({ api, username, onOwnSessionEnded }: Props) {
       <button
         className="button button-secondary"
         disabled={disabled}
-        onClick={() => void load(search, null)}
+        onClick={() => void load(null)}
       >
         Refresh accounts
       </button>
