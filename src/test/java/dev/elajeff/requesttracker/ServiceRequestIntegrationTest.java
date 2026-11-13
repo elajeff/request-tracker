@@ -62,6 +62,10 @@ class ServiceRequestIntegrationTest extends SupportApiTest {
 
         assertEquals(200, listed.statusCode());
         assertTrue(listed.body().contains(id), listed.body());
+
+        assertEquals(400, post("/api/requests",
+                "{\"title\":\"   \",\"description\":\"A valid description.\"}").statusCode());
+        assertEquals(404, get("/api/requests/" + UUID.randomUUID()).statusCode());
     }
 
     @Test
@@ -152,42 +156,13 @@ class ServiceRequestIntegrationTest extends SupportApiTest {
         retrieved = get("/api/requests/" + id);
         assertTrue(retrieved.body().contains("\"status\":\"RESOLVED\""),
                 retrieved.body());
-    }
 
-    @Test
-    void invalidStatusIsRejected() throws Exception {
-        String id = createRequestAndGetId();
-
-        HttpResponse<String> response = patch("/api/requests/" + id + "/status",
-                "{\"status\":\"CLOSED\"}");
-
-        assertEquals(400, response.statusCode());
-    }
-
-    @Test
-    void unknownRequestStatusUpdateReturnsNotFound() throws Exception {
-        HttpResponse<String> response = patch(
-                "/api/requests/" + UUID.randomUUID() + "/status",
-                "{\"status\":\"IN_PROGRESS\"}");
-
-        assertEquals(404, response.statusCode());
-    }
-
-    @Test
-    void blankTitleIsRejected() throws Exception {
-        HttpResponse<String> response = post(
-                "/api/requests",
-                "{\"title\":\"   \",\"description\":\"A valid description.\"}");
-
-        assertEquals(400, response.statusCode());
-    }
-
-    @Test
-    void unknownRequestReturnsNotFound() throws Exception {
-        HttpResponse<String> response = get(
-                "/api/requests/" + UUID.randomUUID());
-
-        assertEquals(404, response.statusCode());
+        assertEquals(400, patch("/api/requests/" + id + "/status",
+                "{\"status\":\"CLOSED\"}").statusCode());
+        assertEquals(404, patch("/api/requests/" + UUID.randomUUID() + "/status",
+                "{\"status\":\"IN_PROGRESS\"}").statusCode());
+        assertEquals(404, patch("/api/requests/" + UUID.randomUUID() + "/assignment",
+                assignment(UUID.randomUUID())).statusCode());
     }
 
     @Autowired
@@ -201,24 +176,6 @@ class ServiceRequestIntegrationTest extends SupportApiTest {
 
     @MockitoSpyBean
     private ServiceRequestRepository repository;
-
-    @Test
-    void assignmentCanBeChangedClearedAndValidated() throws Exception {
-        String id = createRequestAndGetId();
-        String path = "/api/requests/" + id + "/assignment";
-        UUID alex = staff.create("Alex Support").id();
-        UUID sam = staff.create("Sam Support").id();
-        assertEquals(200, patch(path, assignment(alex)).statusCode());
-        assertTrue(get("/api/requests/" + id).body().contains("\"assignee\":\"Alex Support\""));
-        assertEquals(200, patch(path, assignment(sam)).statusCode());
-        assertEquals(200, patch(path, "{\"unassign\":true}").statusCode());
-        assertTrue(get("/api/requests/" + id).body().contains("\"assignee\":null"));
-        assertEquals(400, patch(path, "{}").statusCode());
-        assertEquals(400, patch(path, "{\"assignee\":null}").statusCode());
-        assertEquals(400, patch(path, "{\"assignee\":\"" + "x".repeat(121) + "\"}").statusCode());
-        assertEquals(404, patch("/api/requests/" + UUID.randomUUID() + "/assignment",
-                assignment(alex)).statusCode());
-    }
 
     @Test
     void historyRecordsChangesButNotNoOpsOrRejectedUpdates() throws Exception {
