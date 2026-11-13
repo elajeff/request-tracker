@@ -106,6 +106,7 @@ class AccountAdminIntegrationTest extends SupportApiTest {
                 Map.of("username", "Bad Name", "role", "REQUESTER", "password", password()),
                 Map.of("username", username(), "role", "ADMIN", "password", password()),
                 Map.of("username", username(), "role", "REQUESTER", "password", "short"),
+                Map.of("username", username(), "role", "REQUESTER", "password", "é".repeat(37)),
                 Map.of())) {
             assertEquals(400, send("POST", "/api/accounts", body).statusCode());
         }
