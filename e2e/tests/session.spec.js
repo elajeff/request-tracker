@@ -67,7 +67,7 @@ test('invalidated server session clears private content and permits a fresh logi
   await expect(page.getByText('API unavailable', { exact: true })).toHaveCount(0);
   await expect(page.getByRole('article')).toHaveCount(0);
   await page.getByRole('textbox', { name: 'Username', exact: true }).fill('e2e-support');
-  await page.getByLabel('Password', { exact: true }).fill(process.env.E2E_SUPPORT_PASSWORD);
+  await page.getByLabel('Password', { exact: true }).fill(process.env.E2E_PASSWORD);
   await page.route('**/api/requests?*', () => {});
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
   await expect(page.getByText('Manage support staff', { exact: true })).toBeVisible();

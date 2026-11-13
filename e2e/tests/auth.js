@@ -9,7 +9,7 @@ export async function csrfHeaders(request) {
 
 export async function loginApi(request, role = 'SUPPORT') {
   const response = await request.post('/api/session/login', {
-    form: { username: `e2e-${role.toLowerCase()}`, password: process.env[`E2E_${role}_PASSWORD`] },
+    form: { username: `e2e-${role.toLowerCase()}`, password: process.env.E2E_PASSWORD },
     headers: await csrfHeaders(request),
   });
   expect(response.status(), 'Fixture login must succeed').toBe(204);
@@ -18,7 +18,7 @@ export async function loginApi(request, role = 'SUPPORT') {
 export async function loginUi(page, role = 'SUPPORT') {
   await page.goto('/');
   await page.getByRole('textbox', { name: 'Username', exact: true }).fill(`e2e-${role.toLowerCase()}`);
-  await page.getByLabel('Password', { exact: true }).fill(process.env[`E2E_${role}_PASSWORD`]);
+  await page.getByLabel('Password', { exact: true }).fill(process.env.E2E_PASSWORD);
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Sign out' })).toBeVisible();
   await expect(page.locator('.signed-in')).toHaveText(`Signed in as e2e-${role.toLowerCase()} ${role === 'SUPPORT' ? 'Support' : 'Requester'}`);
