@@ -15,7 +15,7 @@ import org.springframework.stereotype.Repository;
 @Repository
 public class AccountRepository implements UserDetailsService {
     private static final RowMapper<Account> ROW_MAPPER = (row, n) -> new Account(row.getObject("id", UUID.class),
-            row.getString("username"), row.getString("role"), row.getBoolean("enabled"));
+            row.getString("username"), AccountRole.valueOf(row.getString("role")), row.getBoolean("enabled"));
 
     private final JdbcTemplate jdbc;
 
@@ -37,11 +37,11 @@ public class AccountRepository implements UserDetailsService {
     }
 
     // Empty when the username is taken.
-    public Optional<Account> insert(UUID id, String username, String passwordHash, String role) {
+    public Optional<Account> insert(UUID id, String username, String passwordHash, AccountRole role) {
         return jdbc.query("""
                 INSERT INTO login_accounts (id, username, password_hash, role) VALUES (?, ?, ?, ?)
                 ON CONFLICT (username) DO NOTHING RETURNING id, username, role, enabled
-                """, ROW_MAPPER, id, username, passwordHash, role).stream().findFirst();
+                """, ROW_MAPPER, id, username, passwordHash, role.name()).stream().findFirst();
     }
 
     public Optional<Account> setEnabled(String username, boolean enabled) {
@@ -49,9 +49,9 @@ public class AccountRepository implements UserDetailsService {
                 ROW_MAPPER, enabled, username).stream().findFirst();
     }
 
-    public Optional<Account> setRole(String username, String role) {
+    public Optional<Account> setRole(String username, AccountRole role) {
         return jdbc.query("UPDATE login_accounts SET role = ? WHERE username = ? RETURNING id, username, role, enabled",
-                ROW_MAPPER, role, username).stream().findFirst();
+                ROW_MAPPER, role.name(), username).stream().findFirst();
     }
 
     public Optional<Account> setPasswordHash(String username, String passwordHash) {
