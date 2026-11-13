@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { useSession, errorMessage } from "./useSession";
+import { useSession } from "./useSession";
+import { errorMessage } from "./helpers";
 import { Dashboard } from "./Dashboard";
 
 export function App() {

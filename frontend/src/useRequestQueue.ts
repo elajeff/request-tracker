@@ -7,7 +7,7 @@ import type {
   ServiceRequest,
   SupportStaff,
 } from "./types";
-import { errorMessage } from "./useSession";
+import { errorMessage, uniqueById } from "./helpers";
 
 export interface QueueFilters {
   query: string;
@@ -34,10 +34,6 @@ const sameFilters = (a: QueueFilters | null, b: QueueFilters) =>
   a.query === b.query &&
   a.staff === b.staff &&
   a.status === b.status;
-
-export const uniqueById = <T extends { id: string | number }>(items: T[]) => [
-  ...new Map(items.map((item) => [item.id, item])).values(),
-];
 
 function queuePath(filters: QueueFilters, cursor: string | null) {
   const params = new URLSearchParams({ limit: "25", q: filters.query.trim() });

@@ -1,7 +1,6 @@
 import { useRef, useState } from "react";
-import { label } from "./RequestCard";
+import { errorMessage, label, requestPriorities } from "./helpers";
 import type { Api, ServiceRequest } from "./types";
-import { errorMessage } from "./useSession";
 
 export function CreateRequest({
   api,
@@ -85,7 +84,7 @@ export function CreateRequest({
             value={priority}
             onChange={(event) => setPriority(event.target.value)}
           >
-            {["HIGH", "MEDIUM", "LOW"].map((value) => (
+            {requestPriorities.map((value) => (
               <option key={value} value={value}>
                 {label(value)}
               </option>
