@@ -46,6 +46,7 @@ postgresql:
       cpu: 500m
       memory: 512Mi
 
+# Delivery mode needs the ConfigMap and ServiceAccount of the baseline release.
 delivery:
   enabled: false
   replicas: 4

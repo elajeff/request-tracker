@@ -13,7 +13,7 @@ A new backend version is rolled out gradually and checked against live metrics. 
 - Missing data counts as a failure, so a version that receives no traffic can never pass.
 - Actuator requests and everything under `/api/session` (sign-in, sign-out and session reads) are excluded from the numbers.
 
-Delivery mode uses the same database as the normal Helm install. Argo CD manages only the delivery resources; the database, its volume and its Secret stay with the baseline Helm release. Do not run `helm upgrade` while delivery mode is enabled.
+Delivery mode uses the same database as the normal Helm install. Argo CD manages only the delivery resources; the database, its volume, its Secret, the ConfigMap and the ServiceAccount stay with the baseline Helm release. Do not run `helm upgrade` while delivery mode is enabled.
 
 ## Trying it
 

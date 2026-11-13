@@ -48,7 +48,7 @@ spec:
       containers:
         - name: backend
           image: "{{ .Values.backend.image.repository }}:{{ .Values.backend.image.tag }}"
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: {{ .Values.backend.image.pullPolicy }}
           ports: [{name: http, containerPort: 8080}]
           lifecycle:
             preStop:
@@ -66,7 +66,7 @@ spec:
             - name: MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE
               value: health,prometheus
             - name: DIAGNOSTICS_SLOW_REQUEST_MILLIS
-              value: {{ .Values.backend.slowRequestMillis | default 0 | quote }}
+              value: {{ .Values.backend.slowRequestMillis | quote }}
           startupProbe:
             httpGet: {path: /actuator/health/liveness, port: http}
             periodSeconds: 5
@@ -170,6 +170,7 @@ spec:
       containers:
         - name: frontend
           image: "{{ .Values.frontend.image.repository }}:{{ .Values.frontend.image.tag }}"
+          imagePullPolicy: {{ .Values.frontend.image.pullPolicy }}
           ports: [{name: http, containerPort: 8080}]
           lifecycle:
             preStop:
