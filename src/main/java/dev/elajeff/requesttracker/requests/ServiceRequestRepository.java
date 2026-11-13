@@ -113,6 +113,10 @@ public class ServiceRequestRepository {
                 ROW_MAPPER, id, ownerId, ownerId).stream().findFirst();
     }
 
+    public boolean setOwnerIfNone(UUID id, UUID ownerId) {
+        return jdbc.update("UPDATE service_requests SET owner_id = ? WHERE id = ? AND owner_id IS NULL", ownerId, id) == 1;
+    }
+
     public void recordChange(UUID id, String field, String oldValue, String newValue, UUID actorId, String actorUsername) {
         jdbc.update("""
                 INSERT INTO request_history (request_id, field, old_value, new_value, actor_account_id, actor_username)
