@@ -8,6 +8,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import dev.elajeff.requesttracker.PageLimit;
+
 @Service
 public class StaffService {
     private final StaffRepository repository;
@@ -21,9 +23,7 @@ public class StaffService {
     }
 
     public StaffPage findPage(String cursor, int limit, String query) {
-        if (limit < 1 || limit > 100) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Limit must be between 1 and 100");
-        }
+        PageLimit.validate(limit);
         UUID afterId = null;
         if (cursor != null) {
             try {

@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import dev.elajeff.requesttracker.PageLimit;
 import dev.elajeff.requesttracker.requests.ServiceRequestRepository;
 
 // Shared by the admin API and the command line, so both apply the same rules.
@@ -27,9 +28,7 @@ public class AccountAdministration {
     }
 
     public AccountPage findPage(String cursor, int limit, String query) {
-        if (limit < 1 || limit > 100) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Limit must be between 1 and 100");
-        }
+        PageLimit.validate(limit);
         if (cursor != null && !validUsername(cursor)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid account cursor");
         }

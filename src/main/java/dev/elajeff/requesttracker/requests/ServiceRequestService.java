@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import dev.elajeff.requesttracker.PageLimit;
 import dev.elajeff.requesttracker.security.Account;
 import dev.elajeff.requesttracker.security.CurrentAccount;
 import dev.elajeff.requesttracker.staff.StaffService;
@@ -40,7 +41,7 @@ public class ServiceRequestService {
     }
 
     public RequestQueuePage findPage(String query, String cursor, int limit, UUID staffId, boolean unassigned, ServiceRequestStatus status) {
-        validateLimit(limit);
+        PageLimit.validate(limit);
         if (staffId != null && unassigned) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Choose staffId or unassigned, not both");
         }
@@ -129,7 +130,7 @@ public class ServiceRequestService {
     }
 
     public RequestHistoryPage findHistory(UUID id, String cursor, int limit) {
-        validateLimit(limit);
+        PageLimit.validate(limit);
         Long beforeId = null;
         if (cursor != null) {
             try {
@@ -147,12 +148,6 @@ public class ServiceRequestService {
 
     private static String assignmentLabel(String name, UUID id) {
         return id == null ? null : name + " [" + id + "]";
-    }
-
-    private static void validateLimit(int limit) {
-        if (limit < 1 || limit > 100) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Limit must be between 1 and 100");
-        }
     }
 
     /** Requesters only see their own requests; support sees all of them. */
