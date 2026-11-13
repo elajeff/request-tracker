@@ -2,26 +2,28 @@ package dev.elajeff.requesttracker.security;
 
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import org.springframework.http.HttpStatus;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import dev.elajeff.requesttracker.requests.ServiceRequestRepository;
+
 // Shared by the admin API and the command line, so both apply the same rules.
 @Service
 public class AccountAdministration {
-    private final JdbcTemplate jdbc;
     private final PasswordEncoder passwords;
     private final AccountRepository accounts;
+    private final ServiceRequestRepository requests;
 
-    public AccountAdministration(JdbcTemplate jdbc, PasswordEncoder passwords, AccountRepository accounts) {
-        this.jdbc = jdbc;
+    public AccountAdministration(PasswordEncoder passwords, AccountRepository accounts, ServiceRequestRepository requests) {
         this.passwords = passwords;
         this.accounts = accounts;
+        this.requests = requests;
     }
 
     public AccountPage findPage(String cursor, int limit, String query) {
@@ -49,8 +51,8 @@ public class AccountAdministration {
     public Account setEnabled(String username, boolean enabled) {
         validateUsername(username);
         if (!enabled) keepOneSupport(username);
-        Account account = update(username, "enabled", enabled);
-        if (!enabled) endSessions(username);
+        Account account = found(accounts.setEnabled(username, enabled));
+        if (!enabled) accounts.deleteSessions(username);
         return account;
     }
 
@@ -58,13 +60,12 @@ public class AccountAdministration {
     public Account changeRole(String username, String role) {
         validateUsername(username);
         validateRole(role);
-        Account current = accounts.find(username).orElseThrow(() ->
-                new ResponseStatusException(HttpStatus.NOT_FOUND, "Account not found"));
+        Account current = found(accounts.find(username));
         if (current.role().equals(role)) return current;
         if (role.equals("REQUESTER")) keepOneSupport(username);
-        Account account = update(username, "role", role);
+        Account account = found(accounts.setRole(username, role));
         // A session keeps the role it logged in with, so it has to end.
-        endSessions(username);
+        accounts.deleteSessions(username);
         return account;
     }
 
@@ -72,41 +73,32 @@ public class AccountAdministration {
     public void resetPassword(String username, String password) {
         validateUsername(username);
         validatePassword(password);
-        update(username, "password_hash", passwords.encode(password));
-        endSessions(username);
+        found(accounts.setPasswordHash(username, passwords.encode(password)));
+        accounts.deleteSessions(username);
     }
 
     @Transactional
     public void claimLegacy(String username, UUID requestId) {
         validateUsername(username);
-        var ids = jdbc.query("SELECT id FROM login_accounts WHERE username = ? AND role = 'REQUESTER' AND enabled FOR UPDATE",
-                (row, n) -> row.getObject("id", UUID.class), username);
-        if (ids.size() != 1) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Active requester account required");
-        if (jdbc.update("UPDATE service_requests SET owner_id = ? WHERE id = ? AND owner_id IS NULL", ids.getFirst(), requestId) != 1) {
+        UUID ownerId = accounts.lockActiveRequesterId(username).orElseThrow(() ->
+                new ResponseStatusException(HttpStatus.BAD_REQUEST, "Active requester account required"));
+        if (!requests.setOwnerIfNone(requestId, ownerId)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Ownerless request not found; existing ownership cannot be replaced");
         }
         // The local operator is not the target account; leave the actor unattributed.
-        jdbc.update("INSERT INTO request_history (request_id, field, new_value) VALUES (?, 'OWNER', ?)",
-                requestId, username + " [" + ids.getFirst() + "]");
+        requests.recordChange(requestId, "OWNER", null, username + " [" + ownerId + "]", null, null);
     }
 
     // Lock every enabled SUPPORT row first, so two people removing each other at the same time cannot both succeed.
     private void keepOneSupport(String username) {
-        var support = jdbc.queryForList("SELECT username FROM login_accounts WHERE role = 'SUPPORT' AND enabled ORDER BY id FOR UPDATE",
-                String.class);
+        var support = accounts.lockEnabledSupportUsernames();
         if (support.equals(List.of(username))) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "At least one active SUPPORT account is required");
         }
     }
 
-    private Account update(String username, String column, Object value) {
-        return jdbc.query("UPDATE login_accounts SET " + column + " = ? WHERE username = ? RETURNING id, username, role, enabled",
-                AccountRepository.ROW_MAPPER, value, username).stream().findFirst().orElseThrow(() ->
-                new ResponseStatusException(HttpStatus.NOT_FOUND, "Account not found"));
-    }
-
-    private void endSessions(String username) {
-        jdbc.update("DELETE FROM spring_session WHERE principal_name = ?", username);
+    private static Account found(Optional<Account> account) {
+        return account.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Account not found"));
     }
 
     private static void validateUsername(String username) {
