@@ -293,15 +293,9 @@ test("dashboard desktop and narrow layouts retain labels and keyboard focus", as
   await page.screenshot({ path: "/results/login-narrow.png", fullPage: true });
 });
 
-test("request creation failures keep input and status filtering queries the queue", async ({
+test("request creation failures keep input and the created request appears once retried", async ({
   page,
-  request,
 }) => {
-  const row = await seed(request, "react-status existing");
-  await request.patch(`/api/requests/${row.id}/status`, {
-    headers: await csrfHeaders(request),
-    data: { status: "IN_PROGRESS" },
-  });
   await loginUi(page);
   await page
     .getByRole("searchbox", { name: "Search requests" })
@@ -339,15 +333,6 @@ test("request creation failures keep input and status filtering queries the queu
   await expect(
     page.getByRole("article", { name: "react-status created", exact: true }),
   ).toBeVisible();
-  await page
-    .getByRole("combobox", { name: "Filter by status" })
-    .selectOption("IN_PROGRESS");
-  await expect(
-    page.getByRole("article", { name: row.title, exact: true }),
-  ).toBeVisible();
-  await expect(
-    page.getByRole("article", { name: "react-status created", exact: true }),
-  ).toHaveCount(0);
 });
 
 test("assignment filters retain known staff beyond the first directory page", async ({

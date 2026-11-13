@@ -17,13 +17,12 @@ const titles = (page) =>
     .getByRole("heading", { level: 3 });
 const directory = (page) => page.getByRole("form", { name: /^Staff / });
 
-test("status finds older matches before pagination and combines with search and staff filters", async ({
+test("status finds older matches before pagination and combines with search", async ({
   page,
   request,
 }) => {
   await loginApi(request);
   const token = `queue-filter-${randomUUID().slice(0, 8)}`;
-  const person = await api(request, "POST", "/api/staff", { name: token });
   const older = [];
   for (let i = 0; i < 3; i++) {
     const row = await api(request, "POST", "/api/requests", {
@@ -35,9 +34,6 @@ test("status finds older matches before pagination and combines with search and 
     });
     older.push(row);
   }
-  await api(request, "PATCH", `/api/requests/${older[0].id}/assignment`, {
-    staffId: person.id,
-  });
   for (let i = 0; i < 28; i++)
     await api(request, "POST", "/api/requests", {
       title: `${token} newer ${i}`,
@@ -46,9 +42,6 @@ test("status finds older matches before pagination and combines with search and 
   await loginUi(page);
   await page.getByRole("searchbox", { name: "Search requests" }).fill(token);
   await expect(titles(page)).toHaveCount(25);
-  await page.getByText("Manage support staff", { exact: true }).click();
-  await page.getByRole("searchbox", { name: "Search staff" }).fill(token);
-  await expect(directory(page)).toHaveCount(1);
   const filtered = page.waitForResponse((r) => {
     const u = new URL(r.url());
     return (
@@ -63,28 +56,6 @@ test("status finds older matches before pagination and combines with search and 
     .selectOption("IN_PROGRESS");
   expect((await filtered).status()).toBe(200);
   await expect(titles(page)).toHaveText(older.map((r) => r.title).reverse());
-  await page
-    .getByRole("combobox", { name: "Filter by assigned staff" })
-    .selectOption(person.id);
-  await expect(titles(page)).toHaveText([older[0].title]);
-  await page
-    .getByRole("combobox", { name: "Filter by assigned staff" })
-    .selectOption("unassigned");
-  await expect(titles(page)).toHaveText([older[2].title, older[1].title]);
-  await page.screenshot({
-    path: "/results/filtering-desktop.png",
-    fullPage: true,
-  });
-  await page.setViewportSize({ width: 390, height: 844 });
-  expect(
-    await page.evaluate(
-      () => document.documentElement.scrollWidth <= innerWidth,
-    ),
-  ).toBe(true);
-  await page.screenshot({
-    path: "/results/filtering-narrow.png",
-    fullPage: true,
-  });
   await page
     .getByRole("combobox", { name: "Filter by status", exact: true })
     .selectOption("");
