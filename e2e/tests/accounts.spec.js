@@ -1,14 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
-import { csrfHeaders, loginApi, loginUi } from './auth.js';
+import { csrfHeaders, loginApi, loginUi, mutate } from './auth.js';
 
-async function mutate(page, method, path, action, status = 200) {
-  const [response] = await Promise.all([
-    page.waitForResponse(r => new URL(r.url()).pathname === path && r.request().method() === method), action(),
-  ]);
-  expect(response.status()).toBe(status);
-  return status === 204 ? null : response.json();
-}
 async function open(page) {
   await page.getByText('Manage accounts', { exact: true }).click();
   await expect(page.getByText(/^\d+ accounts shown/)).toBeVisible();

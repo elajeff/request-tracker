@@ -23,3 +23,19 @@ export async function loginUi(page, role = 'SUPPORT') {
   await expect(page.getByRole('button', { name: 'Sign out' })).toBeVisible();
   await expect(page.locator('.signed-in')).toHaveText(`Signed in as e2e-${role.toLowerCase()} ${role === 'SUPPORT' ? 'Support' : 'Requester'}`);
 }
+
+export async function api(request, method, path, data) {
+  const response = await request.fetch(path, { method, data, headers: method === 'GET' ? {} : await csrfHeaders(request) });
+  expect(response.status(), await response.text()).toBe(method === 'POST' ? 201 : 200);
+  return response.json();
+}
+
+export async function mutate(page, method, path, action, status = method === 'POST' ? 201 : 200) {
+  const [response] = await Promise.all([
+    page.waitForResponse(r => new URL(r.url()).pathname === path
+      && r.request().method() === method),
+    action(),
+  ]);
+  expect(response.status(), await response.text()).toBe(status);
+  return status === 204 ? null : response.json();
+}

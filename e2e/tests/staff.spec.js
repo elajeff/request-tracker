@@ -1,20 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
-import { csrfHeaders, loginApi, loginUi } from './auth.js';
+import { api, csrfHeaders, loginApi, loginUi, mutate } from './auth.js';
 
-async function api(request, method, path, data) {
-  const response = await request.fetch(path, { method, data,
-    headers: method === 'GET' ? {} : await csrfHeaders(request) });
-  expect(response.status()).toBe(method === 'POST' ? 201 : 200);
-  return response.json();
-}
-async function mutate(page, method, path, action) {
-  const [response] = await Promise.all([
-    page.waitForResponse(r => new URL(r.url()).pathname === path && r.request().method() === method), action(),
-  ]);
-  expect(response.status()).toBe(method === 'POST' ? 201 : 200);
-  return response.json();
-}
 const directory = page => page.getByRole('form', { name: /^Staff / });
 const staffRow = (page, person) => page.getByRole('form', { name: `Staff ${person.name}`, exact: true });
 async function open(page) {
