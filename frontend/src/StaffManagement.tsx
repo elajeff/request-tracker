@@ -1,9 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useState } from "react";
 
-import type { Api, Page, SupportStaff } from "./types";
-import { errorMessage } from "./helpers";
-
-const STAFF_SEARCH_DEBOUNCE_MS = 250;
+import type { Api, SupportStaff } from "./types";
+import { usePagedList } from "./usePagedList";
 
 interface Props {
   api: Api;
@@ -11,111 +9,49 @@ interface Props {
   onSaved: (person: SupportStaff) => void;
 }
 
-// Pages are ordered by ID, so keep that order when merging.
-const merge = (previous: SupportStaff[], incoming: SupportStaff[]) =>
-  [
-    ...new Map(
-      [...previous, ...incoming].map((person) => [person.id, person]),
-    ).values(),
-  ].sort((a, b) => a.id.localeCompare(b.id));
+const staffId = (person: SupportStaff) => person.id;
+const normalize = (query: string) => query.trim();
+const matches = (person: SupportStaff, search: string) =>
+  person.name.toLowerCase().includes(search.toLowerCase());
 
 export function StaffManagement({ api, onPage, onSaved }: Props) {
-  const [people, setPeople] = useState<SupportStaff[]>([]);
-  const [cursor, setCursor] = useState<string | null>(null);
-  const [query, setQuery] = useState("");
-  const [loadedQuery, setLoadedQuery] = useState<string | null>(null);
+  const {
+    items: people,
+    cursor,
+    query,
+    search,
+    loading,
+    saving,
+    disabled,
+    error,
+    notice,
+    retryFrom,
+    setError,
+    load,
+    run,
+    show,
+    changeQuery,
+  } = usePagedList<SupportStaff>(api, {
+    path: "/api/staff",
+    key: staffId,
+    normalize,
+    matches,
+    loadFailed: "Could not load staff",
+    saveFailed: "Could not save staff",
+    onPage,
+  });
   const [name, setName] = useState("");
-  // The first page loads on mount, so start in the loading state rather than showing "0 shown".
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
-  // The cursor a failed load used, so "Retry" repeats exactly that request.
-  const [retryFrom, setRetryFrom] = useState<string | null | undefined>();
-  const inFlight = useRef<AbortController | null>(null);
-  // Blocks a second save from a double click before React re-renders.
-  const busy = useRef(false);
-  const search = query.trim();
 
-  const load = useCallback(
-    async (text: string, after: string | null) => {
-      if (busy.current) return;
-      inFlight.current?.abort();
-      const controller = new AbortController();
-      inFlight.current = controller;
-      setLoading(true);
-      setError("");
-      setRetryFrom(undefined);
-      try {
-        const params = new URLSearchParams({ limit: "25", q: text });
-        if (after) params.set("cursor", after);
-        const page = await api<Page<SupportStaff>>(`/api/staff?${params}`, {
-          signal: controller.signal,
-        });
-        if (controller.signal.aborted) return;
-        setPeople((previous) => merge(after ? previous : [], page.items));
-        setCursor(page.nextCursor);
-        setLoadedQuery(text);
-        onPage(page.items);
-      } catch (failure) {
-        if (controller.signal.aborted) return;
-        setError(`Could not load staff: ${errorMessage(failure)}`);
-        setRetryFrom(after);
-      } finally {
-        if (inFlight.current === controller) setLoading(false);
-      }
-    },
-    [api, onPage],
-  );
-
-  useEffect(() => {
-    const timer = window.setTimeout(
-      () => void load(search, null),
-      STAFF_SEARCH_DEBOUNCE_MS,
-    );
-    return () => {
-      window.clearTimeout(timer);
-      inFlight.current?.abort();
-    };
-  }, [load, search]);
-
-  const canLoadMore = cursor !== null && !loading && loadedQuery === search;
-
-  async function save(
-    path: string,
-    method: string,
-    body: object,
-    created = false,
-  ) {
-    if (busy.current) return;
-    busy.current = true;
-    inFlight.current?.abort();
-    setLoading(false);
-    setSaving(true);
-    setError("");
-    setNotice("");
-    setRetryFrom(undefined);
-    try {
+  function save(path: string, method: string, body: object, created = false) {
+    return run(async () => {
       const person = await api<SupportStaff>(path, {
         method,
         body: JSON.stringify(body),
       });
-      setPeople((previous) =>
-        merge(previous, [person]).filter((item) =>
-          item.name.toLowerCase().includes(search.toLowerCase()),
-        ),
-      );
+      show(person);
       if (created) setName("");
       onSaved(person);
-      setNotice(
-        "Staff saved.",
-      );
-    } catch (failure) {
-      setError(`Could not save staff: ${errorMessage(failure)}`);
-    } finally {
-      busy.current = false;
-      setSaving(false);
-    }
+    }, "Staff saved.");
   }
 
   function valid(value: string) {
@@ -126,7 +62,6 @@ export function StaffManagement({ api, onPage, onSaved }: Props) {
     return true;
   }
 
-  const disabled = loading || saving;
   return (
     <details id="staff-directory" className="staff-directory">
       <summary>Manage support staff</summary>
@@ -162,15 +97,7 @@ export function StaffManagement({ api, onPage, onSaved }: Props) {
           type="search"
           value={query}
           disabled={saving}
-          onChange={(event) => {
-            // Clear the old results at once; the effect loads the new ones.
-            setCursor(null);
-            setPeople([]);
-            setError("");
-            setRetryFrom(undefined);
-            setLoading(true);
-            setQuery(event.target.value);
-          }}
+          onChange={(event) => changeQuery(event.target.value)}
         />
       </label>
       {error && <p role="alert">{error}</p>}
@@ -212,9 +139,7 @@ export function StaffManagement({ api, onPage, onSaved }: Props) {
         <button
           className="button button-secondary"
           disabled={disabled}
-          onClick={() => {
-            if (canLoadMore) void load(search, cursor);
-          }}
+          onClick={() => void load(cursor)}
         >
           Load more staff
         </button>
@@ -223,7 +148,7 @@ export function StaffManagement({ api, onPage, onSaved }: Props) {
         <button
           className="button button-secondary"
           disabled={disabled}
-          onClick={() => void load(search, retryFrom)}
+          onClick={() => void load(retryFrom)}
         >
           Retry loading staff
         </button>
@@ -231,7 +156,7 @@ export function StaffManagement({ api, onPage, onSaved }: Props) {
       <button
         className="button button-secondary"
         disabled={disabled}
-        onClick={() => void load(search, null)}
+        onClick={() => void load(null)}
       >
         Refresh staff
       </button>
