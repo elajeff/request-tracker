@@ -1,16 +1,7 @@
 import { test, expect } from "@playwright/test";
 import { randomUUID } from "node:crypto";
-import { loginApi, loginUi, csrfHeaders } from "./auth.js";
+import { api, loginApi, loginUi } from "./auth.js";
 
-async function api(request, method, path, data) {
-  const r = await request.fetch(path, {
-    method,
-    data,
-    headers: method === "GET" ? {} : await csrfHeaders(request),
-  });
-  expect(r.status()).toBe(method === "POST" ? 201 : 200);
-  return r.json();
-}
 const titles = (page) =>
   page
     .getByRole("region", { name: "Request queue" })

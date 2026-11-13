@@ -1,26 +1,10 @@
 import { test, expect } from '@playwright/test';
-import { loginApi, loginUi, csrfHeaders } from './auth.js';
+import { api, loginApi, loginUi, mutate } from './auth.js';
 
 const cards = page => page.getByRole('region', { name: 'Request queue' }).getByRole('article');
 const card = (page, title) => page.getByRole('article', { name: title, exact: true });
 const titles = page => cards(page).getByRole('heading', { level: 3 });
 const historyValues = history => history.getByRole('listitem').getByRole('paragraph');
-
-async function api(request, method, path, data) {
-  const response = await request.fetch(path, { method, data, headers: method === 'GET' ? {} : await csrfHeaders(request) });
-  expect(response.status(), await response.text()).toBe(method === 'POST' ? 201 : 200);
-  return response.json();
-}
-
-async function mutate(page, method, path, action) {
-  const [response] = await Promise.all([
-    page.waitForResponse(response => new URL(response.url()).pathname === path
-      && response.request().method() === method),
-    action(),
-  ]);
-  expect(response.status(), await response.text()).toBe(method === 'POST' ? 201 : 200);
-  return response.json();
-}
 
 function queueResponse(page, parameters) {
   return page.waitForResponse(response => {
