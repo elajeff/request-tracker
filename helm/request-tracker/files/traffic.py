@@ -8,7 +8,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-BASE_URL = os.environ.get("TRAFFIC_BASE_URL", "http://request-tracker-delivery-frontend:80")
+BASE_URL = "http://request-tracker-delivery-frontend:80"
 WORKERS = 4
 INTERVAL_SECONDS = 0.2
 TIMEOUT_SECONDS = 3
