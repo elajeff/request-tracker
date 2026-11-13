@@ -85,7 +85,9 @@ class AuthenticationIntegrationTest {
     @Test
     void authenticationAndCsrfProtectAllMutationsIncludingLogin() throws Exception {
         var anonymous = new ApiSession(port, json);
-        assertEquals(401, anonymous.send("GET", "/api/requests", null).statusCode());
+        var unauthenticated = anonymous.send("GET", "/api/requests", null);
+        assertEquals(401, unauthenticated.statusCode());
+        assertEquals("Sign in required", json.readTree(unauthenticated.body()).get("detail").asText());
         assertEquals(401, anonymous.send("GET", "/api/staff", null).statusCode());
         assertEquals(403, raw(anonymous, "POST", "/api/session/login", "username=missing&password=missing", null).statusCode());
         var support = account("SUPPORT");

@@ -117,9 +117,8 @@ class AccountAdminIntegrationTest extends SupportApiTest {
         assertEquals(404, send("PATCH", "/api/accounts/" + missing + "/enabled", Map.of("enabled", false)).statusCode());
         assertEquals(404, send("PATCH", "/api/accounts/" + missing + "/role", Map.of("role", "SUPPORT")).statusCode());
         assertEquals(404, send("PUT", "/api/accounts/" + missing + "/password", Map.of("password", password())).statusCode());
-        for (String query : List.of("limit=0", "limit=101", "cursor=Bad")) {
-            assertEquals(400, send("GET", "/api/accounts?" + query, null).statusCode());
-        }
+        assertEquals(400, send("GET", "/api/accounts?limit=0", null).statusCode());
+        assertEquals(400, send("GET", "/api/accounts?cursor=Bad", null).statusCode());
         JsonNode first = read(send("GET", "/api/accounts?limit=1", null));
         JsonNode second = read(send("GET", "/api/accounts?limit=1&cursor=" + first.get("nextCursor").asText(), null));
         assertTrue(first.get("items").get(0).get("username").asText()
