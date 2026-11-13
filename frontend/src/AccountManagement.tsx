@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { Account, Api, Page, Role } from "./types";
-import { errorMessage } from "./useSession";
+import { errorMessage } from "./helpers";
 
 const ACCOUNT_SEARCH_DEBOUNCE_MS = 250;
 const USERNAME_PATTERN = /^[a-z0-9][a-z0-9._-]{2,63}$/;

@@ -6,25 +6,20 @@ import type {
   ServiceRequest,
   SupportStaff,
 } from "./types";
-import { errorMessage } from "./useSession";
+import {
+  errorMessage,
+  label,
+  requestPriorities,
+  staffLabel,
+  uniqueById,
+} from "./helpers";
 
-// IN_PROGRESS -> "In progress", HIGH -> "High".
-export const label = (value: string) =>
-  value[0] + value.slice(1).toLowerCase().replace("_", " ");
 const historyValue = (field: string, value: string | null) =>
   value === null
     ? "Unassigned"
     : field === "STATUS" || field === "PRIORITY"
       ? label(value)
       : value;
-// Names are not unique, so people who share one also get the start of their ID.
-export const staffLabel = (person: SupportStaff, everyone: SupportStaff[]) => {
-  const name = person.name || "(no name)";
-  const shared = everyone.some(
-    (other) => other.id !== person.id && other.name === person.name,
-  );
-  return `${name}${shared ? ` (${person.id.slice(0, 8)})` : ""}${person.active ? "" : " (inactive)"}`;
-};
 
 function History({ request, api }: { request: ServiceRequest; api: Api }) {
   const [entries, setEntries] = useState<RequestHistoryEntry[]>([]);
@@ -58,14 +53,9 @@ function History({ request, api }: { request: ServiceRequest; api: Api }) {
       const page = await api<Page<RequestHistoryEntry>>(
         `/api/requests/${request.id}/history?${params}`,
       );
-      setEntries((previous) => [
-        ...new Map(
-          [...(append ? previous : []), ...page.items].map((item) => [
-            item.id,
-            item,
-          ]),
-        ).values(),
-      ]);
+      setEntries((previous) =>
+        uniqueById([...(append ? previous : []), ...page.items]),
+      );
       setCursor(page.nextCursor);
       setLoaded(true);
     } catch (failure) {
@@ -433,7 +423,7 @@ export function RequestCard({
                   disabled={busy}
                   onChange={(event) => setPriorityChoice(event.target.value)}
                 >
-                  {["HIGH", "MEDIUM", "LOW"].map((value) => (
+                  {requestPriorities.map((value) => (
                     <option key={value} value={value}>
                       {label(value)}
                     </option>

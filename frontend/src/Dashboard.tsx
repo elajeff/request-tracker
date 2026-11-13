@@ -1,10 +1,16 @@
 import { useCallback, useMemo, useState } from "react";
 import type { Api, SupportStaff } from "./types";
-import { errorMessage } from "./useSession";
-import { uniqueById, useRequestQueue } from "./useRequestQueue";
+import { useRequestQueue } from "./useRequestQueue";
 import { StaffManagement } from "./StaffManagement";
 import { AccountManagement } from "./AccountManagement";
-import { RequestCard, staffLabel } from "./RequestCard";
+import { RequestCard } from "./RequestCard";
+import {
+  errorMessage,
+  label,
+  requestStatuses,
+  staffLabel,
+  uniqueById,
+} from "./helpers";
 import { CreateRequest } from "./CreateRequest";
 
 export function Dashboard({
@@ -91,9 +97,9 @@ export function Dashboard({
               "Completed requests",
             ],
           ] as const
-        ).map(([label, count, style, caption]) => (
+        ).map(([title, count, style, caption]) => (
           <article className={`stat-card stat-${style}`} key={style}>
-            <span className="stat-label">{label}</span>
+            <span className="stat-label">{title}</span>
             <strong className="stat-number">{count}</strong>
             <span className="stat-caption">{caption}</span>
           </article>
@@ -130,9 +136,9 @@ export function Dashboard({
                 onChange={(event) => setStatusFilter(event.target.value)}
               >
                 <option value="">All statuses</option>
-                {["NEW", "IN_PROGRESS", "RESOLVED"].map((value) => (
+                {requestStatuses.map((value) => (
                   <option key={value} value={value}>
-                    {value.replace("_", " ")}
+                    {label(value)}
                   </option>
                 ))}
               </select>

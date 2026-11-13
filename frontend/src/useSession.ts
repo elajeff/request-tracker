@@ -1,8 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Api, SessionView } from "./types";
-
-export const errorMessage = (error: unknown) =>
-  error instanceof Error ? error.message : "Unexpected error.";
+import { errorMessage } from "./helpers";
 
 export function useSession() {
   const [session, setSession] = useState<SessionView | null>(null);
