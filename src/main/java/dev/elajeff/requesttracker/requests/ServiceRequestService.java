@@ -155,14 +155,18 @@ public class ServiceRequestService {
         return account.support() ? null : account.id();
     }
 
+    private static ResponseStatusException notFound(UUID id) {
+        return new ResponseStatusException(HttpStatus.NOT_FOUND, "Service request " + id + " was not found");
+    }
+
     private ServiceRequest findVisible(Account account, UUID id) {
         return repository.findById(id, ownerScope(account))
-                .orElseThrow(() -> new ServiceRequestNotFoundException(id));
+                .orElseThrow(() -> notFound(id));
     }
 
     private ServiceRequest findForUpdate(Account account, UUID id) {
         return repository.findByIdForUpdate(id, ownerScope(account))
-                .orElseThrow(() -> new ServiceRequestNotFoundException(id));
+                .orElseThrow(() -> notFound(id));
     }
 
     private void recordChange(Account actor, UUID id, String field, String before, String after) {

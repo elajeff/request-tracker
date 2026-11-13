@@ -14,7 +14,7 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public class AccountRepository implements UserDetailsService {
-    private static final RowMapper<Account> ROW_MAPPER = (row, n) -> new Account(row.getObject("id", UUID.class),
+    private static final RowMapper<Account> ROW_MAPPER = (row, number) -> new Account(row.getObject("id", UUID.class),
             row.getString("username"), AccountRole.valueOf(row.getString("role")), row.getBoolean("enabled"));
 
     private final JdbcTemplate jdbc;
@@ -66,7 +66,7 @@ public class AccountRepository implements UserDetailsService {
 
     public Optional<UUID> lockActiveRequesterId(String username) {
         return jdbc.query("SELECT id FROM login_accounts WHERE username = ? AND role = 'REQUESTER' AND enabled FOR UPDATE",
-                (row, n) -> row.getObject("id", UUID.class), username).stream().findFirst();
+                (row, number) -> row.getObject("id", UUID.class), username).stream().findFirst();
     }
 
     public void deleteSessions(String username) {
@@ -76,7 +76,7 @@ public class AccountRepository implements UserDetailsService {
     @Override
     public UserDetails loadUserByUsername(String username) {
         return jdbc.query("SELECT username, password_hash, role, enabled FROM login_accounts WHERE username = ?",
-                (row, n) -> User.withUsername(row.getString("username"))
+                (row, number) -> User.withUsername(row.getString("username"))
                         .password(row.getString("password_hash")).roles(row.getString("role"))
                         .disabled(!row.getBoolean("enabled")).build(), username).stream().findFirst()
                 .orElseThrow(() -> new UsernameNotFoundException("Invalid credentials"));
