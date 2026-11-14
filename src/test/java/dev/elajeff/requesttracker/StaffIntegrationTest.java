@@ -185,6 +185,6 @@ class StaffIntegrationTest extends SupportApiTest {
         return json.readTree(response.body());
     }
     private HttpResponse<String> send(String method, String path, Object body) throws Exception {
-        return CLIENT.send(method, path, body == null ? null : json.writeValueAsString(body));
+        return support.send(method, path, body == null ? null : json.writeValueAsString(body));
     }
 }

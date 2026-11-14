@@ -15,7 +15,7 @@ test("queue loading, failed refresh and delayed search preserve newer state and 
   page,
   request,
 }) => {
-  const row = await seed(request, "react-race original");
+  const row = await seed(request, "dashboard-race original");
   await loginUi(page);
   const card = page.getByRole("article", { name: row.title, exact: true });
   await card
@@ -53,7 +53,7 @@ test("queue loading, failed refresh and delayed search preserve newer state and 
     finish = resolve;
   });
   await page.route("**/api/requests?*", async (route) => {
-    if (new URL(route.request().url()).searchParams.get("q") === "react-race") {
+    if (new URL(route.request().url()).searchParams.get("q") === "dashboard-race") {
       const response = await route.fetch();
       await held;
       await route.fulfill({ response }).catch(() => {});
@@ -61,18 +61,18 @@ test("queue loading, failed refresh and delayed search preserve newer state and 
     } else await route.continue();
   });
   const dispatched = page.waitForRequest(
-    (r) => new URL(r.url()).searchParams.get("q") === "react-race",
+    (r) => new URL(r.url()).searchParams.get("q") === "dashboard-race",
   );
   await page
     .getByRole("searchbox", { name: "Search requests" })
-    .fill("react-race");
+    .fill("dashboard-race");
   await dispatched;
   await expect(
     page.getByText("Loading requests…", { exact: true }),
   ).toBeVisible();
   await page
     .getByRole("searchbox", { name: "Search requests" })
-    .fill("react-no-match");
+    .fill("dashboard-no-match");
   await expect(
     page.getByText("No matching requests", { exact: true }),
   ).toBeVisible();
@@ -85,7 +85,7 @@ test("request validation, forbidden and not-found errors retain drafts for manua
   page,
   request,
 }) => {
-  const row = await seed(request, "react-errors");
+  const row = await seed(request, "dashboard-errors");
   await loginUi(page);
   const card = page.getByRole("article", { name: row.title, exact: true });
   await card
@@ -95,7 +95,7 @@ test("request validation, forbidden and not-found errors retain drafts for manua
   await title.fill("   ");
   await card.getByRole("button", { name: "Save changes" }).click();
   await expect(page.locator("#notice")).toContainText("Enter both");
-  await title.fill("react-errors saved");
+  await title.fill("dashboard-errors saved");
   for (const status of [403, 404]) {
     await page.route(`**/api/requests/${row.id}`, (route) =>
       route.fulfill({
@@ -109,7 +109,7 @@ test("request validation, forbidden and not-found errors retain drafts for manua
     await expect(page.locator("#notice")).toContainText(
       status === 403 ? "Access denied" : "Request not found",
     );
-    await expect(title).toHaveValue("react-errors saved");
+    await expect(title).toHaveValue("dashboard-errors saved");
     await expect(
       card.getByRole("button", { name: "Save changes" }),
     ).toBeFocused();
@@ -117,10 +117,10 @@ test("request validation, forbidden and not-found errors retain drafts for manua
   }
   await card.getByRole("button", { name: "Save changes" }).click();
   await expect(
-    page.getByRole("article", { name: "react-errors saved", exact: true }),
+    page.getByRole("article", { name: "dashboard-errors saved", exact: true }),
   ).toBeVisible();
   await expect(
-    page.getByRole("button", { name: "Edit details for react-errors saved" }),
+    page.getByRole("button", { name: "Edit details for dashboard-errors saved" }),
   ).toBeFocused();
 });
 
@@ -128,7 +128,7 @@ test("late queue responses cannot restore protected content after session loss",
   page,
   request,
 }) => {
-  const row = await seed(request, "react-private-late");
+  const row = await seed(request, "dashboard-private-late");
   let staffReads = 0;
   page.on("request", (request) => {
     if (new URL(request.url()).pathname === "/api/staff") staffReads++;
@@ -206,11 +206,11 @@ test("dashboard desktop and narrow layouts retain labels and keyboard focus", as
   page,
   request,
 }) => {
-  const row = await seed(request, "react-layout");
+  const row = await seed(request, "dashboard-layout");
   const person = await (
     await request.post("/api/staff", {
       headers: await csrfHeaders(request),
-      data: { name: "react-layout staff" },
+      data: { name: "dashboard-layout staff" },
     })
   ).json();
   await loginUi(page);
@@ -299,11 +299,11 @@ test("request creation failures keep input and the created request appears once 
   await loginUi(page);
   await page
     .getByRole("searchbox", { name: "Search requests" })
-    .fill("react-status");
+    .fill("dashboard-status");
   const form = page.getByRole("complementary", { name: "Create request" });
   await form
     .getByRole("textbox", { name: /^Title/ })
-    .fill("react-status created");
+    .fill("dashboard-status created");
   await form
     .getByRole("textbox", { name: /^Description/ })
     .fill("Retained on failure");
@@ -323,7 +323,7 @@ test("request creation failures keep input and the created request appears once 
     .click();
   await expect(page.locator("#notice")).toContainText("Creation unavailable");
   await expect(form.getByRole("textbox", { name: /^Title/ })).toHaveValue(
-    "react-status created",
+    "dashboard-status created",
   );
   expect(calls).toBe(1);
   await page.unroute("**/api/requests");
@@ -331,7 +331,7 @@ test("request creation failures keep input and the created request appears once 
     .getByRole("button", { name: "Create request", exact: true })
     .click();
   await expect(
-    page.getByRole("article", { name: "react-status created", exact: true }),
+    page.getByRole("article", { name: "dashboard-status created", exact: true }),
   ).toBeVisible();
 });
 
@@ -339,7 +339,7 @@ test("assignment filters retain known staff beyond the first directory page", as
   page,
   request,
 }) => {
-  const row = await seed(request, "react-known-staff");
+  const row = await seed(request, "dashboard-known-staff");
   const people = [];
   for (let i = 0; i < 28; i++) {
     const response = await request.post("/api/staff", {

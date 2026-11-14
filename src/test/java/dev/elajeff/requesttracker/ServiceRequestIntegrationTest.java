@@ -46,7 +46,7 @@ class ServiceRequestIntegrationTest extends SupportApiTest {
         String body = "{\"title\":\"" + title
                 + "\",\"description\":\"" + description + "\"}";
 
-        HttpResponse<String> created = CLIENT.send("POST", "/api/requests", body);
+        HttpResponse<String> created = support.send("POST", "/api/requests", body);
 
         assertEquals(201, created.statusCode());
         assertTrue(created.body().contains(title), created.body());
@@ -55,20 +55,20 @@ class ServiceRequestIntegrationTest extends SupportApiTest {
 
         String id = json.readTree(created.body()).get("id").asText();
 
-        HttpResponse<String> retrieved = CLIENT.send("GET", "/api/requests/" + id, null);
+        HttpResponse<String> retrieved = support.send("GET", "/api/requests/" + id, null);
 
         assertEquals(200, retrieved.statusCode());
         assertTrue(retrieved.body().contains(title), retrieved.body());
         assertTrue(retrieved.body().contains(description), retrieved.body());
 
-        HttpResponse<String> listed = CLIENT.send("GET", "/api/requests", null);
+        HttpResponse<String> listed = support.send("GET", "/api/requests", null);
 
         assertEquals(200, listed.statusCode());
         assertTrue(listed.body().contains(id), listed.body());
 
-        assertEquals(400, CLIENT.send("POST", "/api/requests",
+        assertEquals(400, support.send("POST", "/api/requests",
                 "{\"title\":\"   \",\"description\":\"A valid description.\"}").statusCode());
-        assertEquals(404, CLIENT.send("GET", "/api/requests/" + UUID.randomUUID(), null).statusCode());
+        assertEquals(404, support.send("GET", "/api/requests/" + UUID.randomUUID(), null).statusCode());
     }
 
     @Test
@@ -77,7 +77,7 @@ class ServiceRequestIntegrationTest extends SupportApiTest {
         String title = "Updated request " + UUID.randomUUID();
         String description = "Updated description.";
 
-        HttpResponse<String> updated = CLIENT.send("PUT", "/api/requests/" + id,
+        HttpResponse<String> updated = support.send("PUT", "/api/requests/" + id,
                 "{\"title\":\"" + title
                         + "\",\"description\":\"" + description + "\"}");
 
@@ -85,15 +85,15 @@ class ServiceRequestIntegrationTest extends SupportApiTest {
         assertTrue(updated.body().contains(title), updated.body());
         assertTrue(updated.body().contains(description), updated.body());
 
-        HttpResponse<String> retrieved = CLIENT.send("GET", "/api/requests/" + id, null);
+        HttpResponse<String> retrieved = support.send("GET", "/api/requests/" + id, null);
         assertTrue(retrieved.body().contains(title), retrieved.body());
         assertTrue(retrieved.body().contains(description), retrieved.body());
 
-        HttpResponse<String> invalid = CLIENT.send("PUT", "/api/requests/" + id,
+        HttpResponse<String> invalid = support.send("PUT", "/api/requests/" + id,
                 "{\"title\":\"   \",\"description\":\"Valid description.\"}");
         assertEquals(400, invalid.statusCode());
 
-        HttpResponse<String> missing = CLIENT.send("PUT", "/api/requests/" + UUID.randomUUID(),
+        HttpResponse<String> missing = support.send("PUT", "/api/requests/" + UUID.randomUUID(),
                 "{\"title\":\"Missing request\",\"description\":\"Valid description.\"}");
         assertEquals(404, missing.statusCode());
     }
@@ -103,22 +103,22 @@ class ServiceRequestIntegrationTest extends SupportApiTest {
         String body = "{\"title\":\"" + title
                 + "\",\"description\":\"Access needed.\",\"priority\":\"HIGH\"}";
 
-        HttpResponse<String> created = CLIENT.send("POST", "/api/requests", body);
+        HttpResponse<String> created = support.send("POST", "/api/requests", body);
         assertEquals(201, created.statusCode());
         assertTrue(created.body().contains("\"priority\":\"HIGH\""), created.body());
 
         String id = json.readTree(created.body()).get("id").asText();
 
-        HttpResponse<String> updated = CLIENT.send("PATCH", "/api/requests/" + id + "/priority",
+        HttpResponse<String> updated = support.send("PATCH", "/api/requests/" + id + "/priority",
                 "{\"priority\":\"LOW\"}");
 
         assertEquals(200, updated.statusCode());
         assertTrue(updated.body().contains("\"priority\":\"LOW\""), updated.body());
 
-        HttpResponse<String> retrieved = CLIENT.send("GET", "/api/requests/" + id, null);
+        HttpResponse<String> retrieved = support.send("GET", "/api/requests/" + id, null);
         assertTrue(retrieved.body().contains("\"priority\":\"LOW\""), retrieved.body());
 
-        HttpResponse<String> invalid = CLIENT.send("PATCH", "/api/requests/" + id + "/priority",
+        HttpResponse<String> invalid = support.send("PATCH", "/api/requests/" + id + "/priority",
                 "{\"priority\":\"URGENT\"}");
 
         assertEquals(400, invalid.statusCode());
@@ -128,36 +128,36 @@ class ServiceRequestIntegrationTest extends SupportApiTest {
     void statusMovesForwardAndIsPersisted() throws Exception {
         String id = createRequestAndGetId();
 
-        assertEquals(409, CLIENT.send("PATCH", "/api/requests/" + id + "/status",
+        assertEquals(409, support.send("PATCH", "/api/requests/" + id + "/status",
                 "{\"status\":\"RESOLVED\"}").statusCode());
 
-        HttpResponse<String> inProgress = CLIENT.send("PATCH", "/api/requests/" + id + "/status",
+        HttpResponse<String> inProgress = support.send("PATCH", "/api/requests/" + id + "/status",
                 "{\"status\":\"IN_PROGRESS\"}");
 
         assertEquals(200, inProgress.statusCode());
         assertTrue(inProgress.body().contains("\"status\":\"IN_PROGRESS\""),
                 inProgress.body());
 
-        HttpResponse<String> retrieved = CLIENT.send("GET", "/api/requests/" + id, null);
+        HttpResponse<String> retrieved = support.send("GET", "/api/requests/" + id, null);
         assertTrue(retrieved.body().contains("\"status\":\"IN_PROGRESS\""),
                 retrieved.body());
 
-        HttpResponse<String> resolved = CLIENT.send("PATCH", "/api/requests/" + id + "/status",
+        HttpResponse<String> resolved = support.send("PATCH", "/api/requests/" + id + "/status",
                 "{\"status\":\"RESOLVED\"}");
 
         assertEquals(200, resolved.statusCode());
         assertTrue(resolved.body().contains("\"status\":\"RESOLVED\""),
                 resolved.body());
 
-        retrieved = CLIENT.send("GET", "/api/requests/" + id, null);
+        retrieved = support.send("GET", "/api/requests/" + id, null);
         assertTrue(retrieved.body().contains("\"status\":\"RESOLVED\""),
                 retrieved.body());
 
-        assertEquals(400, CLIENT.send("PATCH", "/api/requests/" + id + "/status",
+        assertEquals(400, support.send("PATCH", "/api/requests/" + id + "/status",
                 "{\"status\":\"CLOSED\"}").statusCode());
-        assertEquals(404, CLIENT.send("PATCH", "/api/requests/" + UUID.randomUUID() + "/status",
+        assertEquals(404, support.send("PATCH", "/api/requests/" + UUID.randomUUID() + "/status",
                 "{\"status\":\"IN_PROGRESS\"}").statusCode());
-        assertEquals(404, CLIENT.send("PATCH", "/api/requests/" + UUID.randomUUID() + "/assignment",
+        assertEquals(404, support.send("PATCH", "/api/requests/" + UUID.randomUUID() + "/assignment",
                 assignment(UUID.randomUUID())).statusCode());
     }
 
@@ -167,26 +167,26 @@ class ServiceRequestIntegrationTest extends SupportApiTest {
         UUID requestId = UUID.fromString(id);
         String path = "/api/requests/" + id;
         UUID alex = staff.create("Alex").id();
-        assertEquals(200, CLIENT.send("PATCH", path + "/assignment", assignment(alex)).statusCode());
-        assertEquals(200, CLIENT.send("PATCH", path + "/priority", "{\"priority\":\"HIGH\"}").statusCode());
-        assertEquals(200, CLIENT.send("PATCH", path + "/status", "{\"status\":\"IN_PROGRESS\"}").statusCode());
-        assertEquals(200, CLIENT.send("PUT", path, "{\"title\":\"Edited title\",\"description\":\"Edited details\"}").statusCode());
+        assertEquals(200, support.send("PATCH", path + "/assignment", assignment(alex)).statusCode());
+        assertEquals(200, support.send("PATCH", path + "/priority", "{\"priority\":\"HIGH\"}").statusCode());
+        assertEquals(200, support.send("PATCH", path + "/status", "{\"status\":\"IN_PROGRESS\"}").statusCode());
+        assertEquals(200, support.send("PUT", path, "{\"title\":\"Edited title\",\"description\":\"Edited details\"}").statusCode());
         assertEquals(6, historyCount(requestId));
-        assertEquals(200, CLIENT.send("PATCH", path + "/assignment", assignment(alex)).statusCode());
-        assertEquals(200, CLIENT.send("PATCH", path + "/priority", "{\"priority\":\"HIGH\"}").statusCode());
-        assertEquals(200, CLIENT.send("PATCH", path + "/status", "{\"status\":\"IN_PROGRESS\"}").statusCode());
-        assertEquals(200, CLIENT.send("PUT", path, "{\"title\":\"Edited title\",\"description\":\"Edited details\"}").statusCode());
-        assertEquals(409, CLIENT.send("PATCH", path + "/status", "{\"status\":\"NEW\"}").statusCode());
+        assertEquals(200, support.send("PATCH", path + "/assignment", assignment(alex)).statusCode());
+        assertEquals(200, support.send("PATCH", path + "/priority", "{\"priority\":\"HIGH\"}").statusCode());
+        assertEquals(200, support.send("PATCH", path + "/status", "{\"status\":\"IN_PROGRESS\"}").statusCode());
+        assertEquals(200, support.send("PUT", path, "{\"title\":\"Edited title\",\"description\":\"Edited details\"}").statusCode());
+        assertEquals(409, support.send("PATCH", path + "/status", "{\"status\":\"NEW\"}").statusCode());
         assertEquals(6, historyCount(requestId));
         var entries = service.findHistory(requestId, null, 25).items();
         assertEquals("DESCRIPTION", entries.getFirst().field());
         assertEquals("Status update test.", entries.getFirst().oldValue());
         assertEquals("Edited details", entries.getFirst().newValue());
         assertEquals("CREATED", entries.getLast().field());
-        HttpResponse<String> history = CLIENT.send("GET", path + "/history", null);
+        HttpResponse<String> history = support.send("GET", path + "/history", null);
         assertEquals(200, history.statusCode());
         assertTrue(history.body().contains("\"field\":\"ASSIGNEE\""));
-        assertEquals(404, CLIENT.send("GET", "/api/requests/" + UUID.randomUUID() + "/history", null).statusCode());
+        assertEquals(404, support.send("GET", "/api/requests/" + UUID.randomUUID() + "/history", null).statusCode());
     }
 
     @Test
@@ -214,7 +214,7 @@ class ServiceRequestIntegrationTest extends SupportApiTest {
         String body = "{\"title\":\"" + title
                 + "\",\"description\":\"Status update test.\"}";
 
-        HttpResponse<String> created = CLIENT.send("POST", "/api/requests", body);
+        HttpResponse<String> created = support.send("POST", "/api/requests", body);
         assertEquals(201, created.statusCode());
 
         return json.readTree(created.body()).get("id").asText();

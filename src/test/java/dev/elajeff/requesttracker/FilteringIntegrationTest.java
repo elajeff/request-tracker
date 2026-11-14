@@ -31,17 +31,17 @@ class FilteringIntegrationTest extends SupportApiTest {
         for (int i = 0; i < 32; i++) insert(token, "IN_PROGRESS", null, null, i);
         for (int i = 0; i < 28; i++) insert(token, "NEW", null, null, 100 + i);
         String path = "/api/requests?q=" + token + "&status=IN_PROGRESS&limit=25";
-        JsonNode first = page(CLIENT, path);
+        JsonNode first = page(support, path);
         assertEquals(25, ids(first).size());
         insert(token, "IN_PROGRESS", null, null, 200);
         insert(token, "RESOLVED", null, null, 201);
-        JsonNode last = page(CLIENT, path + "&cursor=" + first.get("nextCursor").asText());
+        JsonNode last = page(support, path + "&cursor=" + first.get("nextCursor").asText());
         assertEquals(7, ids(last).size());
         var all = new ArrayList<>(ids(first)); all.addAll(ids(last));
         assertEquals(32, all.stream().distinct().count());
         assertTrue(last.get("nextCursor").isNull());
         for (JsonNode item : first.get("items")) assertEquals("IN_PROGRESS", item.get("status").asText());
-        assertEquals(33, collect(CLIENT, path).size());
+        assertEquals(33, collect(support, path).size());
     }
 
     @Test
@@ -51,9 +51,9 @@ class FilteringIntegrationTest extends SupportApiTest {
         String unassigned = insert(token, "RESOLVED", null, null, 2);
         insert(token, "NEW", staff, null, 3); insert("other", "RESOLVED", staff, null, 4);
         String path = "/api/requests?q=" + token + "&status=RESOLVED";
-        assertEquals(List.of(assigned), ids(page(CLIENT, path + "&staffId=" + staff)));
-        assertEquals(List.of(unassigned), ids(page(CLIENT, path + "&unassigned=true")));
-        assertEquals(400, CLIENT.send("GET", path + "&staffId=" + staff + "&unassigned=true", null).statusCode());
+        assertEquals(List.of(assigned), ids(page(support, path + "&staffId=" + staff)));
+        assertEquals(List.of(unassigned), ids(page(support, path + "&unassigned=true")));
+        assertEquals(400, support.send("GET", path + "&staffId=" + staff + "&unassigned=true", null).statusCode());
     }
 
     @Test
@@ -68,7 +68,7 @@ class FilteringIntegrationTest extends SupportApiTest {
         insert(token, "IN_PROGRESS", null, null, 4);
         ApiSession requester = new ApiSession(port, json); assertEquals(204, requester.login(username, password).statusCode());
         assertEquals(List.of(own), ids(page(requester, "/api/requests?q=" + token + "&status=NEW")));
-        assertEquals(2, ids(page(CLIENT, "/api/requests?q=" + token + "&status=NEW")).size());
+        assertEquals(2, ids(page(support, "/api/requests?q=" + token + "&status=NEW")).size());
         assertEquals(List.of(own), ids(page(requester, "/api/requests?q=" + token + "&status=NEW&staffId=" + staff)));
         assertEquals(List.of(progress), ids(page(requester, "/api/requests?q=" + token + "&status=IN_PROGRESS&unassigned=true")));
     }
@@ -76,12 +76,12 @@ class FilteringIntegrationTest extends SupportApiTest {
     @Test
     void invalidStatusUsesBadRequestAndOmittedStatusRemainsCompatible() throws Exception {
         for (String invalid : List.of("", "new")) {
-            var response = CLIENT.send("GET", "/api/requests?status=" + invalid, null);
+            var response = support.send("GET", "/api/requests?status=" + invalid, null);
             assertEquals(400, response.statusCode());
             assertEquals(400, json.readTree(response.body()).get("status").asInt());
             assertEquals("Invalid request status", json.readTree(response.body()).get("detail").asText());
         }
-        assertEquals(200, CLIENT.send("GET", "/api/requests", null).statusCode());
+        assertEquals(200, support.send("GET", "/api/requests", null).statusCode());
     }
 
     @Test
@@ -90,7 +90,7 @@ class FilteringIntegrationTest extends SupportApiTest {
         for (int i = 0; i < 31; i++) expected.add(person(token + " " + i, i % 2 == 0).toString());
         person("unrelated", true); expected.sort(String::compareTo);
         String path = "/api/staff?q=" + URLEncoder.encode("  " + token.toUpperCase() + "  ", StandardCharsets.UTF_8) + "&limit=10";
-        JsonNode first = page(CLIENT, path); assertEquals(expected.subList(0, 10), ids(first));
+        JsonNode first = page(support, path); assertEquals(expected.subList(0, 10), ids(first));
         // UUID order has no creation-time snapshot: inserts before the cursor stay behind it.
         UUID before = UUID.fromString("00000000-0000-0000-0000-000000000001");
         jdbc.update("INSERT INTO support_staff(id,name) VALUES (?,?)", before, token);
@@ -100,14 +100,14 @@ class FilteringIntegrationTest extends SupportApiTest {
         person("nonmatching arrival", true);
         List<String> all = new ArrayList<>(ids(first)); String cursor = first.get("nextCursor").asText();
         while (cursor != null) {
-            JsonNode next = page(CLIENT, path + "&cursor=" + cursor); all.addAll(ids(next));
+            JsonNode next = page(support, path + "&cursor=" + cursor); all.addAll(ids(next));
             cursor = next.get("nextCursor").isNull() ? null : next.get("nextCursor").asText();
         }
         assertEquals(expected, all);
-        assertEquals(33, collect(CLIENT, "/api/staff?q=%25_&limit=10").size());
-        JsonNode matches = page(CLIENT, path.replace("limit=10", "limit=100"));
+        assertEquals(33, collect(support, "/api/staff?q=%25_&limit=10").size());
+        JsonNode matches = page(support, path.replace("limit=10", "limit=100"));
         assertTrue(matches.get("items").valueStream().anyMatch(x -> !x.get("active").asBoolean()));
-        assertEquals(ids(page(CLIENT, "/api/staff?limit=100")), ids(page(CLIENT, "/api/staff?q=%20%20&limit=100")));
+        assertEquals(ids(page(support, "/api/staff?limit=100")), ids(page(support, "/api/staff?q=%20%20&limit=100")));
     }
 
     private UUID person(String name, boolean active) {

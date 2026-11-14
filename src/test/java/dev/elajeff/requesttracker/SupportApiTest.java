@@ -19,15 +19,15 @@ abstract class SupportApiTest {
     @Value("${local.server.port}") private int apiPort;
     @Autowired private JsonMapper apiJson;
     @Autowired private AccountAdministration administration;
-    protected ApiSession CLIENT;
+    protected ApiSession support;
 
     @BeforeEach
     void supportSession() throws Exception {
         String username = "support-" + UUID.randomUUID();
         String password = UUID.randomUUID().toString();
         administration.create(username, "SUPPORT", password);
-        CLIENT = new ApiSession(apiPort, apiJson);
-        assertEquals(204, CLIENT.login(username, password).statusCode());
+        support = new ApiSession(apiPort, apiJson);
+        assertEquals(204, support.login(username, password).statusCode());
         SecurityContextHolder.getContext().setAuthentication(UsernamePasswordAuthenticationToken.authenticated(
                 username, null, List.of(new SimpleGrantedAuthority("ROLE_SUPPORT"))));
     }
