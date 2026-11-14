@@ -1,9 +1,6 @@
 package dev.elajeff.requesttracker;
 
-import java.net.URI;
-import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -13,7 +10,6 @@ import javax.sql.DataSource;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import tools.jackson.databind.JsonNode;
@@ -24,7 +20,6 @@ import static org.junit.jupiter.api.Assertions.*;
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
         properties = "server.servlet.session.cookie.secure=false")
 class StaffIntegrationTest extends SupportApiTest {
-    @Value("${local.server.port}") private int port;
     @Autowired private JsonMapper json;
     @Autowired private JdbcTemplate jdbc;
     @Autowired private DataSource dataSource;
@@ -190,10 +185,6 @@ class StaffIntegrationTest extends SupportApiTest {
         return json.readTree(response.body());
     }
     private HttpResponse<String> send(String method, String path, Object body) throws Exception {
-        HttpRequest request = HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + port + path))
-                .timeout(Duration.ofSeconds(5)).header("Content-Type", "application/json")
-                .method(method, body == null ? HttpRequest.BodyPublishers.noBody()
-                        : HttpRequest.BodyPublishers.ofString(json.writeValueAsString(body))).build();
-        return CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+        return CLIENT.send(method, path, body == null ? null : json.writeValueAsString(body));
     }
 }
