@@ -11,7 +11,13 @@ export function App() {
     <div className="app-shell">
       <header className="topbar">
         <a className="brand" href="/" aria-label="Request Tracker home">
-          <img className="brand-mark" src="/apple-touch-icon.png" alt="" width="36" height="36" />
+          <img
+            className="brand-mark"
+            src="/apple-touch-icon.png"
+            alt=""
+            width="36"
+            height="36"
+          />
           <span>Request Tracker</span>
         </a>
         <div className="connection-status">
