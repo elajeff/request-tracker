@@ -9,7 +9,7 @@ async function open(page) {
   await expect(page.getByText(/^\d+ staff shown/)).toBeVisible();
 }
 
-test('React staff lifecycle keeps assignments, history and reloads consistent', async ({ page, request }) => {
+test('staff lifecycle keeps assignments, history and reloads consistent', async ({ page, request }) => {
   const prefix = `staff-life-${randomUUID().slice(0, 8)}`;
   await loginApi(request);
   const assigned = await api(request, 'POST', '/api/requests', { title: prefix, description: 'Staff lifecycle' });
@@ -50,7 +50,7 @@ test('React staff lifecycle keeps assignments, history and reloads consistent', 
   await open(page);
   await page.getByRole('searchbox', { name: 'Search staff' }).fill(renamed);
   await expect(staffRow(page, person)).toContainText('Active');
-  await page.locator('#staff-management-root').screenshot({ path: '/results/react-staff.png' });
+  await page.locator('#staff-management-root').screenshot({ path: '/results/staff.png' });
   expect(await api(request, 'GET', `/api/requests/${assigned.id}`)).toMatchObject({ assignee: renamed, assigneeActive: true });
 });
 
@@ -103,7 +103,7 @@ test('staff empty, load retry, validation and failed save retain usable drafts',
   await expect(input).toHaveValue('');
 });
 
-test('React staff state clears on session loss and stays absent for requesters', async ({ page }) => {
+test('staff state clears on session loss and stays absent for requesters', async ({ page }) => {
   await loginUi(page);
   await open(page);
   await page.getByRole('textbox', { name: 'Staff name', exact: true }).fill('Unsaved private staff draft');

@@ -20,7 +20,7 @@ class PrometheusEndpointIntegrationTest extends SupportApiTest {
 
     @Test
     void prometheusEndpointExportsHttpAndJvmMetrics() throws Exception {
-        assertEquals(200, CLIENT.send("GET", "/api/requests", null).statusCode());
+        assertEquals(200, support.send("GET", "/api/requests", null).statusCode());
         var metrics = new ApiSession(port, json).send("GET", "/actuator/prometheus", null);
         assertEquals(200, metrics.statusCode());
         assertTrue(metrics.body().contains("http_server_requests_seconds_count"));

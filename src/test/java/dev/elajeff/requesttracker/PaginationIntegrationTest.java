@@ -173,7 +173,7 @@ class PaginationIntegrationTest extends SupportApiTest {
     }
 
     private HttpResponse<String> get(String path) throws Exception {
-        return CLIENT.send(HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + port + path)).GET().build(),
+        return support.send(HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + port + path)).GET().build(),
                 HttpResponse.BodyHandlers.ofString());
     }
 }
