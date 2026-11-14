@@ -209,9 +209,7 @@ export function Dashboard({
               <span className="empty-symbol" aria-hidden="true">
                 ○
               </span>
-              <h3>
-                {filtered ? "No matching requests" : "No requests yet"}
-              </h3>
+              <h3>{filtered ? "No matching requests" : "No requests yet"}</h3>
               <p>
                 {filtered
                   ? "Try a different search or filter."

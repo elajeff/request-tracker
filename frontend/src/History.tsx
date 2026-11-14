@@ -9,7 +9,13 @@ const historyValue = (field: string, value: string | null) =>
       ? label(value)
       : value;
 
-export function History({ request, api }: { request: ServiceRequest; api: Api }) {
+export function History({
+  request,
+  api,
+}: {
+  request: ServiceRequest;
+  api: Api;
+}) {
   const [entries, setEntries] = useState<RequestHistoryEntry[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);

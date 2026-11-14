@@ -1,11 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { Api, ServiceRequest, SupportStaff } from "./types";
-import {
-  errorMessage,
-  label,
-  requestPriorities,
-  staffLabel,
-} from "./helpers";
+import { errorMessage, label, requestPriorities, staffLabel } from "./helpers";
 import { History } from "./History";
 
 export function RequestCard({
@@ -400,9 +395,7 @@ export function RequestCard({
             >
               Save assignment
             </button>
-            <small>
-              More staff are listed under Manage support staff.
-            </small>
+            <small>More staff are listed under Manage support staff.</small>
           </form>
         </>
       )}
