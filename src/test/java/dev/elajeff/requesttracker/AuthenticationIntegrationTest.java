@@ -54,7 +54,7 @@ class AuthenticationIntegrationTest {
     }
 
     @Test
-    void genericLoginErrorsAndDisabledSessionsDoNotDiscloseAccountState() throws Exception {
+    void disablingAnAccountEndsItsSessionsAndLoginErrorsLookAlike() throws Exception {
         String username = username();
         String password = UUID.randomUUID().toString();
         accounts.create(username, "REQUESTER", password);
@@ -83,7 +83,7 @@ class AuthenticationIntegrationTest {
     }
 
     @Test
-    void authenticationAndCsrfProtectAllMutationsIncludingLogin() throws Exception {
+    void apiNeedsSignInAndChangesNeedACsrfToken() throws Exception {
         var anonymous = new ApiSession(port, json);
         var unauthenticated = anonymous.send("GET", "/api/requests", null);
         assertEquals(401, unauthenticated.statusCode());
@@ -103,7 +103,7 @@ class AuthenticationIntegrationTest {
     }
 
     @Test
-    void requesterCannotManipulateOwnershipRolesPriorityOrSupportOperations() throws Exception {
+    void requestersCannotForgeFieldsOrUseSupportActions() throws Exception {
         var requester = account("REQUESTER");
         var other = account("REQUESTER");
         String id = create(requester, "Owned");
@@ -133,7 +133,7 @@ class AuthenticationIntegrationTest {
     }
 
     @Test
-    void requesterDetailsStopAtNewAndHistoryRecordsActualActorSnapshots() throws Exception {
+    void requestersCanOnlyEditNewRequestsAndHistoryNamesTheActor() throws Exception {
         var requester = account("REQUESTER");
         var support = account("SUPPORT");
         String id = create(requester, "Original");
@@ -150,7 +150,7 @@ class AuthenticationIntegrationTest {
     }
 
     @Test
-    void ownershipScopesSearchStaffFiltersCountsAndEveryQueueAndHistoryPage() throws Exception {
+    void requestersOnlySeeTheirOwnRequestsAndHistory() throws Exception {
         var requester = account("REQUESTER");
         var other = account("REQUESTER");
         var support = account("SUPPORT");
@@ -194,7 +194,7 @@ class AuthenticationIntegrationTest {
     }
 
     @Test
-    void localOwnershipAssignmentIsExplicitTransactionalAndCannotReplaceAnOwner() throws Exception {
+    void legacyRequestCanBeClaimedOnceAndIsRecordedInHistory() throws Exception {
         var requester = account("REQUESTER");
         String username = requester.session().get("user").get("username").asText();
         UUID id = UUID.randomUUID();
@@ -233,7 +233,7 @@ class AuthenticationIntegrationTest {
     }
 
     @Test
-    void onlyExplicitOperationalReadsAreAnonymousAndHealthHidesComponents() throws Exception {
+    void anonymousUsersOnlyGetBasicHealthAndMetrics() throws Exception {
         var anonymous = new ApiSession(port, json);
         for (String path : List.of("/actuator/health", "/actuator/health/readiness", "/actuator/health/liveness")) {
             var response = anonymous.send("GET", path, null);
