@@ -22,9 +22,12 @@ export function History({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const lock = useRef(false);
+  const reloadAfterLoad = useRef(false);
   const details = useRef<HTMLDetailsElement>(null);
   const reload = useEffectEvent(() => {
-    if (loaded && details.current?.open) void load();
+    if (!details.current?.open) return;
+    if (lock.current) reloadAfterLoad.current = true;
+    else if (loaded) void load();
   });
   // These are the fields that write history entries.
   useEffect(() => {
@@ -57,6 +60,10 @@ export function History({
     } finally {
       lock.current = false;
       setBusy(false);
+      if (reloadAfterLoad.current) {
+        reloadAfterLoad.current = false;
+        void load();
+      }
     }
   }
   return (
