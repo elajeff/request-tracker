@@ -50,6 +50,33 @@ test('queue loading, failed refresh and delayed search preserve newer state and 
   await expect(card).toHaveCount(0);
 });
 
+test('a save during the first history load shows up without refreshing the history', async ({ page, request }) => {
+  const row = await seed(request, 'dashboard-history-race');
+  await loginUi(page);
+  const card = page.getByRole('article', { name: row.title, exact: true });
+  let release, capture;
+  const held = new Promise(resolve => {
+    release = resolve;
+  });
+  const captured = new Promise(resolve => {
+    capture = resolve;
+  });
+  await page.route(`**/api/requests/${row.id}/history?*`, async route => {
+    const response = await route.fetch();
+    capture();
+    await held;
+    await route.fulfill({ response }).catch(() => {});
+  }, { times: 1 });
+  await card.getByText('Change history', { exact: true }).click();
+  await captured;
+  await card.getByRole('combobox', { name: `Priority for ${row.title}` }).selectOption('HIGH');
+  await card.getByRole('button', { name: `Save priority for ${row.title}` }).click();
+  await expect(card.locator('.pill.priority-high')).toBeVisible();
+  release();
+  const history = card.getByRole('list', { name: `Change history for ${row.title}` });
+  await expect(history.getByRole('listitem').first()).toHaveText(/priority.*Medium → High/s);
+});
+
 test('request validation, forbidden and not-found errors retain drafts for manual retry', async ({ page, request }) => {
   const row = await seed(request, 'dashboard-errors');
   await loginUi(page);
