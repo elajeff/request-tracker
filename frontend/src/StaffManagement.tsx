@@ -109,12 +109,9 @@ export function StaffManagement({ api, onPage, onSaved }: Props) {
             : `${people.length} staff shown.${cursor ? " More staff are available." : ""}`}
       </p>
       {notice && <p role="status">{notice}</p>}
-      {!loading &&
-        !error &&
-        !people.length &&
-        (!search || cursor === null) && (
-          <p>{search ? "No matching staff." : "No staff records yet."}</p>
-        )}
+      {!loading && !error && !people.length && (!search || cursor === null) && (
+        <p>{search ? "No matching staff." : "No staff records yet."}</p>
+      )}
       <div aria-label="Staff records" aria-busy={disabled}>
         {people.map((person) => (
           <StaffRow

@@ -57,7 +57,9 @@ export function Dashboard({
         <div className="page-actions">
           <p className="signed-in">
             Signed in as <strong>{username}</strong>{" "}
-            <span className="role-badge">{support ? "Support" : "Requester"}</span>
+            <span className="role-badge">
+              {support ? "Support" : "Requester"}
+            </span>
           </p>
           <button className="button button-secondary" onClick={queue.refresh}>
             Refresh
@@ -238,7 +240,7 @@ export function Dashboard({
                 api={api}
                 onPage={receiveStaff}
                 onSaved={(person) => {
-                  setDirectory((previous) => uniqueById([...previous, person]))
+                  setDirectory((previous) => uniqueById([...previous, person]));
                   queue.staffChanged(person);
                 }}
               />
