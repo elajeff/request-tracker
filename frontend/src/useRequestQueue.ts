@@ -57,9 +57,7 @@ export function useRequestQueue(
   const [requests, setRequests] = useState<ServiceRequest[]>([]);
   const [counts, setCounts] = useState(emptyCounts);
   const [cursor, setCursor] = useState<string | null>(null);
-  const [loadedFilters, setLoadedFilters] = useState<QueueFilters | null>(
-    null,
-  );
+  const [loadedFilters, setLoadedFilters] = useState<QueueFilters | null>(null);
   // The first page loads on mount, so start in the loading state rather than showing "No requests yet".
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");

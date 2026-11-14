@@ -183,9 +183,7 @@ function StaffRow({
         rename(name);
       }}
     >
-      <small>
-        {person.active ? "Active" : "Inactive"}
-      </small>
+      <small>{person.active ? "Active" : "Inactive"}</small>
       <input
         aria-label={`Name for ${person.name}`}
         value={name}
