@@ -160,17 +160,25 @@ export function AccountManagement({ api, username, onOwnSessionEnded }: Props) {
           onChange={(event) => changeQuery(event.target.value)}
         />
       </label>
-      {error && <p role="alert">{error}</p>}
-      <p role="status">
+      {error && (
+        <p className="notice" role="alert">
+          {error}
+        </p>
+      )}
+      <p className="muted" role="status">
         {loading
           ? "Loading accounts..."
           : saving
             ? "Saving account..."
             : `${accounts.length} accounts shown.${cursor ? " More accounts are available." : ""}`}
       </p>
-      {notice && <p role="status">{notice}</p>}
+      {notice && (
+        <p className="notice" role="status">
+          {notice}
+        </p>
+      )}
       {search && !loading && !error && !accounts.length && cursor === null && (
-        <p>No matching accounts.</p>
+        <p className="muted">No matching accounts.</p>
       )}
       <div aria-label="Accounts" aria-busy={disabled}>
         {accounts.map((account) => (
