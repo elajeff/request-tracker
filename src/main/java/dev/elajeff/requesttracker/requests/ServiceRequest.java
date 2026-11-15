@@ -12,5 +12,6 @@ public record ServiceRequest(
         Instant createdAt,
         String assignee,
         UUID assigneeId,
-        Boolean assigneeActive) {
+        Boolean assigneeActive,
+        String requester) {
 }

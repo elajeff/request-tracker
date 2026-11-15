@@ -171,6 +171,9 @@ export function RequestCard({
             dateStyle: "medium",
           })}
         </span>
+        {support && request.requester && (
+          <span>Requested by {request.requester}</span>
+        )}
         <span>Assigned staff: {request.assignee ?? "Unassigned"}</span>
       </div>
       {!draft && (support || request.status === "NEW") && (

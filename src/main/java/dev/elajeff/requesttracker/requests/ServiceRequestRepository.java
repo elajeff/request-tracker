@@ -17,7 +17,8 @@ public class ServiceRequestRepository {
             ServiceRequestStatus.valueOf(row.getString("status")),
             ServiceRequestPriority.valueOf(row.getString("priority")),
             row.getTimestamp("created_at").toInstant(), row.getString("assignee"),
-            row.getObject("assignee_id", UUID.class), row.getObject("assignee_active", Boolean.class));
+            row.getObject("assignee_id", UUID.class), row.getObject("assignee_active", Boolean.class),
+            row.getString("requester"));
 
     private static final RowMapper<RequestHistoryEntry> HISTORY_ROW_MAPPER = (row, number) -> new RequestHistoryEntry(
             row.getLong("id"), row.getString("field"), row.getString("old_value"), row.getString("new_value"),
@@ -25,8 +26,10 @@ public class ServiceRequestRepository {
 
     private static final String SELECT_REQUEST = """
             SELECT r.id, r.title, r.description, r.status, r.priority, r.created_at,
-                r.assignee_id, s.name AS assignee, s.active AS assignee_active
+                r.assignee_id, s.name AS assignee, s.active AS assignee_active,
+                a.username AS requester
             FROM service_requests r LEFT JOIN support_staff s ON s.id = r.assignee_id
+                LEFT JOIN login_accounts a ON a.id = r.owner_id
             """;
 
     private final JdbcTemplate jdbc;

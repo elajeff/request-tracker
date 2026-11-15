@@ -162,6 +162,7 @@ test('dashboard desktop and narrow layouts retain labels and keyboard focus', as
   await page.getByRole('searchbox', { name: 'Search requests' }).fill(row.title);
   const card = page.getByRole('article', { name: row.title, exact: true });
   await expect(card).toBeVisible();
+  await expect(card).toContainText('Requested by e2e-support');
   await card.getByRole('button', { name: `Edit details for ${row.title}` }).click();
   await expect(card.getByRole('textbox', { name: 'Title', exact: true })).toBeFocused();
   await card.getByRole('button', { name: 'Cancel', exact: true }).click();
