@@ -859,6 +859,10 @@ h1 {
   margin-bottom: 1rem;
 }
 
+.login-status {
+  margin-top: 1rem;
+}
+
 :where(button, summary, a):focus-visible {
   outline: 3px solid var(--blue);
   outline-offset: 3px;

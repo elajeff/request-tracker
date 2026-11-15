@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { Api, SessionView } from "./types";
 import { errorMessage } from "./helpers";
 
+const CONNECT_FAILED = "Could not connect. Use Retry connection.";
+
 export function useSession() {
   const [session, setSession] = useState<SessionView | null>(null);
   const [notice, setNotice] = useState("Connecting…");
@@ -28,8 +30,7 @@ export function useSession() {
       });
       if (sequence !== refreshSequence.current || startedIn !== epoch.current)
         return;
-      if (!response.ok)
-        throw new Error("Could not connect. Use Retry connection.");
+      if (!response.ok) throw new Error(CONNECT_FAILED);
       const loaded: SessionView = await response.json();
       if (sequence !== refreshSequence.current || startedIn !== epoch.current)
         return;
@@ -38,13 +39,18 @@ export function useSession() {
       current.current = loaded;
       setSession(loaded);
       setNotice((previous) =>
-        previous === "Connecting…"
+        previous === "Connecting…" || previous === CONNECT_FAILED
           ? "Enter your username and password."
           : previous,
       );
     } catch (error) {
-      if (sequence === refreshSequence.current && startedIn === epoch.current)
+      if (sequence === refreshSequence.current && startedIn === epoch.current) {
+        if (!current.current?.user) {
+          current.current = null;
+          setSession(null);
+        }
         setNotice(errorMessage(error));
+      }
     }
   }, [clear]);
   const api: Api = useCallback(

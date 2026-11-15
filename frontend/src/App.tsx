@@ -104,13 +104,17 @@ export function App() {
               Sign in
             </button>
           </form>
-          <p role="status">{auth.notice}</p>
-          <button
-            className="button button-secondary"
-            onClick={() => void auth.refresh()}
-          >
-            Retry connection
-          </button>
+          <p className="login-status" role="status">
+            {auth.notice}
+          </p>
+          {!auth.session && (
+            <button
+              className="button button-secondary"
+              onClick={() => void auth.refresh()}
+            >
+              Retry connection
+            </button>
+          )}
         </section>
       )}
     </div>
