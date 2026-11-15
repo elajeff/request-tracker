@@ -14,6 +14,13 @@ export const uniqueById = <T extends { id: string | number }>(items: T[]) => [
   ...new Map(items.map((item) => [item.id, item])).values(),
 ];
 
+// The order the server lists staff in: lowercased name by character code, then ID.
+export const compareStaff = (a: SupportStaff, b: SupportStaff) => {
+  const first = a.name.toLowerCase();
+  const second = b.name.toLowerCase();
+  return first === second ? (a.id < b.id ? -1 : 1) : first < second ? -1 : 1;
+};
+
 // IN_PROGRESS -> "In progress", HIGH -> "High".
 export const label = (value: string) =>
   value[0] + value.slice(1).toLowerCase().replace("_", " ");

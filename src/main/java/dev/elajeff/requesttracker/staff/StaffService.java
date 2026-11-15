@@ -24,18 +24,10 @@ public class StaffService {
 
     public StaffPage findPage(String cursor, int limit, String query) {
         PageLimit.validate(limit);
-        UUID afterId = null;
-        if (cursor != null) {
-            try {
-                afterId = UUID.fromString(cursor);
-                if (!afterId.toString().equals(cursor)) throw new IllegalArgumentException();
-            } catch (IllegalArgumentException error) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid staff cursor");
-            }
-        }
-        List<SupportStaff> rows = repository.findPage(afterId, limit + 1, query.strip());
+        StaffCursor after = cursor == null ? null : StaffCursor.decode(cursor);
+        List<SupportStaff> rows = repository.findPage(after, limit + 1, query.strip());
         List<SupportStaff> items = List.copyOf(rows.subList(0, Math.min(limit, rows.size())));
-        return new StaffPage(items, rows.size() > limit ? items.getLast().id().toString() : null);
+        return new StaffPage(items, rows.size() > limit ? StaffCursor.after(items.getLast()).encode() : null);
     }
 
     @Transactional

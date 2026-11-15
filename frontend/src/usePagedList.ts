@@ -7,8 +7,10 @@ const SEARCH_DEBOUNCE_MS = 250;
 
 interface Options<T> {
   path: string;
-  /** Pages are ordered by this key, so it is also the order when merging. */
+  /** Tells items apart when merging pages. */
   key: (item: T) => string;
+  /** The order the server pages in. Defaults to ordering by `key`. */
+  compare?: (a: T, b: T) => number;
   /** Turns the search box text into the text sent to the server. */
   normalize: (query: string) => string;
   /** Tells whether a saved item still belongs in the list for this search. */
@@ -18,12 +20,17 @@ interface Options<T> {
   onPage?: (items: T[]) => void;
 }
 
-function merge<T>(previous: T[], incoming: T[], key: (item: T) => string) {
+function merge<T>(
+  previous: T[],
+  incoming: T[],
+  key: (item: T) => string,
+  compare = (a: T, b: T) => key(a).localeCompare(key(b)),
+) {
   return [
     ...new Map(
       [...previous, ...incoming].map((item) => [key(item), item]),
     ).values(),
-  ].sort((a, b) => key(a).localeCompare(key(b)));
+  ].sort(compare);
 }
 
 /**
@@ -32,7 +39,16 @@ function merge<T>(previous: T[], incoming: T[], key: (item: T) => string) {
  */
 export function usePagedList<T>(
   api: Api,
-  { path, key, normalize, matches, loadFailed, saveFailed, onPage }: Options<T>,
+  {
+    path,
+    key,
+    compare,
+    normalize,
+    matches,
+    loadFailed,
+    saveFailed,
+    onPage,
+  }: Options<T>,
 ) {
   const [items, setItems] = useState<T[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
@@ -65,7 +81,9 @@ export function usePagedList<T>(
           signal: controller.signal,
         });
         if (controller.signal.aborted) return;
-        setItems((previous) => merge(after ? previous : [], page.items, key));
+        setItems((previous) =>
+          merge(after ? previous : [], page.items, key, compare),
+        );
         setCursor(page.nextCursor);
         onPage?.(page.items);
       } catch (failure) {
@@ -76,7 +94,7 @@ export function usePagedList<T>(
         if (inFlight.current === controller) setLoading(false);
       }
     },
-    [api, path, key, search, loadFailed, onPage],
+    [api, path, key, compare, search, loadFailed, onPage],
   );
 
   useEffect(() => {
@@ -126,7 +144,9 @@ export function usePagedList<T>(
     run,
     show: (item: T) =>
       setItems((previous) =>
-        merge(previous, [item], key).filter((kept) => matches(kept, search)),
+        merge(previous, [item], key, compare).filter((kept) =>
+          matches(kept, search),
+        ),
       ),
     changeQuery(text: string) {
       // Clear the old results at once; the effect loads the new ones.

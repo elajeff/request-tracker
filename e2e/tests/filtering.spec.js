@@ -87,7 +87,6 @@ test('staff backend search stays paginated, resets when cleared and rejects slow
   const token = `directory-filter-${randomUUID().slice(0, 8)}`;
   const people = [];
   for (let i = 0; i < 35; i++) people.push(await api(request, 'POST', '/api/staff', { name: `${token} ${String(i).padStart(2, '0')}` }));
-  people.sort((a, b) => a.id.localeCompare(b.id));
   const target = people.at(-1);
   await loginUi(page);
   await page.getByText('Manage support staff', { exact: true }).click();

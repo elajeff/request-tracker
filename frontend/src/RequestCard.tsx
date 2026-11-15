@@ -1,6 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import type { Api, ServiceRequest, SupportStaff } from "./types";
-import { errorMessage, label, requestPriorities, staffLabel } from "./helpers";
+import {
+  compareStaff,
+  errorMessage,
+  label,
+  requestPriorities,
+  staffLabel,
+} from "./helpers";
 import { History } from "./History";
 
 export function RequestCard({
@@ -368,20 +374,15 @@ export function RequestCard({
                 onChange={(event) => setAssignment(event.target.value)}
               >
                 <option value="">Unassigned</option>
-                {choices
-                  .sort(
-                    (a, b) =>
-                      a.name.localeCompare(b.name) || a.id.localeCompare(b.id),
-                  )
-                  .map((person) => (
-                    <option
-                      key={person.id}
-                      value={person.id}
-                      disabled={!person.active}
-                    >
-                      {staffLabel(person, choices)}
-                    </option>
-                  ))}
+                {choices.sort(compareStaff).map((person) => (
+                  <option
+                    key={person.id}
+                    value={person.id}
+                    disabled={!person.active}
+                  >
+                    {staffLabel(person, choices)}
+                  </option>
+                ))}
               </select>
             </label>
             <button

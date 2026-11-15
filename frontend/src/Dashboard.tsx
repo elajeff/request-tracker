@@ -5,6 +5,7 @@ import { StaffManagement } from "./StaffManagement";
 import { AccountManagement } from "./AccountManagement";
 import { RequestCard } from "./RequestCard";
 import {
+  compareStaff,
   errorMessage,
   label,
   requestStatuses,
@@ -156,13 +157,11 @@ export function Dashboard({
                 >
                   <option value="">All staff</option>
                   <option value="unassigned">Unassigned</option>
-                  {[...knownStaff]
-                    .sort((a, b) => a.name.localeCompare(b.name))
-                    .map((person) => (
-                      <option key={person.id} value={person.id}>
-                        {staffLabel(person, knownStaff)}
-                      </option>
-                    ))}
+                  {[...knownStaff].sort(compareStaff).map((person) => (
+                    <option key={person.id} value={person.id}>
+                      {staffLabel(person, knownStaff)}
+                    </option>
+                  ))}
                 </select>
               </label>
             )}

@@ -30,12 +30,15 @@ public class StaffRepository {
                 .stream().findFirst();
     }
 
-    public List<SupportStaff> findPage(UUID cursor, int limit, String query) {
+    // COLLATE "C" compares the lowercased names byte by byte, not by the database's collation.
+    public List<SupportStaff> findPage(StaffCursor cursor, int limit, String query) {
+        String afterName = cursor == null ? null : cursor.name();
+        UUID afterId = cursor == null ? null : cursor.id();
         return jdbc.query("""
                 SELECT id, name, active FROM support_staff WHERE strpos(lower(name), lower(?)) > 0
-                    AND (?::uuid IS NULL OR id > ?)
-                ORDER BY id LIMIT ?
-                """, ROW_MAPPER, query, cursor, cursor, limit);
+                    AND (?::varchar IS NULL OR (lower(name) COLLATE "C", id) > (lower(?::varchar) COLLATE "C", ?::uuid))
+                ORDER BY lower(name) COLLATE "C", id LIMIT ?
+                """, ROW_MAPPER, query, afterName, afterName, afterId, limit);
     }
 
     public SupportStaff rename(UUID id, String name) {
