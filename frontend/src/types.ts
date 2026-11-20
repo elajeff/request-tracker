@@ -23,6 +23,13 @@ export interface RequestHistoryEntry {
   actorUsername: string | null;
 }
 
+export interface RequestComment {
+  id: number;
+  body: string;
+  createdAt: string;
+  authorUsername: string;
+}
+
 export interface Page<T> {
   items: T[];
   nextCursor: string | null;

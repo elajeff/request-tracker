@@ -24,6 +24,10 @@ public class ServiceRequestRepository {
             row.getLong("id"), row.getString("field"), row.getString("old_value"), row.getString("new_value"),
             row.getTimestamp("changed_at").toInstant(), row.getString("actor_username"));
 
+    private static final RowMapper<RequestComment> COMMENT_ROW_MAPPER = (row, number) -> new RequestComment(
+            row.getLong("id"), row.getString("body"), row.getTimestamp("created_at").toInstant(),
+            row.getString("author_username"));
+
     private static final String SELECT_REQUEST = """
             SELECT r.id, r.title, r.description, r.status, r.priority, r.created_at,
                 r.assignee_id, s.name AS assignee, s.active AS assignee_active,
@@ -133,5 +137,21 @@ public class ServiceRequestRepository {
                 FROM request_history WHERE request_id = ? AND (?::bigint IS NULL OR id < ?)
                 ORDER BY id DESC LIMIT ?
                 """, HISTORY_ROW_MAPPER, id, beforeId, beforeId, limit);
+    }
+
+    public List<RequestComment> findComments(UUID id, Long beforeId, int limit) {
+        return jdbc.query("""
+                SELECT id, body, created_at, author_username
+                FROM request_comments WHERE request_id = ? AND (?::bigint IS NULL OR id < ?)
+                ORDER BY id DESC LIMIT ?
+                """, COMMENT_ROW_MAPPER, id, beforeId, beforeId, limit);
+    }
+
+    public RequestComment addComment(UUID id, String body, UUID authorId, String authorUsername) {
+        return jdbc.queryForObject("""
+                INSERT INTO request_comments (request_id, author_account_id, author_username, body)
+                VALUES (?, ?, ?, ?)
+                RETURNING id, body, created_at, author_username
+                """, COMMENT_ROW_MAPPER, id, authorId, authorUsername, body);
     }
 }

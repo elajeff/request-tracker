@@ -149,6 +149,25 @@ test('status and priority changes persist with before/after history', async ({ p
   });
 });
 
+test('a comment added from the card is listed with its author and kept after a reload', async ({ page }) => {
+  await search(page, 'e2e-comment');
+  const created = await create(page, 'e2e-comment thread');
+  const item = card(page, created.title);
+  await item.getByText('Comments', { exact: true }).click();
+  const comments = item.getByRole('list', { name: `Comments on ${created.title}` });
+  await expect(item.getByText('No comments yet.')).toBeVisible();
+  await item.getByRole('textbox', { name: 'New comment' }).fill('Called the requester back');
+  await mutate(page, 'POST', `/api/requests/${created.id}/comments`,
+    () => item.getByRole('button', { name: 'Add comment' }).click());
+  await expect(comments.getByRole('listitem')).toHaveText(/e2e-support.*Called the requester back/s);
+  await expect(item.getByRole('textbox', { name: 'New comment' })).toBeFocused();
+  await expect(item.getByRole('textbox', { name: 'New comment' })).toHaveValue('');
+  await page.reload();
+  await search(page, 'e2e-comment');
+  await item.getByText('Comments', { exact: true }).click();
+  await expect(comments.getByRole('listitem')).toHaveText(/Called the requester back/);
+});
+
 test('search and staff filters paginate queue and history without shifts or duplicates', async ({ page, request }) => {
   const person = await api(request, 'POST', '/api/staff', { name: 'E2E pages primary' });
   const other = await api(request, 'POST', '/api/staff', { name: 'E2E pages other' });

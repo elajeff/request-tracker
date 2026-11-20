@@ -785,22 +785,26 @@ h1 {
   color: #526178;
 }
 
-.request-history {
+.request-history,
+.request-comments {
   margin-top: 16px;
 }
 
-.request-history summary {
+.request-history summary,
+.request-comments summary {
   cursor: pointer;
   margin-bottom: 12px;
 }
 
-.history-entry {
+.history-entry,
+.comment-entry {
   padding-block: 10px;
   border-bottom: 1px solid #dce3ee;
   overflow-wrap: anywhere;
 }
 
-.history-entry p {
+.history-entry p,
+.comment-entry p {
   margin-block: 5px;
   white-space: pre-wrap;
 }
@@ -857,7 +861,8 @@ h1 {
   gap: 8px;
 }
 
-.history-list {
+.history-list,
+.comment-list {
   list-style: none;
   margin: 0;
   padding: 0;
