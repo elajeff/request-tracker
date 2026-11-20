@@ -87,4 +87,17 @@ public class ServiceRequestController {
             @RequestParam(defaultValue = "25") int limit) {
         return service.findHistory(id, cursor, limit);
     }
+
+    @GetMapping("/{id}/comments")
+    public RequestCommentPage findComments(@PathVariable UUID id,
+            @RequestParam(required = false) String cursor,
+            @RequestParam(defaultValue = "25") int limit) {
+        return service.findComments(id, cursor, limit);
+    }
+
+    @PostMapping("/{id}/comments")
+    public ResponseEntity<RequestComment> addComment(@PathVariable UUID id,
+            @Valid @RequestBody CreateRequestCommentRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(service.addComment(id, request.body()));
+    }
 }

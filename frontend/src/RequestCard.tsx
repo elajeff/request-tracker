@@ -7,6 +7,7 @@ import {
   requestPriorities,
   staffLabel,
 } from "./helpers";
+import { Comments } from "./Comments";
 import { History } from "./History";
 
 export function RequestCard({
@@ -404,6 +405,7 @@ export function RequestCard({
         </>
       )}
       <History request={request} api={api} />
+      <Comments request={request} api={api} />
     </article>
   );
 }

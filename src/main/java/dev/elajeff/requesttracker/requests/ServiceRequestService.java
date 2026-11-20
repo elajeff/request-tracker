@@ -131,19 +131,37 @@ public class ServiceRequestService {
 
     public RequestHistoryPage findHistory(UUID id, String cursor, int limit) {
         PageLimit.validate(limit);
-        Long beforeId = null;
-        if (cursor != null) {
-            try {
-                beforeId = Long.valueOf(cursor);
-                if (beforeId <= 0) throw new NumberFormatException();
-            } catch (NumberFormatException error) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid history cursor");
-            }
-        }
+        Long beforeId = parseCursor(cursor, "history");
         findById(id);
         List<RequestHistoryEntry> rows = repository.findHistory(id, beforeId, limit + 1);
         List<RequestHistoryEntry> items = List.copyOf(rows.subList(0, Math.min(limit, rows.size())));
         return new RequestHistoryPage(items, rows.size() > limit ? Long.toString(items.getLast().id()) : null);
+    }
+
+    public RequestCommentPage findComments(UUID id, String cursor, int limit) {
+        PageLimit.validate(limit);
+        Long beforeId = parseCursor(cursor, "comment");
+        findById(id);
+        List<RequestComment> rows = repository.findComments(id, beforeId, limit + 1);
+        List<RequestComment> items = List.copyOf(rows.subList(0, Math.min(limit, rows.size())));
+        return new RequestCommentPage(items, rows.size() > limit ? Long.toString(items.getLast().id()) : null);
+    }
+
+    public RequestComment addComment(UUID id, String body) {
+        Account account = currentAccount.required();
+        findVisible(account, id);
+        return repository.addComment(id, body.strip(), account.id(), account.username());
+    }
+
+    private static Long parseCursor(String cursor, String name) {
+        if (cursor == null) return null;
+        try {
+            long parsed = Long.parseLong(cursor);
+            if (parsed <= 0) throw new NumberFormatException();
+            return parsed;
+        } catch (NumberFormatException error) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid " + name + " cursor");
+        }
     }
 
     private static String assignmentLabel(String name, UUID id) {

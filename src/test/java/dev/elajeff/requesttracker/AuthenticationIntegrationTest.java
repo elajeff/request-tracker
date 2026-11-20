@@ -194,6 +194,30 @@ class AuthenticationIntegrationTest {
     }
 
     @Test
+    void commentsAreListedNewestFirstAndHiddenFromOtherRequesters() throws Exception {
+        var requester = account("REQUESTER");
+        var other = account("REQUESTER");
+        var support = account("SUPPORT");
+        String id = create(requester, "Commented");
+        String path = "/api/requests/" + id + "/comments";
+        var posted = requester.send("POST", path, "{\"body\":\"  First comment  \"}");
+        assertEquals(201, posted.statusCode(), posted.body());
+        assertEquals(201, support.send("POST", path, "{\"body\":\"Second comment\"}").statusCode());
+        var items = json.readTree(requester.send("GET", path, null).body()).get("items");
+        assertEquals("Second comment", items.get(0).get("body").asText());
+        assertEquals(support.session().get("user").get("username").asText(), items.get(0).get("authorUsername").asText());
+        assertEquals("First comment", items.get(1).get("body").asText());
+        assertEquals(requester.session().get("user").get("username").asText(), items.get(1).get("authorUsername").asText());
+        var first = json.readTree(requester.send("GET", path + "?limit=1", null).body());
+        var older = json.readTree(requester.send("GET", path + "?limit=1&cursor=" + first.get("nextCursor").asText(), null).body());
+        assertEquals("First comment", older.get("items").get(0).get("body").asText());
+        assertTrue(older.get("nextCursor").isNull());
+        assertEquals(400, requester.send("POST", path, "{\"body\":\"   \"}").statusCode());
+        assertEquals(404, other.send("GET", path, null).statusCode());
+        assertEquals(404, other.send("POST", path, "{\"body\":\"Not mine\"}").statusCode());
+    }
+
+    @Test
     void legacyRequestCanBeClaimedOnceAndIsRecordedInHistory() throws Exception {
         var requester = account("REQUESTER");
         String username = requester.session().get("user").get("username").asText();
