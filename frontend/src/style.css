@@ -502,7 +502,10 @@ h1 {
 .control-select,
 .form-field input,
 .form-field textarea,
-.form-field select {
+.form-field select,
+.staff-record input,
+.account-record input,
+.account-record select {
   width: 100%;
   min-width: 0;
   min-height: 37px;
@@ -518,7 +521,10 @@ h1 {
 .control-select:focus,
 .form-field input:focus,
 .form-field textarea:focus,
-.form-field select:focus {
+.form-field select:focus,
+.staff-record input:focus,
+.account-record input:focus,
+.account-record select:focus {
   border-color: #9eafea;
   box-shadow: 0 0 0 3px #3459d70c;
 }
@@ -821,16 +827,24 @@ h1 {
   border-bottom: 1px solid #dce3ee;
 }
 
+.staff-directory .muted,
+.account-directory .muted {
+  font-size: 11px;
+}
+
+.staff-directory .notice,
+.account-directory .notice {
+  margin-top: 8px;
+}
+
 .staff-record small,
 .account-record small {
   width: 100%;
   overflow-wrap: anywhere;
 }
 
-.staff-record input,
-.account-record input {
-  width: 100%;
-  min-width: 0;
+.account-record select {
+  width: auto;
 }
 
 .assignment-select {

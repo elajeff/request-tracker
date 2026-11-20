@@ -100,17 +100,27 @@ export function StaffManagement({ api, onPage, onSaved }: Props) {
           onChange={(event) => changeQuery(event.target.value)}
         />
       </label>
-      {error && <p role="alert">{error}</p>}
-      <p role="status">
+      {error && (
+        <p className="notice" role="alert">
+          {error}
+        </p>
+      )}
+      <p className="muted" role="status">
         {loading
           ? "Loading staff..."
           : saving
             ? "Saving staff..."
             : `${people.length} staff shown.${cursor ? " More staff are available." : ""}`}
       </p>
-      {notice && <p role="status">{notice}</p>}
+      {notice && (
+        <p className="notice" role="status">
+          {notice}
+        </p>
+      )}
       {!loading && !error && !people.length && (!search || cursor === null) && (
-        <p>{search ? "No matching staff." : "No staff records yet."}</p>
+        <p className="muted">
+          {search ? "No matching staff." : "No staff records yet."}
+        </p>
       )}
       <div aria-label="Staff records" aria-busy={disabled}>
         {people.map((person) => (
