@@ -18,6 +18,7 @@ test('requester owns persisted details and history while support alone manages t
   const created = await createdResponse.json();
   const card = page.getByRole('article', { name: created.title, exact: true });
   await expect(card).toContainText('Requester details');
+  await expect(card).not.toContainText('Requested by');
   await expect(card.getByRole('combobox')).toHaveCount(0);
   await card.getByRole('button', { name: `Edit details for ${created.title}` }).click();
   await card.getByRole('textbox', { name: 'Description', exact: true }).fill('Edited requester details');

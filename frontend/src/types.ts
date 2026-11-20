@@ -11,6 +11,7 @@ export interface ServiceRequest {
   assignee: string | null;
   assigneeId: string | null;
   assigneeActive: boolean | null;
+  requester: string | null;
 }
 
 export interface RequestHistoryEntry {

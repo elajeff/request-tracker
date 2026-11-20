@@ -54,6 +54,8 @@ class ServiceRequestIntegrationTest extends SupportApiTest {
         assertTrue(created.body().contains("\"priority\":\"MEDIUM\""), created.body());
 
         String id = json.readTree(created.body()).get("id").asText();
+        String username = support.session().get("user").get("username").asText();
+        assertEquals(username, json.readTree(created.body()).path("requester").asText());
 
         HttpResponse<String> retrieved = support.send("GET", "/api/requests/" + id, null);
 
