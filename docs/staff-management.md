@@ -29,7 +29,7 @@ Open **Change history** on a request to read it, newest first.
 
 ## Pagination
 
-Requests, staff and history use cursors. Requests are ordered newest first and staff by ID. Pass `nextCursor` from one page as `cursor` in the next call. When you change a filter or search text, start again without a cursor.
+Requests, staff and history use cursors. Requests are ordered newest first and staff by name, then ID. Pass `nextCursor` from one page as `cursor` in the next call. When you change a filter or search text, start again without a cursor.
 
 ## Migrations
 

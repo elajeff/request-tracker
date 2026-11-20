@@ -1,5 +1,6 @@
 import { useState } from "react";
 
+import { compareStaff } from "./helpers";
 import type { Api, SupportStaff } from "./types";
 import { usePagedList } from "./usePagedList";
 
@@ -34,6 +35,7 @@ export function StaffManagement({ api, onPage, onSaved }: Props) {
   } = usePagedList<SupportStaff>(api, {
     path: "/api/staff",
     key: staffId,
+    compare: compareStaff,
     normalize,
     matches,
     loadFailed: "Could not load staff",

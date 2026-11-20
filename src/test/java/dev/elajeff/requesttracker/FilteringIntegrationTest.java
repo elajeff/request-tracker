@@ -4,6 +4,8 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
 import java.util.UUID;
 
 import dev.elajeff.requesttracker.security.AccountAdministration;
@@ -86,16 +88,16 @@ class FilteringIntegrationTest extends SupportApiTest {
 
     @Test
     void staffSearchTrimsMatchesLiterallyAndPaginatesActiveAndInactiveRows() throws Exception {
-        String token = "Search%_\\" + UUID.randomUUID(); List<String> expected = new ArrayList<>();
-        for (int i = 0; i < 31; i++) expected.add(person(token + " " + i, i % 2 == 0).toString());
-        person("unrelated", true); expected.sort(String::compareTo);
+        String token = "Search%_\\" + UUID.randomUUID(); Map<String, String> byName = new TreeMap<>();
+        for (int i = 0; i < 31; i++) byName.put(token + " " + i, person(token + " " + i, i % 2 == 0).toString());
+        person("unrelated", true); List<String> expected = new ArrayList<>(byName.values());
         String path = "/api/staff?q=" + URLEncoder.encode("  " + token.toUpperCase() + "  ", StandardCharsets.UTF_8) + "&limit=10";
         JsonNode first = page(support, path); assertEquals(expected.subList(0, 10), ids(first));
-        // UUID order has no creation-time snapshot: inserts before the cursor stay behind it.
-        UUID before = UUID.fromString("00000000-0000-0000-0000-000000000001");
+        // The order has no creation-time snapshot: inserts before the cursor stay behind it.
+        UUID before = UUID.randomUUID();
         jdbc.update("INSERT INTO support_staff(id,name) VALUES (?,?)", before, token);
-        UUID after = UUID.fromString("ffffffff-ffff-ffff-ffff-ffffffffffff");
-        jdbc.update("INSERT INTO support_staff(id,name) VALUES (?,?)", after, token);
+        UUID after = UUID.randomUUID();
+        jdbc.update("INSERT INTO support_staff(id,name) VALUES (?,?)", after, token + " zz");
         expected.add(after.toString());
         person("nonmatching arrival", true);
         List<String> all = new ArrayList<>(ids(first)); String cursor = first.get("nextCursor").asText();

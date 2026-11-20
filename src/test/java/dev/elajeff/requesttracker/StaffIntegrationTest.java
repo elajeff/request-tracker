@@ -46,10 +46,22 @@ class StaffIntegrationTest extends SupportApiTest {
         UUID blank = UUID.randomUUID();
         jdbc.update("INSERT INTO support_staff (id,name,active) VALUES (?, ' ', false)", blank);
         assertEquals(409, send("PATCH", "/api/staff/" + blank + "/active", Map.of("active", true)).statusCode());
-        JsonNode firstPage = ok("GET", "/api/staff?limit=1", null, 200);
-        JsonNode second = ok("GET", "/api/staff?limit=1&cursor=" + firstPage.get("nextCursor").asText(), null, 200);
-        assertTrue(firstPage.get("items").get(0).get("id").asText()
-                .compareTo(second.get("items").get(0).get("id").asText()) < 0);
+        String token = UUID.randomUUID().toString();
+        UUID adams = UUID.fromString("ffffffff-ffff-ffff-ffff-ffffffffffff");
+        UUID smithOne = UUID.fromString("00000000-0000-0000-0000-000000000001");
+        UUID smithTwo = UUID.fromString("00000000-0000-0000-0000-000000000002");
+        UUID adler = UUID.fromString("00000000-0000-0000-0000-000000000003");
+        jdbc.update("INSERT INTO support_staff (id,name) VALUES (?,?), (?,?), (?,?), (?,?)",
+                smithTwo, token + " Smith, Jr", adams, token + " Adams", smithOne, token + " Smith, Jr",
+                adler, token + " adler");
+        List<String> listed = new ArrayList<>();
+        JsonNode page = ok("GET", "/api/staff?limit=1&q=" + token, null, 200);
+        while (true) {
+            listed.add(page.get("items").get(0).get("id").asText());
+            if (page.get("nextCursor").isNull()) break;
+            page = ok("GET", "/api/staff?limit=1&q=" + token + "&cursor=" + page.get("nextCursor").asText(), null, 200);
+        }
+        assertEquals(List.of(adams, adler, smithOne, smithTwo).stream().map(UUID::toString).toList(), listed);
         assertEquals(400, send("GET", "/api/staff?limit=0", null).statusCode());
         assertEquals(400, send("GET", "/api/staff?cursor=bad", null).statusCode());
     }
